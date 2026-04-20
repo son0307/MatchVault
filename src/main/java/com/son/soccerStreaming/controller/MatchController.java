@@ -4,10 +4,7 @@ import com.son.soccerStreaming.service.SseService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.http.MediaType;
-import org.springframework.web.bind.annotation.CrossOrigin;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 @RestController
@@ -20,9 +17,9 @@ public class MatchController {
     private final StringRedisTemplate stringRedisTemplate;
 
     // 클라이언트가 SSE 연결을 맺는 엔드포인트
-    @GetMapping(path = "/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-    public SseEmitter stream() {
-        return sseService.subscribe();
+    @GetMapping(path = "/stream/{matchId}", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    public SseEmitter stream(@PathVariable String matchId) {
+        return sseService.subscribe(matchId);
     }
 
     // 중간에 접속한 유저가 현재 경기 정보를 가져가는 엔드포인트

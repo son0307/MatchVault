@@ -27,7 +27,7 @@ public class MatchEventConsumer {
             matchRedisService.incrementEventCount(event.getEventType(), event.getTeamId());
 
             // 클라이언트로 데이터 전송
-            sseService.broadcast(messagePayload);
+            sseService.broadcastToMatch(event.getMatchId(), messagePayload);
 
             log.info("수신된 이벤트 : [{}분] {} - 선수 ID: {}",
                     event.getMatchMinute(),
