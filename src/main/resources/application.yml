@@ -1,4 +1,9 @@
 spring:
+  profiles:
+    active: local
+  jpa:
+    hibernate:
+      ddl-auto: update
   # Kafka
   kafka:
     bootstrap-servers: localhost:9092

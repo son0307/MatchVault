@@ -1,13 +1,13 @@
 package com.son.soccerStreaming.entity;
 
 import jakarta.persistence.*;
-import lombok.AccessLevel;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
+import lombok.*;
 
 @Entity
 @Getter
+@Builder
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
+@AllArgsConstructor(access = AccessLevel.PROTECTED)
 public class MatchLineup {
 
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
