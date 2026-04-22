@@ -1,6 +1,6 @@
 package com.son.soccerStreaming.service;
 
-import com.son.soccerStreaming.dto.MatchResponseDto;
+import com.son.soccerStreaming.dto.MatchLineupResponseDto;
 import com.son.soccerStreaming.entity.MatchLineup;
 import com.son.soccerStreaming.entity.MatchRecord;
 import com.son.soccerStreaming.exception.CustomException;
@@ -21,7 +21,7 @@ public class MatchLineupService {
     private final MatchLineupRepository matchLineupRepository;
     private final MatchRecordRepository matchRecordRepository;
 
-    public MatchResponseDto.Lineup getMatchLineups(String matchId) {
+    public MatchLineupResponseDto.Lineup getMatchLineups(String matchId) {
         // 경기 정보 조회 (홈/원정팀 구분)
         MatchRecord match = matchRecordRepository.findByMatchId(matchId)
                 .orElseThrow(() -> new CustomException(ErrorCode.MATCH_NOT_FOUND));
@@ -30,17 +30,17 @@ public class MatchLineupService {
         List<MatchLineup> allLineups = matchLineupRepository.findAllByMatchId(matchId);
 
         // 홈팀과 원정팀으로 선수 구분해서 반환
-        return MatchResponseDto.Lineup.builder()
+        return MatchLineupResponseDto.Lineup.builder()
                 .matchId(matchId)
                 .homeTeam(buildTeamLineup(match.getHomeTeam().getName(), match.getHomeTeam().getId(), allLineups))
                 .awayTeam(buildTeamLineup(match.getAwayTeam().getName(), match.getAwayTeam().getId(), allLineups))
                 .build();
     }
 
-    private MatchResponseDto.TeamLineup buildTeamLineup(String teamName, Long teamId, List<MatchLineup> lineups) {
-        List<MatchResponseDto.PlayerLineup> players = lineups.stream()
+    private MatchLineupResponseDto.TeamLineup buildTeamLineup(String teamName, Long teamId, List<MatchLineup> lineups) {
+        List<MatchLineupResponseDto.PlayerLineup> players = lineups.stream()
                 .filter(ml -> ml.getPlayer().getTeam().getId().equals(teamId))
-                .map(ml -> MatchResponseDto.PlayerLineup.builder()
+                .map(ml -> MatchLineupResponseDto.PlayerLineup.builder()
                         .playerName(ml.getPlayer().getName())
                         .backNumber(ml.getPlayer().getBackNumber())
                         .formationPosition(ml.getFormationPosition())
@@ -48,7 +48,7 @@ public class MatchLineupService {
                         .build())
                 .toList();
 
-        return MatchResponseDto.TeamLineup.builder()
+        return MatchLineupResponseDto.TeamLineup.builder()
                 .teamName(teamName)
                 .players(players)
                 .build();

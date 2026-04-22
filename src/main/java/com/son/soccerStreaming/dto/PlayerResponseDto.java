@@ -1,35 +1,43 @@
 package com.son.soccerStreaming.dto;
 
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Data;
-import lombok.NoArgsConstructor;
+import lombok.*;
 
 
 public class PlayerResponseDto {
 
-    @Data
+    @Getter
     @Builder
-    @NoArgsConstructor
-    @AllArgsConstructor
     public static class Summary {
         String playerId;
-        String name;
+        String playerName;
         int backNumber;
     }
 
-    @Data
+    @Getter
     @Builder
-    @NoArgsConstructor
-    @AllArgsConstructor
     public static class Details {
         String playerId;
-        String name;
+        String playerName;
         int backNumber;
         int age;
         int height;
         int weight;
         String mainPosition;
         String subPosition;
+    }
+
+    @Getter
+    @Builder
+    public static class SeasonStats {
+        String playerId;
+        int totalMatches;
+        int goals;
+        int assists;
+        int shots;
+        int shotsOnTarget;
+        int totalPasses;
+        double passAccuracy;
+        int fouls;
+        int tackles;
     }
 }

@@ -1,0 +1,25 @@
+package com.son.soccerStreaming.controller;
+
+import com.son.soccerStreaming.dto.PlayerResponseDto;
+import com.son.soccerStreaming.service.TeamService;
+import lombok.RequiredArgsConstructor;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+import java.util.List;
+
+@RestController
+@RequestMapping("/api/v1/teams")
+@RequiredArgsConstructor
+public class TeamController {
+
+    private final TeamService teamService;
+
+    // 특정 팀 소속 선수 조회
+    @GetMapping("/{teamId}/players")
+    public List<PlayerResponseDto.Summary> getTeamPlayers(@PathVariable String teamId) {
+        return teamService.getPlayersByTeam(teamId);
+    }
+}

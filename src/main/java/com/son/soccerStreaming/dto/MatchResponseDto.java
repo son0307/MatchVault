@@ -1,34 +1,18 @@
 package com.son.soccerStreaming.dto;
 
-import lombok.*;
-
-import java.util.List;
+import com.son.soccerStreaming.entity.MatchStatus;
+import lombok.Builder;
+import lombok.Getter;
 
 public class MatchResponseDto {
-
-    @Data
+    @Getter
     @Builder
-    @NoArgsConstructor
-    @AllArgsConstructor
-    public static class Lineup {
+    public static class Summary {
         private String matchId;
-        private TeamLineup homeTeam;
-        private TeamLineup awayTeam;
-    }
-
-    @Getter
-    @Builder
-    public static class TeamLineup {
-        private String teamName;
-        private List<PlayerLineup> players;
-    }
-
-    @Getter
-    @Builder
-    public static class PlayerLineup {
-        private String playerName;
-        private int backNumber;
-        private String formationPosition;
-        private boolean isStarting;
+        private String homeTeamName;
+        private String awayTeamName;
+        private int homeScore;
+        private int awayScore;
+        private MatchStatus matchStatus;
     }
 }

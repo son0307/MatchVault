@@ -24,6 +24,7 @@ public class PlayerMatchStat {
     private int goals = 0;
     private int assists = 0;
     private int shots = 0;
+    private int shotsOnTarget = 0;
     private int totalPasses = 0;
     private int successfulPasses = 0;
     private int fouls = 0;
