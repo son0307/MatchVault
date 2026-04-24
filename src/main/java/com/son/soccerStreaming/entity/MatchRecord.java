@@ -4,6 +4,8 @@ import jakarta.persistence.*;
 import lombok.*;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 
 @Entity
 @Getter
@@ -35,4 +37,10 @@ public class MatchRecord {
 
     private int homeScore = 0;
     private int awayScore = 0;
+
+    @OneToMany(mappedBy = "matchRecord", cascade = CascadeType.REMOVE, orphanRemoval = true)
+    private List<MatchLineup> lineups = new ArrayList<>();
+
+    @OneToMany(mappedBy = "matchRecord", cascade = CascadeType.REMOVE, orphanRemoval = true)
+    private List<PlayerMatchStat> stats = new ArrayList<>();
 }
