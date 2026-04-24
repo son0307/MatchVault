@@ -4,6 +4,10 @@ import jakarta.persistence.*;
 import lombok.*;
 
 @Entity
+@Table(name = "player_match_stat", indexes = {
+        @Index(name = "idx_stat_match_id", columnList = "match_record_id"),
+        @Index(name = "idx_stat_player_id", columnList = "plyaer_id")
+})
 @Getter
 @Builder
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
@@ -13,12 +17,12 @@ public class PlayerMatchStat {
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @ManyToOne(fetch = FetchType.LAZY, cascade = CascadeType.ALL)
-    @JoinColumn(name = "match_record_id")
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "match_record_id", foreignKey = @ForeignKey(ConstraintMode.NO_CONSTRAINT))
     private MatchRecord matchRecord;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "player_id")
+    @JoinColumn(name = "player_id", foreignKey = @ForeignKey(ConstraintMode.NO_CONSTRAINT))
     private Player player;
 
     private int goals = 0;
