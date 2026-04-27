@@ -18,11 +18,11 @@ public class PlayerMatchStat {
     private Long id;
 
     @ManyToOne(fetch = FetchType.LAZY, cascade = CascadeType.ALL)
-    @JoinColumn(name = "match_record_id")
+    @JoinColumn(name = "match_record_id", foreignKey = @ForeignKey(ConstraintMode.NO_CONSTRAINT))
     private MatchRecord matchRecord;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "player_id")
+    @JoinColumn(name = "player_id", foreignKey = @ForeignKey(ConstraintMode.NO_CONSTRAINT))
     private Player player;
 
     private int goals = 0;

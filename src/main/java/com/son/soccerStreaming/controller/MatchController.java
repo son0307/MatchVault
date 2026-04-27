@@ -25,7 +25,7 @@ public class MatchController {
     public ResponseEntity<CursorResponse<MatchResponseDto.Summary>> getMatches(
             @RequestParam(required = false) Long cursorId,
             @RequestParam(defaultValue = "10") int size) {
-        return ResponseEntity.ok(matchService.getMatches(cursorId, size));
+        return ResponseEntity.ok(matchService.getRecentMatches(cursorId, size));
     }
 
     // 경기 선발 라인업 조회

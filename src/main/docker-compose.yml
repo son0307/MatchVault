@@ -6,6 +6,8 @@ services:
     container_name: influxdb
     ports:
       - "8086:8086"
+    volumes:
+      - influxdb:/var/lib/influxdb
     environment:
       - INFLUXDB_DB=k6
 
@@ -17,7 +19,20 @@ services:
     environment:
       - GF_AUTH_ANONYMOUS_ENABLED=true
       - GF_AUTH_ANONYMOUS_ORG_ROLE=Admin
+    volumes:
+      - grafana:/var/lib/grafana
     depends_on:
       - influxdb
 
-  # k6는 명령어로 실행하므로 컨테이너를 상시 띄워둘 필요는 없습니다.
+  k6:
+    image: grafana/k6
+    volumes:
+      - ./test:/scripts
+    depends_on:
+      - influxdb
+    environment:
+      - K6_OUT=influxdb=http://influxdb:8086/k6
+
+volumes:
+  influxdb:
+  grafana:
