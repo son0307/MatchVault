@@ -14,13 +14,13 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
 
 @Service
-@Transactional(readOnly = true)
 @RequiredArgsConstructor
 public class MatchStatService {
 
     private final MatchRecordRepository matchRecordRepository;
     private final PlayerMatchStatRepository playerMatchStatRepository;
 
+    @Transactional(readOnly = true)
     public MatchStatResponseDto getMatchStats(String matchId) {
         // 경기 정보 조회
         MatchRecord matchRecord = matchRecordRepository.findByMatchId(matchId)
