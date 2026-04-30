@@ -28,6 +28,7 @@ public class PlayerResponseDto {
 
     @Getter
     @Builder
+    @AllArgsConstructor
     public static class SeasonStats {
         String playerId;
         int totalMatches;

@@ -10,6 +10,8 @@ import com.son.soccerStreaming.repository.PlayerMatchStatRepository;
 import com.son.soccerStreaming.repository.PlayerRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.data.redis.cache.RedisCacheManager;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -27,7 +29,9 @@ public class MatchResultService {
     private final MatchRecordRepository matchRecordRepository;
     private final PlayerRepository playerRepository;
     private final PlayerMatchStatRepository matchStatRepository;
+    private final RedisCacheManager cacheManager;
 
+    @CacheEvict(value = "recentMatches", allEntries = true)
     @Transactional
     public void closeMatch(String matchId) {
         // 경기 정보 조회
@@ -83,6 +87,11 @@ public class MatchResultService {
                     .build();
 
             statsToSave.add(stat);
+
+            // 이번 경기를 뛴 선수의 누적 스탯 캐시 무효화 (새로 계산 필요)
+            var cache = cacheManager.getCache("playerStats");
+            if (cache != null)
+                cache.evict(playerId);
         }
 
         matchStatRepository.saveAll(statsToSave);

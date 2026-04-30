@@ -5,18 +5,20 @@ import com.son.soccerStreaming.dto.MatchResponseDto;
 import com.son.soccerStreaming.entity.MatchRecord;
 import com.son.soccerStreaming.repository.MatchRecordRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
 @Service
-@Transactional(readOnly = true)
 @RequiredArgsConstructor
 public class MatchService {
 
     private final MatchRecordRepository matchRecordRepository;
 
+    @Cacheable(value = "recentMatches", key = "#cursorId != null ? #cursorId + '_' + #size : 'first_' + #size")
+    @Transactional(readOnly = true)
     public CursorResponse<MatchResponseDto.Summary> getRecentMatches(Long cursorId, int size) {
 
         // Querydsl 메서드 호출

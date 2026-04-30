@@ -7,17 +7,18 @@ import com.son.soccerStreaming.exception.ErrorCode;
 import com.son.soccerStreaming.repository.PlayerMatchStatRepository;
 import com.son.soccerStreaming.repository.PlayerRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
-@Transactional(readOnly = true)
 @RequiredArgsConstructor
 public class PlayerService {
 
     private final PlayerRepository playerRepository;
     private final PlayerMatchStatRepository playerMatchStatRepository;
 
+    @Transactional(readOnly = true)
     public PlayerResponseDto.Details getPlayerDetails(String playerId) {
         Player playerData = playerRepository.findByPlayerId(playerId)
                 .orElseThrow(() -> new CustomException(ErrorCode.PLAYER_NOT_FOUND));
@@ -34,6 +35,8 @@ public class PlayerService {
                 .build();
     }
 
+    @Cacheable(value = "playerStats", key = "#playerId")
+    @Transactional(readOnly = true)
     public PlayerResponseDto.SeasonStats getPlayerSeasonStats(String playerId) {
         // 선수가 실제로 존재하는지 확인
         Player player = playerRepository.findByPlayerId(playerId)
@@ -49,7 +52,7 @@ public class PlayerService {
 
         // DTO 조립 및 반환
         return PlayerResponseDto.SeasonStats.builder()
-                .playerId(playerId)
+                .playerId(player.getPlayerId())
                 .totalMatches(stats.getTotalMatches())
                 .goals(stats.getGoals())
                 .assists(stats.getAssists())
