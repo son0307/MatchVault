@@ -7,18 +7,19 @@ import lombok.Getter;
 @Builder
 public class MatchStatResponseDto {
     private String matchId;
-    private TeamStatSummary homeTeam;
-    private TeamStatSummary awayTeam;
+    private TeamStatSummary homeTeamStat;
+    private TeamStatSummary awayTeamStat;
 
     @Getter
     @Builder
     public static class TeamStatSummary {
-        private String teamName;
+        private String teamId;
         private int score;
         private int totalShots;
         private int shotsOnTarget;
-        private int passes;
-        private int passAccuracy;
+        private int totalPasses;
+        private int successfulPasses;
+        private double passAccuracy;
         private int fouls;
         private int tackles;
     }

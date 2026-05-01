@@ -99,7 +99,8 @@ public class DummyDataInitializer implements CommandLineRunner {
                 Team.builder().teamId("team_tottenham").name("Tottenham Hotspur").stadium("Spurs Stadium").build(),
                 Team.builder().teamId("team_arsenal").name("Arsenal FC").stadium("Emirates").build(),
                 Team.builder().teamId("team_mancity").name("Manchester City").stadium("Etihad").build(),
-                Team.builder().teamId("team_liverpool").name("Liverpool FC").stadium("Anfield").build()
+                Team.builder().teamId("team_liverpool").name("Liverpool FC").stadium("Anfield").build(),
+                Team.builder().teamId("team_chelsea").name("Chelsea FC").stadium("Stamford").build()
         );
     }
 

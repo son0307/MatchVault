@@ -1,6 +1,7 @@
 package com.son.soccerStreaming.service;
 
 import com.son.soccerStreaming.dto.MatchEventDto;
+import com.son.soccerStreaming.dto.MatchStatResponseDto;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.HashOperations;
@@ -29,50 +30,77 @@ public class MatchRedisService {
         }
     }
 
-    // 이벤트 타입별 카운트 누적
-    public void incrementEventCount(String matchId, String eventType, String teamId) {
-        String key = "match:" + matchId + ":count:" + eventType + ":" + teamId;
-        redisTemplate.opsForValue().increment(key);
-    }
-
-    // 선수별 스탯 누적
-    public void updatePlayerStat(MatchEventDto event) {
+    // 선수별, 팀별 스탯 누적
+    public void updateStat(MatchEventDto event) {
         String matchId = event.getMatchId();
         String playerId = event.getPlayerId();
+        String teamId = event.getTeamId();
         String eventType = event.getEventType();
         Map<String, Object> detail = event.getEventDetail();
 
         if (playerId == null || "OVER".equals(eventType)) return;
 
-        String key = "match:" + matchId + ":player:" + playerId;
+        String playerKey = "match:" + matchId + ":player:" + playerId;
+        String teamKey = "match:" + matchId+ ":team:" + teamId;
         HashOperations<String, String, String> hashOps = redisTemplate.opsForHash();
 
         switch (eventType) {
             case "PASS":
-                hashOps.increment(key, "totalPasses", 1);
+                hashOps.increment(playerKey, "totalPasses", 1);
+                hashOps.increment(teamKey, "totalPasses", 1);
                 // 성공한 패스
                 if (detail != null && (Boolean) detail.getOrDefault("is_successful", false)) {
-                    hashOps.increment(key, "successfulPasses", 1);
+                    hashOps.increment(playerKey, "successfulPasses", 1);
+                    hashOps.increment(teamKey, "successfulPasses", 1);
                 }
                 break;
             case "SHOT":
-                hashOps.increment(key, "totalShots", 1);
+                hashOps.increment(playerKey, "totalShots", 1);
+                hashOps.increment(teamKey, "totalShots", 1);
                 // 유효 슈팅이 된 슈팅
                 if (detail != null && (Boolean) detail.getOrDefault("is_on_target", false)) {
-                    hashOps.increment(key, "shotsOnTarget", 1);
+                    hashOps.increment(playerKey, "shotsOnTarget", 1);
+                    hashOps.increment(teamKey, "shotsOnTarget", 1);
                     // 골로 연결된 경우
                     if ((Boolean) detail.getOrDefault("is_goal", false)) {
-                        hashOps.increment(key, "goals", 1);
-                        incrementEventCount(matchId, "GOAL", event.getTeamId());
+                        hashOps.increment(playerKey, "goals", 1);
+                        hashOps.increment(teamKey, "goals", 1);
                     }
                 }
                 break;
             case "TACKLE":
-                hashOps.increment(key, "tackles", 1);
+                hashOps.increment(playerKey, "tackles", 1);
+                hashOps.increment(teamKey, "tackles", 1);
                 break;
             case "FOUL":
-                hashOps.increment(key, "fouls", 1);
+                hashOps.increment(playerKey, "fouls", 1);
+                hashOps.increment(teamKey, "fouls", 1);
                 break;
         }
+    }
+
+    public MatchStatResponseDto.TeamStatSummary getTeamStatSummary(String matchId, String teamId) {
+        String key = "match:" + matchId + ":team:" + teamId;
+        var entries = redisTemplate.opsForHash().entries(key);
+
+        int passes = parseStat(entries.get("totalPasses"));
+        int successfulPasses = parseStat(entries.get("successfulPasses"));
+        double passAccuracy = passes != 0 ? (double) (successfulPasses * 100) / passes : 0;
+
+        return MatchStatResponseDto.TeamStatSummary.builder()
+                .teamId(teamId)
+                .score(parseStat(entries.get("goals")))
+                .totalShots(parseStat(entries.get("totalShots")))
+                .shotsOnTarget(parseStat(entries.get("shotsOnTarget")))
+                .totalPasses(passes)
+                .successfulPasses(successfulPasses)
+                .passAccuracy(passAccuracy)
+                .fouls(parseStat(entries.get("fouls")))
+                .tackles(parseStat(entries.get("tackles")))
+                .build();
+    }
+
+    private int parseStat(Object value) {
+        return value == null ? 0 : Integer.parseInt(value.toString());
     }
 }

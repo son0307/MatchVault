@@ -44,9 +44,15 @@ public class MatchRecord {
     @OneToMany(mappedBy = "matchRecord", cascade = CascadeType.REMOVE, orphanRemoval = true)
     private List<PlayerMatchStat> stats = new ArrayList<>();
 
-    public void finishMatch(int homeScore, int awayScore) {
+    public void finishMatch() {
         this.status = MatchStatus.FINISHED;
-        this.homeScore = homeScore;
-        this.awayScore = awayScore;
+    }
+
+    public void addHomeScore() {
+        this.homeScore += 1;
+    }
+
+    public void addAwayScore() {
+        this.awayScore += 1;
     }
 }

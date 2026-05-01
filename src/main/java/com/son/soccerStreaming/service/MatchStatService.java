@@ -32,12 +32,12 @@ public class MatchStatService {
         // 팀별 집계 및 DTO 반환
         return MatchStatResponseDto.builder()
                 .matchId(matchId)
-                .homeTeam(aggregateTeamStats(matchRecord.getHomeTeam().getName(), matchRecord.getHomeTeam().getTeamId(), matchRecord.getHomeScore(), allStats))
-                .awayTeam(aggregateTeamStats(matchRecord.getAwayTeam().getName(), matchRecord.getAwayTeam().getTeamId(), matchRecord.getAwayScore(), allStats))
+                .homeTeamStat(aggregateTeamStats(matchRecord.getHomeTeam().getTeamId(), matchRecord.getHomeScore(), allStats))
+                .awayTeamStat(aggregateTeamStats(matchRecord.getAwayTeam().getTeamId(), matchRecord.getAwayScore(), allStats))
                 .build();
     }
 
-    private MatchStatResponseDto.TeamStatSummary aggregateTeamStats(String teamName, String teamId, int score, List<PlayerMatchStat> matchStats) {
+    private MatchStatResponseDto.TeamStatSummary aggregateTeamStats(String teamId, int score, List<PlayerMatchStat> matchStats) {
         // 해당 팀 선수의 스탯만 필터링
         List<PlayerMatchStat> teamStats = matchStats.stream()
                 .filter(s -> s.getPlayer().getTeam().getTeamId().equals(teamId))
@@ -51,12 +51,13 @@ public class MatchStatService {
         int totalTackles = teamStats.stream().mapToInt(PlayerMatchStat::getTackles).sum();
 
         return MatchStatResponseDto.TeamStatSummary.builder()
-                .teamName(teamName)
+                .teamId(teamId)
                 .score(score)
                 .totalShots(totalShots)
                 .shotsOnTarget(totalShotsOnTarget)
-                .passes(totalPasses)
-                .passAccuracy(totalPasses > 0 ? (totalSuccessPasses * 100 / totalPasses) : 0)
+                .totalPasses(totalPasses)
+                .successfulPasses(totalSuccessPasses)
+                .passAccuracy(totalPasses > 0 ? ((double) (totalSuccessPasses * 100) / totalPasses) : 0)
                 .fouls(totalFouls)
                 .tackles(totalTackles)
                 .build();

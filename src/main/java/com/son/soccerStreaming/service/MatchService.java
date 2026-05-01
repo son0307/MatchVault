@@ -3,9 +3,10 @@ package com.son.soccerStreaming.service;
 import com.son.soccerStreaming.dto.CursorResponse;
 import com.son.soccerStreaming.dto.MatchResponseDto;
 import com.son.soccerStreaming.entity.MatchRecord;
+import com.son.soccerStreaming.exception.CustomException;
+import com.son.soccerStreaming.exception.ErrorCode;
 import com.son.soccerStreaming.repository.MatchRecordRepository;
 import lombok.RequiredArgsConstructor;
-import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -17,7 +18,6 @@ public class MatchService {
 
     private final MatchRecordRepository matchRecordRepository;
 
-    @Cacheable(value = "recentMatches", key = "#cursorId != null ? #cursorId + '_' + #size : 'first_' + #size")
     @Transactional(readOnly = true)
     public CursorResponse<MatchResponseDto.Summary> getRecentMatches(Long cursorId, int size) {
 
@@ -51,5 +51,17 @@ public class MatchService {
                 .hasNext(hasNext)
                 .nextCursor(nextCursor)
                 .build();
+    }
+
+    @Transactional
+    public void addScoreToDb(String matchId, String teamId) {
+        MatchRecord match = matchRecordRepository.findByMatchId(matchId)
+                .orElseThrow(() -> new CustomException(ErrorCode.MATCH_NOT_FOUND));
+
+        if (match.getHomeTeam().getTeamId().equals(teamId)) {
+            match.addHomeScore();
+        } else if (match.getAwayTeam().getTeamId().equals(teamId)) {
+            match.addAwayScore();
+        }
     }
 }

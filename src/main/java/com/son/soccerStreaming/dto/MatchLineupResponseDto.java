@@ -24,6 +24,7 @@ public class MatchLineupResponseDto {
     @Getter
     @Builder
     public static class PlayerLineup {
+        private String playerId;
         private String playerName;
         private int backNumber;
         private String formationPosition;

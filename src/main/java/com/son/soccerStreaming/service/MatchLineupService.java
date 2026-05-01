@@ -41,6 +41,7 @@ public class MatchLineupService {
         List<MatchLineupResponseDto.PlayerLineup> players = lineups.stream()
                 .filter(ml -> ml.getPlayer().getTeam().getId().equals(teamId))
                 .map(ml -> MatchLineupResponseDto.PlayerLineup.builder()
+                        .playerId(ml.getPlayer().getPlayerId())
                         .playerName(ml.getPlayer().getName())
                         .backNumber(ml.getPlayer().getBackNumber())
                         .formationPosition(ml.getFormationPosition())
