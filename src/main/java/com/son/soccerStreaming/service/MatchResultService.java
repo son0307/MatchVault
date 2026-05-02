@@ -32,13 +32,13 @@ public class MatchResultService {
     private final RedisCacheManager cacheManager;
 
     @Transactional
-    public void closeMatch(String matchId) {
+    public void closeMatch(Long matchId) {
         // 경기 정보 조회
-        MatchRecord match = matchRecordRepository.findByMatchId(matchId)
+        MatchRecord match = matchRecordRepository.findByApiFixtureId(matchId)
                 .orElseThrow(() -> new CustomException(ErrorCode.MATCH_NOT_FOUND));
 
         // 경기 종료 상태 변경
-        match.finishMatch();
+        // match.finishMatch();
 
         // 선수별 상세 스탯 업데이트
         savePlayerStatsToDb(match, matchId);
@@ -49,36 +49,35 @@ public class MatchResultService {
         log.info("✅ [{}] 경기 결과 및 선수 스탯 DB 저장 완료!", matchId);
     }
 
-    private void savePlayerStatsToDb(MatchRecord match, String matchId) {
+    private void savePlayerStatsToDb(MatchRecord match, Long matchId) {
         String pattern = "match:" + matchId + ":player:*";
         Set<String> keys = redisTemplate.keys(pattern);
 
         if (keys == null || keys.isEmpty()) return;
 
         List<PlayerMatchStat> statsToSave = new ArrayList<>();
-        List<String> playerIdsToEvict = new ArrayList<>();
+        List<Long> playerIdsToEvict = new ArrayList<>();
 
         for (String key : keys) {
             // Redis Hash에서 해당 선수의 모든 필드를 가져옴
             var entries = redisTemplate.opsForHash().entries(key);
 
             // 키에서 선수 ID 추출
-            String playerId = key.split(":player:")[1];
+            Long playerId = Long.parseLong(key.split(":player:")[1]);
 
             // 선수 엔티티 조회
-            Player player = playerRepository.findByPlayerId(playerId)
+            Player player = playerRepository.findByApiPlayerId(playerId)
                     .orElseThrow(() -> new CustomException(ErrorCode.PLAYER_NOT_FOUND));
 
             PlayerMatchStat stat = PlayerMatchStat.builder()
                     .matchRecord(match)
                     .player(player)
                     .goals(parseStat(entries.get("goals")))
-                    .shots(parseStat(entries.get("totalShots")))
+                    .shotsTotal(parseStat(entries.get("totalShots")))
                     .shotsOnTarget(parseStat(entries.get("shotsOnTarget")))
-                    .totalPasses(parseStat(entries.get("totalPasses")))
-                    .successfulPasses(parseStat(entries.get("successfulPasses")))
-                    .tackles(parseStat(entries.get("tackles")))
-                    .fouls(parseStat(entries.get("fouls")))
+                    .passesTotal(parseStat(entries.get("totalPasses")))
+                    .tacklesTotal(parseStat(entries.get("tackles")))
+                    .foulsCommitted(parseStat(entries.get("fouls")))
                     .build();
 
             statsToSave.add(stat);
@@ -90,7 +89,7 @@ public class MatchResultService {
         // 이번 경기를 뛴 선수들의 누적 스탯 캐시 무효화 (새로 계산 필요)
         Cache cache = cacheManager.getCache("playerStats");
         if (cache != null) {
-            for (String id : playerIdsToEvict) {
+            for (Long id : playerIdsToEvict) {
                 cache.evictIfPresent(id);
             }
         }
@@ -101,7 +100,7 @@ public class MatchResultService {
         return Integer.parseInt(value.toString());
     }
 
-    private void clearMatchDataFromRedis(String matchId) {
+    private void clearMatchDataFromRedis(Long matchId) {
         // 해당 경기와 관련된 모든 데이터 삭제
         Set<String> keys = redisTemplate.keys("match:" + matchId + ":*");
         if (keys != null && !keys.isEmpty()) {

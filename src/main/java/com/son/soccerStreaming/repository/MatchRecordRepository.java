@@ -6,5 +6,5 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import java.util.Optional;
 
 public interface MatchRecordRepository extends JpaRepository<MatchRecord, Long>, MatchRecordRepositoryCustom {
-    Optional<MatchRecord> findByMatchId(String matchId);
+    Optional<MatchRecord> findByApiFixtureId(Long matchId);
 }

@@ -10,7 +10,7 @@ public class MatchResponseDto {
     @Builder
     @AllArgsConstructor
     public static class Summary {
-        private String matchId;
+        private Long matchId;
         private String homeTeamName;
         private String awayTeamName;
         private int homeScore;

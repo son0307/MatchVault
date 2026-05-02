@@ -41,7 +41,7 @@ public class MatchController {
     @GetMapping("/{matchId}/lineups")
     public ResponseEntity<MatchLineupResponseDto.Lineup> getLineup(
             @Parameter(description = "조회할 경기의 고유 ID", example = "match_01")
-            @PathVariable String matchId) {
+            @PathVariable Long matchId) {
         return ResponseEntity.ok(matchLineupService.getMatchLineups(matchId));
     }
 
@@ -50,7 +50,7 @@ public class MatchController {
     @GetMapping("/{matchId}/stats")
     public ResponseEntity<MatchStatResponseDto> getMatchStats(
             @Parameter(description = "조회할 경기의 고유 ID", example = "match_01")
-            @PathVariable String matchId) {
+            @PathVariable Long matchId) {
         return ResponseEntity.ok(matchStatService.getMatchStats(matchId));
     }
 }

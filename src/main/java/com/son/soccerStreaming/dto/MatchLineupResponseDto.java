@@ -9,7 +9,7 @@ public class MatchLineupResponseDto {
     @Getter
     @Builder
     public static class Lineup {
-        private String matchId;
+        private Long matchId;
         private TeamLineup homeTeam;
         private TeamLineup awayTeam;
     }
@@ -24,7 +24,7 @@ public class MatchLineupResponseDto {
     @Getter
     @Builder
     public static class PlayerLineup {
-        private String playerId;
+        private Long playerId;
         private String playerName;
         private int backNumber;
         private String formationPosition;

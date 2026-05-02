@@ -26,7 +26,7 @@ public class TeamController {
     @GetMapping("/{teamId}/players")
     public List<PlayerResponseDto.Summary> getTeamPlayers(
             @Parameter(description = "조회할 팀의 고유 ID (예: team_tottenham)")
-            @PathVariable String teamId) {
+            @PathVariable Long teamId) {
         return teamService.getPlayersByTeam(teamId);
     }
 }

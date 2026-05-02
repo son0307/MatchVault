@@ -24,7 +24,7 @@ public class PlayerController {
     // 특정 선수 상세 정보 조회
     @Operation(summary = "선수 상세 정보 조회", description = "특정 선수의 정보를 조회합니다. (키, 몸무게, 등번호 등)")
     @GetMapping("/{playerId}")
-    public ResponseEntity<PlayerResponseDto.Details> getPlayerDetails(@PathVariable String playerId) {
+    public ResponseEntity<PlayerResponseDto.Details> getPlayerDetails(@PathVariable Long playerId) {
         return ResponseEntity.ok(playerService.getPlayerDetails(playerId));
     }
 
@@ -33,7 +33,7 @@ public class PlayerController {
     @GetMapping("/{playerId}/stats")
     public ResponseEntity<PlayerResponseDto.SeasonStats> getPlayerSeasonStats(
             @Parameter(description = "조회할 선수의 고유 ID (예: player_tottenham_6)")
-            @PathVariable String playerId) {
+            @PathVariable Long playerId) {
         return ResponseEntity.ok(playerService.getPlayerSeasonStats(playerId));
     }
 }

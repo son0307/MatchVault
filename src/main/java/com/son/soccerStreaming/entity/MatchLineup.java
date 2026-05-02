@@ -4,10 +4,7 @@ import jakarta.persistence.*;
 import lombok.*;
 
 @Entity
-@Table(name = "match_lineup", indexes = {
-        @Index(name = "idx_lineup_match_id", columnList = "match_record_id"),
-        @Index(name = "idx_lineup_player_id", columnList = "player_id")
-})
+@Table(name = "match_lineup")
 @Getter
 @Builder
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
@@ -15,17 +12,30 @@ import lombok.*;
 public class MatchLineup {
 
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private int id;
+    private Long id;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "match_record_id", foreignKey = @ForeignKey(ConstraintMode.NO_CONSTRAINT))
+    @JoinColumn(name = "match_record_id", nullable = false)
     private MatchRecord matchRecord;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "player_id", foreignKey = @ForeignKey(ConstraintMode.NO_CONSTRAINT))
+    @JoinColumn(name = "team_id", nullable = false)
+    private Team team;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "player_id", nullable = false)
     private Player player;
 
-    private boolean isStarting;
+    // 라인업 정보
+    @Column(nullable = false)
+    private Integer jerseyNumber;   // 등번호 (예: 17)
 
-    private String formationPosition;
+    @Column(nullable = false, length = 10)
+    private String position;        // 포지션 (G: 골키퍼, D: 수비수, M: 미드필더, F: 공격수)
+
+    @Column(length = 10)
+    private String grid;            // 포메이션 위치 (예: "3:3" / 교체선수는 null)
+
+    @Column(nullable = false)
+    private boolean isStarter;      // true: 선발(startXI), false: 교체(substitutes)
 }

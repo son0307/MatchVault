@@ -8,7 +8,7 @@ public class PlayerResponseDto {
     @Getter
     @Builder
     public static class Summary {
-        String playerId;
+        Long playerId;
         String playerName;
         int backNumber;
     }
@@ -16,21 +16,20 @@ public class PlayerResponseDto {
     @Getter
     @Builder
     public static class Details {
-        String playerId;
+        Long playerId;
         String playerName;
         int backNumber;
         int age;
         int height;
         int weight;
-        String mainPosition;
-        String subPosition;
+        String position;
     }
 
     @Getter
     @Builder
     @AllArgsConstructor
     public static class SeasonStats {
-        String playerId;
+        Long playerId;
         int totalMatches;
         int goals;
         int assists;

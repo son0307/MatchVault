@@ -32,19 +32,19 @@ public class LiveMatchController {
     // 중간에 접속한 유저를 위한 실시간 정보 스냅샷 제공
     @GetMapping("/matches/{matchId}/stats")
     public ResponseEntity<MatchStatResponseDto> getMatchStats(
-            @PathVariable String matchId
+            @PathVariable Long matchId
     ) {
-        MatchRecord match = matchRecordRepository.findByMatchId(matchId)
+        MatchRecord match = matchRecordRepository.findByApiFixtureId(matchId)
                 .orElseThrow(() -> new CustomException(ErrorCode.MATCH_NOT_FOUND));
 
         MatchStatResponseDto.TeamStatSummary homeStats = matchRedisService.getTeamStatSummary(
                 matchId,
-                match.getHomeTeam().getTeamId()
+                match.getHomeTeam().getTeamApiId()
         );
 
         MatchStatResponseDto.TeamStatSummary awayStats = matchRedisService.getTeamStatSummary(
                 matchId,
-                match.getAwayTeam().getTeamId()
+                match.getAwayTeam().getTeamApiId()
         );
 
         MatchStatResponseDto snapshot = MatchStatResponseDto.builder()

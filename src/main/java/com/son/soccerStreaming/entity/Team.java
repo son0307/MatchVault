@@ -16,13 +16,15 @@ public class Team {
     private Long id;
 
     @Column(nullable = false, unique = true)
-    private String teamId;
+    private Long teamApiId;
 
     @Column(nullable = false)
     private String name;
+    private String code;
+    private String country;
+    private Integer founded;
+    private String logoUrl;
 
-    private String stadium;
-
-    @Column(nullable = false)
-    private boolean isDeleted;
+    @Embedded
+    private Venue venue;
 }

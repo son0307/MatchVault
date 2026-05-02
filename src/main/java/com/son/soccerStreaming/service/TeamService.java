@@ -17,11 +17,11 @@ public class TeamService {
     private final TeamRepository teamRepository;
     private final PlayerRepository playerRepository;
 
-    public List<PlayerResponseDto.Summary> getPlayersByTeam(String teamId) {
-        return playerRepository.findAllByTeamTeamId(teamId).stream()
+    public List<PlayerResponseDto.Summary> getPlayersByTeam(Long teamId) {
+        return playerRepository.findAllByTeamTeamApiId(teamId).stream()
                 .map(player -> PlayerResponseDto.Summary.builder()
-                        .playerId(player.getPlayerId())
+                        .playerId(player.getApiPlayerId())
                         .playerName(player.getName())
-                        .backNumber(player.getBackNumber()).build()).toList();
+                        .backNumber(player.getDefaultNumber()).build()).toList();
     }
 }

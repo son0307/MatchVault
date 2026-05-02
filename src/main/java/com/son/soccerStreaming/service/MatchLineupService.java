@@ -21,9 +21,9 @@ public class MatchLineupService {
     private final MatchLineupRepository matchLineupRepository;
     private final MatchRecordRepository matchRecordRepository;
 
-    public MatchLineupResponseDto.Lineup getMatchLineups(String matchId) {
+    public MatchLineupResponseDto.Lineup getMatchLineups(Long matchId) {
         // 경기 정보 조회 (홈/원정팀 구분)
-        MatchRecord match = matchRecordRepository.findByMatchId(matchId)
+        MatchRecord match = matchRecordRepository.findByApiFixtureId(matchId)
                 .orElseThrow(() -> new CustomException(ErrorCode.MATCH_NOT_FOUND));
 
         // 해당 경기의 모든 선수 데이터 조회
@@ -41,11 +41,11 @@ public class MatchLineupService {
         List<MatchLineupResponseDto.PlayerLineup> players = lineups.stream()
                 .filter(ml -> ml.getPlayer().getTeam().getId().equals(teamId))
                 .map(ml -> MatchLineupResponseDto.PlayerLineup.builder()
-                        .playerId(ml.getPlayer().getPlayerId())
+                        .playerId(ml.getPlayer().getApiPlayerId())
                         .playerName(ml.getPlayer().getName())
-                        .backNumber(ml.getPlayer().getBackNumber())
-                        .formationPosition(ml.getFormationPosition())
-                        .isStarting(ml.isStarting())
+                        .backNumber(ml.getJerseyNumber())
+                        .formationPosition(ml.getPosition())
+                        .isStarting(ml.isStarter())
                         .build())
                 .toList();
 

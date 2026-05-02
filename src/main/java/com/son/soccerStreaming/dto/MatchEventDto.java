@@ -1,51 +1,50 @@
 package com.son.soccerStreaming.dto;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
-import com.fasterxml.jackson.annotation.JsonProperty;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Data;
+import lombok.Getter;
 import lombok.NoArgsConstructor;
+import lombok.ToString;
 
-import java.util.Map;
-
-@Data
-@Builder
-@NoArgsConstructor
-@AllArgsConstructor
+@Getter
+@NoArgsConstructor // 💡 Jackson이 JSON을 객체로 만들 때 사용하는 기본 생성자
+@ToString
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class MatchEventDto {
 
-    @JsonProperty("event_id")
-    private String eventId;
+    // 파이썬 시뮬레이터가 이미 주입해서 보내준 경기 ID를 고스란히 받습니다.
+    private Long fixtureId;
 
-    @JsonProperty("match_id")
-    private String matchId;
+    private TimeInfo time;
+    private TeamInfo team;
+    private PlayerInfo player;
+    private PlayerInfo assist;
 
-    private Long timestamp;
+    private String type;
+    private String detail;
+    private String comments;
 
-    @JsonProperty("match_minute")
-    private String matchMinute;
-
-    @JsonProperty("team_id")
-    private String teamId;
-
-    @JsonProperty("player_id")
-    private String playerId;
-
-    @JsonProperty("event_type")
-    private String eventType;
-
-    private Coordinates coordinates;
-
-    @JsonProperty("event_detail")
-    private Map<String, Object> eventDetail;
-
-    @Data
+    @Getter
     @NoArgsConstructor
-    @AllArgsConstructor
-    public static class Coordinates {
-        private Double x;
-        private Double y;
+    @ToString
+    public static class TimeInfo {
+        private Integer elapsed;
+        private Integer extra;
+    }
+
+    @Getter
+    @NoArgsConstructor
+    @ToString
+    public static class TeamInfo {
+        private Long id;
+        private String name;
+        private String logo;
+    }
+
+    @Getter
+    @NoArgsConstructor
+    @ToString
+    public static class PlayerInfo {
+        private Long id;
+        private String name;
     }
 }

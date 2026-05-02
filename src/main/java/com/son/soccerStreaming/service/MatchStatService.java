@@ -12,6 +12,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.OptionalDouble;
 
 @Service
 @RequiredArgsConstructor
@@ -21,45 +22,49 @@ public class MatchStatService {
     private final PlayerMatchStatRepository playerMatchStatRepository;
 
     @Transactional(readOnly = true)
-    public MatchStatResponseDto getMatchStats(String matchId) {
-        // 경기 정보 조회
-        MatchRecord matchRecord = matchRecordRepository.findByMatchId(matchId)
+    // 💡 String matchId -> Long fixtureId 로 변경
+    public MatchStatResponseDto getMatchStats(Long fixtureId) {
+
+        MatchRecord matchRecord = matchRecordRepository.findByApiFixtureId(fixtureId)
                 .orElseThrow(() -> new CustomException(ErrorCode.MATCH_NOT_FOUND));
 
-        // 해당 경기의 모든 선수 스탯 조회
-        List<PlayerMatchStat> allStats = playerMatchStatRepository.findAllByMatchRecordMatchId(matchId);
+        // 💡 JPA 메서드명 변경 적용 (MatchId -> ApiFixtureId)
+        List<PlayerMatchStat> allStats = playerMatchStatRepository.findAllByMatchRecordApiFixtureId(fixtureId);
 
-        // 팀별 집계 및 DTO 반환
         return MatchStatResponseDto.builder()
-                .matchId(matchId)
-                .homeTeamStat(aggregateTeamStats(matchRecord.getHomeTeam().getTeamId(), matchRecord.getHomeScore(), allStats))
-                .awayTeamStat(aggregateTeamStats(matchRecord.getAwayTeam().getTeamId(), matchRecord.getAwayScore(), allStats))
+                .matchId(fixtureId) // DTO 내부 타입도 Long이어야 합니다.
+                .homeTeamStat(aggregateTeamStats(matchRecord.getHomeTeam().getTeamApiId(), matchRecord.getHomeScore(), allStats))
+                .awayTeamStat(aggregateTeamStats(matchRecord.getAwayTeam().getTeamApiId(), matchRecord.getAwayScore(), allStats))
                 .build();
     }
 
-    private MatchStatResponseDto.TeamStatSummary aggregateTeamStats(String teamId, int score, List<PlayerMatchStat> matchStats) {
-        // 해당 팀 선수의 스탯만 필터링
+    private MatchStatResponseDto.TeamStatSummary aggregateTeamStats(Long teamId, int score, List<PlayerMatchStat> matchStats) {
+        // 💡 s.getPlayer().getTeam() 이 아닌 s.getTeam() 으로 바로 접근 (성능 최적화)
         List<PlayerMatchStat> teamStats = matchStats.stream()
-                .filter(s -> s.getPlayer().getTeam().getTeamId().equals(teamId))
+                .filter(s -> s.getTeam().getTeamApiId().equals(teamId))
                 .toList();
 
-        int totalShots = teamStats.stream().mapToInt(PlayerMatchStat::getShots).sum();
+        // 💡 새 엔티티 필드명에 맞춘 스트림 집계
+        int totalShots = teamStats.stream().mapToInt(PlayerMatchStat::getShotsTotal).sum();
         int totalShotsOnTarget = teamStats.stream().mapToInt(PlayerMatchStat::getShotsOnTarget).sum();
-        int totalPasses = teamStats.stream().mapToInt(PlayerMatchStat::getTotalPasses).sum();
-        int totalSuccessPasses = teamStats.stream().mapToInt(PlayerMatchStat::getSuccessfulPasses).sum();
-        int totalFouls = teamStats.stream().mapToInt(PlayerMatchStat::getFouls).sum();
-        int totalTackles = teamStats.stream().mapToInt(PlayerMatchStat::getTackles).sum();
+        int totalPasses = teamStats.stream().mapToInt(PlayerMatchStat::getPassesTotal).sum();
+        int totalFouls = teamStats.stream().mapToInt(PlayerMatchStat::getFoulsCommitted).sum();
+        int totalTackles = teamStats.stream().mapToInt(PlayerMatchStat::getTacklesTotal).sum();
+
+        // 💡 성공한 패스 개수 대신, 평균 패스 정확도(%)로 변경됨
+        OptionalDouble avgPassAccuracy = teamStats.stream()
+                .filter(s -> s.getPassAccuracy() != null)
+                .mapToDouble(PlayerMatchStat::getPassAccuracy)
+                .average();
+
+        int yellowCards = teamStats.stream().mapToInt(PlayerMatchStat::getYellowCards).sum();
+        int redCards = teamStats.stream().mapToInt(PlayerMatchStat::getRedCards).sum();
 
         return MatchStatResponseDto.TeamStatSummary.builder()
                 .teamId(teamId)
                 .score(score)
-                .totalShots(totalShots)
-                .shotsOnTarget(totalShotsOnTarget)
-                .totalPasses(totalPasses)
-                .successfulPasses(totalSuccessPasses)
-                .passAccuracy(totalPasses > 0 ? ((double) (totalSuccessPasses * 100) / totalPasses) : 0)
-                .fouls(totalFouls)
-                .tackles(totalTackles)
+                .yellowCards(yellowCards)
+                .redCards(redCards)
                 .build();
     }
 }

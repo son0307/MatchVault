@@ -10,8 +10,6 @@ import org.springframework.stereotype.Service;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.ObjectMapper;
 
-import java.util.Map;
-
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -20,7 +18,7 @@ public class MatchRedisService {
     private final StringRedisTemplate redisTemplate;
     private final ObjectMapper objectMapper;
 
-    // 최신 이벤트 데이터 업데이트
+    // 최신 이벤트 데이터 업데이트 (프론트엔드 알림용)
     public void saveLatestEvent(MatchEventDto event) {
         try {
             String eventJson = objectMapper.writeValueAsString(event);
@@ -30,73 +28,53 @@ public class MatchRedisService {
         }
     }
 
-    // 선수별, 팀별 스탯 누적
-    public void updateStat(MatchEventDto event) {
-        String matchId = event.getMatchId();
-        String playerId = event.getPlayerId();
-        String teamId = event.getTeamId();
-        String eventType = event.getEventType();
-        Map<String, Object> detail = event.getEventDetail();
+    // 💡 API-Sports 규격에 맞춘 선수별/팀별 실시간 스탯 누적 (Goal, Card 위주)
+    public void updateEventStat(MatchEventDto event) {
+        Long fixtureId = event.getFixtureId();
 
-        if (playerId == null || "OVER".equals(eventType)) return;
+        // Null 방지 처리 (VAR 이벤트 등에서는 선수가 없을 수도 있음)
+        Long teamId = event.getTeam() != null ? event.getTeam().getId() : null;
+        Long playerId = event.getPlayer() != null ? event.getPlayer().getId() : null;
+        String eventType = event.getType();
+        String detail = event.getDetail();
 
-        String playerKey = "match:" + matchId + ":player:" + playerId;
-        String teamKey = "match:" + matchId+ ":team:" + teamId;
+        if (fixtureId == null || teamId == null || eventType == null) return;
+
         HashOperations<String, String, String> hashOps = redisTemplate.opsForHash();
+        String teamKey = "match:" + fixtureId + ":team:" + teamId;
+        String playerKey = playerId != null ? "match:" + fixtureId + ":player:" + playerId : null;
 
         switch (eventType) {
-            case "PASS":
-                hashOps.increment(playerKey, "totalPasses", 1);
-                hashOps.increment(teamKey, "totalPasses", 1);
-                // 성공한 패스
-                if (detail != null && (Boolean) detail.getOrDefault("is_successful", false)) {
-                    hashOps.increment(playerKey, "successfulPasses", 1);
-                    hashOps.increment(teamKey, "successfulPasses", 1);
+            case "Goal":
+                // 일반 필드골과 페널티킥만 득점으로 인정 (자책골 제외)
+                if ("Normal Goal".equals(detail) || "Penalty".equals(detail)) {
+                    hashOps.increment(teamKey, "goals", 1);
+                    if (playerKey != null) hashOps.increment(playerKey, "goals", 1);
                 }
                 break;
-            case "SHOT":
-                hashOps.increment(playerKey, "totalShots", 1);
-                hashOps.increment(teamKey, "totalShots", 1);
-                // 유효 슈팅이 된 슈팅
-                if (detail != null && (Boolean) detail.getOrDefault("is_on_target", false)) {
-                    hashOps.increment(playerKey, "shotsOnTarget", 1);
-                    hashOps.increment(teamKey, "shotsOnTarget", 1);
-                    // 골로 연결된 경우
-                    if ((Boolean) detail.getOrDefault("is_goal", false)) {
-                        hashOps.increment(playerKey, "goals", 1);
-                        hashOps.increment(teamKey, "goals", 1);
-                    }
+
+            case "Card":
+                if ("Yellow Card".equals(detail)) {
+                    hashOps.increment(teamKey, "yellowCards", 1);
+                    if (playerKey != null) hashOps.increment(playerKey, "yellowCards", 1);
+                } else if ("Red card".equals(detail) || "Red Card".equals(detail)) {
+                    hashOps.increment(teamKey, "redCards", 1);
+                    if (playerKey != null) hashOps.increment(playerKey, "redCards", 1);
                 }
-                break;
-            case "TACKLE":
-                hashOps.increment(playerKey, "tackles", 1);
-                hashOps.increment(teamKey, "tackles", 1);
-                break;
-            case "FOUL":
-                hashOps.increment(playerKey, "fouls", 1);
-                hashOps.increment(teamKey, "fouls", 1);
                 break;
         }
     }
 
-    public MatchStatResponseDto.TeamStatSummary getTeamStatSummary(String matchId, String teamId) {
-        String key = "match:" + matchId + ":team:" + teamId;
+    // 💡 파라미터 타입을 String -> Long으로 통일하고, 저장되는 데이터 규격에 맞춰 반환값 수정
+    public MatchStatResponseDto.TeamStatSummary getTeamStatSummary(Long fixtureId, Long teamId) {
+        String key = "match:" + fixtureId + ":team:" + teamId;
         var entries = redisTemplate.opsForHash().entries(key);
-
-        int passes = parseStat(entries.get("totalPasses"));
-        int successfulPasses = parseStat(entries.get("successfulPasses"));
-        double passAccuracy = passes != 0 ? (double) (successfulPasses * 100) / passes : 0;
 
         return MatchStatResponseDto.TeamStatSummary.builder()
                 .teamId(teamId)
                 .score(parseStat(entries.get("goals")))
-                .totalShots(parseStat(entries.get("totalShots")))
-                .shotsOnTarget(parseStat(entries.get("shotsOnTarget")))
-                .totalPasses(passes)
-                .successfulPasses(successfulPasses)
-                .passAccuracy(passAccuracy)
-                .fouls(parseStat(entries.get("fouls")))
-                .tackles(parseStat(entries.get("tackles")))
+                .yellowCards(parseStat(entries.get("yellowCards")))
+                .redCards(parseStat(entries.get("redCards")))
                 .build();
     }
 
