@@ -2,7 +2,6 @@ package com.son.soccerStreaming.entity;
 
 import jakarta.persistence.*;
 import lombok.*;
-import org.hibernate.annotations.SQLDelete;
 
 import java.time.LocalDate;
 
@@ -11,7 +10,6 @@ import java.time.LocalDate;
 @Builder
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @AllArgsConstructor(access = AccessLevel.PROTECTED)
-@SQLDelete(sql = "UPDATE player SET is_deleted = true WHERE id = ?")
 public class Player {
 
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY)

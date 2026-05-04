@@ -3,8 +3,6 @@ package com.son.soccerStreaming.service;
 import com.son.soccerStreaming.dto.CursorResponse;
 import com.son.soccerStreaming.dto.MatchResponseDto;
 import com.son.soccerStreaming.entity.MatchRecord;
-import com.son.soccerStreaming.exception.CustomException;
-import com.son.soccerStreaming.exception.ErrorCode;
 import com.son.soccerStreaming.repository.MatchRecordRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -35,9 +33,9 @@ public class MatchService {
                         .matchId(match.getApiFixtureId())
                         .homeTeamName(match.getHomeTeam().getName())
                         .awayTeamName(match.getAwayTeam().getName())
-                        .homeScore(match.getHomeScore())
-                        .awayScore(match.getAwayScore())
-                        .matchStatus(match.getStatus())
+                        .homeScore(valueOf(match.getHomeScore()))
+                        .awayScore(valueOf(match.getAwayScore()))
+                        .matchStatus(match.getMatchCategory())
                         .build())
                 .toList();
 
@@ -50,19 +48,7 @@ public class MatchService {
                 .build();
     }
 
-    @Transactional
-    // 💡 파라미터 타입을 String -> Long 으로 완벽하게 수정
-    public void addScoreToDb(Long fixtureId, Long teamId) {
-
-        // 💡 JPA Repository 메서드명도 변경된 엔티티 필드명에 맞춰 수정 (findByApiFixtureId)
-        MatchRecord match = matchRecordRepository.findByApiFixtureId(fixtureId)
-                .orElseThrow(() -> new CustomException(ErrorCode.MATCH_NOT_FOUND));
-
-        // 💡 Team 엔티티의 고유 ID 필드명(apiId)으로 비교
-        if (match.getHomeTeam().getTeamApiId().equals(teamId)) {
-            match.addHomeScore();
-        } else if (match.getAwayTeam().getTeamApiId().equals(teamId)) {
-            match.addAwayScore();
-        }
+    private int valueOf(Integer value) {
+        return value == null ? 0 : value;
     }
 }

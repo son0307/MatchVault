@@ -4,8 +4,6 @@ import jakarta.persistence.*;
 import lombok.*;
 
 import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.List;
 
 @Entity
 @Getter
@@ -41,16 +39,17 @@ public class MatchRecord {
     private String venueCity;
 
     // 상태 및 스코어
-    @Column(nullable = false)
-    @Enumerated(EnumType.STRING)
-    private MatchStatus status;
+    @Column(length = 10)
+    private String statusShort;
+    private String statusLong;
     private Integer elapsed;
 
-    @Builder.Default
-    private Integer homeScore = 0;
+    // 조회를 간단히 하기 위한 매크로 상태
+    @Column(length = 20)
+    private String matchCategory;
 
-    @Builder.Default
-    private Integer awayScore = 0;
+    private Integer homeScore;
+    private Integer awayScore;
 
     // 포메이션 정보
     @Column(length = 20)
@@ -63,19 +62,14 @@ public class MatchRecord {
     private String homeCoachName;
     private String awayCoachName;
 
-    public void addHomeScore() {
-        homeScore++;
-    }
-
-    public void addAwayScore() {
-        awayScore++;
-    }
-
-    public void updateScoreFromApi(int homeScore, int awayScore, MatchStatus status, int elapsed) {
+    public void updateMatchState(String statusShort, String statusLong, String matchCategory,
+                                 Integer elapsed, Integer homeScore, Integer awayScore) {
+        this.statusShort = statusShort;
+        this.statusLong = statusLong;
+        this.matchCategory = matchCategory;
+        this.elapsed = elapsed;
         this.homeScore = homeScore;
         this.awayScore = awayScore;
-        this.status = status;
-        this.elapsed = elapsed;
     }
 
     public void updateTactics(String homeFormation, String awayFormation,

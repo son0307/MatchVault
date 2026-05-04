@@ -14,7 +14,6 @@ import tools.jackson.databind.ObjectMapper;
 public class MatchEventConsumer {
 
     private final ObjectMapper objectMapper;
-    private final MatchService matchService;
     private final MatchRedisService matchRedisService;
     private final SseService sseService;
 
@@ -27,19 +26,6 @@ public class MatchEventConsumer {
             // 1. 프론트엔드가 '가장 최근 발생한 이벤트'를 띄워주기 위해 Redis에 저장
             // (예: "방금 전 토트넘 경고", "방금 전 득점")
             matchRedisService.saveLatestEvent(event);
-
-            // 2. 득점 감지 및 즉시 DB(스코어) 업데이트
-            if ("Goal".equals(event.getType())) {
-                String detail = event.getDetail();
-
-                if ("Normal Goal".equals(detail) || "Penalty".equals(detail)) {
-                    Long teamId = event.getTeam().getId();
-                    log.info("⚽ GOAL! [{}] 팀 득점! DB 스코어 업데이트 실행", teamId);
-
-                    // 💡 타입 리팩토링 전이므로 String으로 변환해서 넘깁니다.
-                    matchService.addScoreToDb(fixtureId, teamId);
-                }
-            }
 
             // 3. 접속 중인 유저들에게 SSE 실시간 알림 발송
             sseService.broadcastToMatch(String.valueOf(fixtureId), messagePayload);

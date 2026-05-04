@@ -1,11 +1,8 @@
 package com.son.soccerStreaming.controller;
 
 import com.son.soccerStreaming.dto.MatchStatResponseDto;
-import com.son.soccerStreaming.entity.MatchRecord;
-import com.son.soccerStreaming.exception.CustomException;
-import com.son.soccerStreaming.exception.ErrorCode;
-import com.son.soccerStreaming.repository.MatchRecordRepository;
 import com.son.soccerStreaming.service.MatchRedisService;
+import com.son.soccerStreaming.service.MatchStatService;
 import com.son.soccerStreaming.service.SseService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.MediaType;
@@ -21,7 +18,7 @@ public class LiveMatchController {
 
     private final SseService sseService;
     private final MatchRedisService matchRedisService;
-    private final MatchRecordRepository matchRecordRepository;
+    private final MatchStatService matchStatService;
 
     // 클라이언트가 SSE 연결을 맺는 엔드포인트
     @GetMapping(path = "/stream/matches/{matchId}", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
@@ -34,25 +31,12 @@ public class LiveMatchController {
     public ResponseEntity<MatchStatResponseDto> getMatchStats(
             @PathVariable Long matchId
     ) {
-        MatchRecord match = matchRecordRepository.findByApiFixtureId(matchId)
-                .orElseThrow(() -> new CustomException(ErrorCode.MATCH_NOT_FOUND));
-
-        MatchStatResponseDto.TeamStatSummary homeStats = matchRedisService.getTeamStatSummary(
-                matchId,
-                match.getHomeTeam().getTeamApiId()
-        );
-
-        MatchStatResponseDto.TeamStatSummary awayStats = matchRedisService.getTeamStatSummary(
-                matchId,
-                match.getAwayTeam().getTeamApiId()
-        );
-
-        MatchStatResponseDto snapshot = MatchStatResponseDto.builder()
-                .matchId(matchId)
-                .homeTeamStat(homeStats)
-                .awayTeamStat(awayStats)
-                .build();
-
-        return ResponseEntity.ok(snapshot);
+        return matchRedisService.getLiveSnapshot(matchId)
+                .map(snapshot -> ResponseEntity.ok(MatchStatResponseDto.builder()
+                        .matchId(snapshot.getFixtureId())
+                        .homeTeamStat(snapshot.getHomeTeamStat())
+                        .awayTeamStat(snapshot.getAwayTeamStat())
+                        .build()))
+                .orElseGet(() -> ResponseEntity.ok(matchStatService.getMatchStats(matchId)));
     }
 }

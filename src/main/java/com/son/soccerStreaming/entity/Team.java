@@ -2,14 +2,12 @@ package com.son.soccerStreaming.entity;
 
 import jakarta.persistence.*;
 import lombok.*;
-import org.hibernate.annotations.SQLDelete;
 
 @Entity
 @Getter
 @Builder
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @AllArgsConstructor(access = AccessLevel.PROTECTED)
-@SQLDelete(sql = "UPDATE team SET is_deleted = true WHERE id = ?")
 public class Team {
 
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -25,6 +23,19 @@ public class Team {
     private Integer founded;
     private String logoUrl;
 
-    @Embedded
+    @OneToOne(fetch = FetchType.LAZY, cascade = CascadeType.ALL, orphanRemoval = true)
+    @JoinColumn(name = "venue_id")
     private Venue venue;
+
+    public void updateTeam(String name, String code, String country, Integer founded, String logoUrl) {
+        this.name = name;
+        this.code = code;
+        this.country = country;
+        this.founded = founded;
+        this.logoUrl = logoUrl;
+    }
+
+    public void updateVenue(Venue venue) {
+        this.venue = venue;
+    }
 }

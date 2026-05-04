@@ -2,6 +2,7 @@ package com.son.soccerStreaming.service;
 
 import com.son.soccerStreaming.dto.PlayerResponseDto;
 import com.son.soccerStreaming.entity.Player;
+import com.son.soccerStreaming.entity.Team;
 import com.son.soccerStreaming.exception.CustomException;
 import com.son.soccerStreaming.exception.ErrorCode;
 import com.son.soccerStreaming.repository.PlayerMatchStatRepository;
@@ -20,61 +21,77 @@ public class PlayerService {
 
     @Transactional(readOnly = true)
     public PlayerResponseDto.Details getPlayerDetails(Long playerId) {
-        Player playerData = playerRepository.findByApiPlayerId(playerId)
+        Player player = playerRepository.findByApiPlayerId(playerId)
                 .orElseThrow(() -> new CustomException(ErrorCode.PLAYER_NOT_FOUND));
 
+        Team team = player.getTeam();
+
         return PlayerResponseDto.Details.builder()
-                .playerId(playerData.getApiPlayerId())
-                .playerName(playerData.getName())
-                .backNumber(playerData.getDefaultNumber())
-                .age(playerData.getAge())
-                // 💡 단위를 제거하고 숫자만 파싱하는 안전한 헬퍼 메서드 사용
-                .height(parsePhysicalStat(playerData.getHeight()))
-                .weight(parsePhysicalStat(playerData.getWeight()))
-                .position(playerData.getPosition())
+                .playerId(player.getApiPlayerId())
+                .playerName(player.getName())
+                .firstname(player.getFirstname())
+                .lastname(player.getLastname())
+                .backNumber(player.getDefaultNumber())
+                .age(player.getAge())
+                .birthDate(player.getBirthDate())
+                .birthPlace(player.getBirthPlace())
+                .birthCountry(player.getBirthCountry())
+                .nationality(player.getNationality())
+                .height(player.getHeight())
+                .weight(player.getWeight())
+                .position(player.getPosition())
+                .photoUrl(player.getPhotoUrl())
+                .teamId(team != null ? team.getTeamApiId() : null)
+                .teamName(team != null ? team.getName() : null)
+                .teamLogoUrl(team != null ? team.getLogoUrl() : null)
                 .build();
     }
 
     @Cacheable(value = "playerStats", key = "#playerId")
     @Transactional(readOnly = true)
     public PlayerResponseDto.SeasonStats getPlayerSeasonStats(Long playerId) {
-
         Player player = playerRepository.findByApiPlayerId(playerId)
                 .orElseThrow(() -> new CustomException(ErrorCode.PLAYER_NOT_FOUND));
 
-        // DB에서 최신 스탯 통계 가져오기
         PlayerMatchStatRepository.SeasonStatSummary stats =
                 playerMatchStatRepository.findSeasonStatSummaryByPlayerId(playerId);
 
-        // 💡 DTO 조립 (변경된 레포지토리 규격 완벽 반영)
         return PlayerResponseDto.SeasonStats.builder()
                 .playerId(player.getApiPlayerId())
                 .totalMatches(stats.getTotalMatches())
+                .minutesPlayed(stats.getMinutesPlayed())
+                .averageRating(roundToOneDecimal(stats.getAverageRating()))
                 .goals(stats.getGoals())
                 .assists(stats.getAssists())
-                .shots(stats.getShotsTotal())        // 변경됨: getShots -> getShotsTotal
+                .conceded(stats.getConceded())
+                .saves(stats.getSaves())
+                .shots(stats.getShotsTotal())
                 .shotsOnTarget(stats.getShotsOnTarget())
-                .totalPasses(stats.getPassesTotal()) // 변경됨: getTotalPasses -> getPassesTotal
-                // 💡 레포지토리에서 바로 평균값을 계산해오므로 별도 수동 계산 로직 삭제
-                // 소수점 첫째 자리까지만 깔끔하게 떨어지도록 반올림
-                .passAccuracy(Math.round(stats.getAvgPassAccuracy() * 10) / 10.0)
-                .fouls(stats.getFoulsCommitted())    // 변경됨: getFouls -> getFoulsCommitted
-                .tackles(stats.getTacklesTotal())    // 변경됨: getTackles -> getTacklesTotal
-                // (선택) DTO 쪽에 필드를 추가하셨다면 아래 항목도 추가 가능
-                // .yellowCards(stats.getYellowCards())
-                // .redCards(stats.getRedCards())
+                .totalPasses(stats.getPassesTotal())
+                .keyPasses(stats.getPassesKey())
+                .passAccuracy(roundToOneDecimal(stats.getAvgPassAccuracy()))
+                .foulsDrawn(stats.getFoulsDrawn())
+                .foulsCommitted(stats.getFoulsCommitted())
+                .tackles(stats.getTacklesTotal())
+                .blocks(stats.getBlocks())
+                .interceptions(stats.getInterceptions())
+                .duelsTotal(stats.getDuelsTotal())
+                .duelsWon(stats.getDuelsWon())
+                .dribblesAttempts(stats.getDribblesAttempts())
+                .dribblesSuccess(stats.getDribblesSuccess())
+                .dribblesPast(stats.getDribblesPast())
+                .yellowCards(stats.getYellowCards())
+                .redCards(stats.getRedCards())
+                .offsides(stats.getOffsides())
+                .penaltyWon(stats.getPenaltyWon())
+                .penaltyCommitted(stats.getPenaltyCommitted())
+                .penaltyScored(stats.getPenaltyScored())
+                .penaltyMissed(stats.getPenaltyMissed())
+                .penaltySaved(stats.getPenaltySaved())
                 .build();
     }
 
-    // 💡 API-Sports 데이터가 없거나 형식이 다를 때 에러가 터지는 것을 막는 헬퍼 메서드
-    private Integer parsePhysicalStat(String statStr) {
-        if (statStr == null || statStr.isBlank()) {
-            return 0; // 데이터가 없으면 0 반환
-        }
-        try {
-            return Integer.parseInt(statStr.split(" ")[0]);
-        } catch (NumberFormatException e) {
-            return 0; // "Unknown cm" 같은 예외 데이터 방어
-        }
+    private double roundToOneDecimal(double value) {
+        return Math.round(value * 10) / 10.0;
     }
 }

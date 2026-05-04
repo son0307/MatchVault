@@ -13,10 +13,14 @@ public class MatchStatResponseDto {
     @Getter
     @Builder
     public static class TeamStatSummary {
-        private Long teamId;       // 💡 String -> Long
-        private int score;         // goals
-
-        // 💡 기존 패스/슈팅 통계 제거, 실시간 집계가 가능한 카드 통계 추가
+        private Long teamId;
+        private int score;
+        private int totalShots;
+        private int shotsOnTarget;
+        private int totalPasses;
+        private double passAccuracy;
+        private int fouls;
+        private int tackles;
         private int yellowCards;
         private int redCards;
     }

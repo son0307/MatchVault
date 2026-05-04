@@ -1,84 +1,99 @@
 package com.son.soccerStreaming.service;
 
+import com.son.soccerStreaming.dto.LiveMatchSnapshotDto;
 import com.son.soccerStreaming.dto.MatchEventDto;
 import com.son.soccerStreaming.dto.MatchStatResponseDto;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.data.redis.core.HashOperations;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.ObjectMapper;
+
+import java.time.Duration;
+import java.util.Optional;
 
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class MatchRedisService {
 
+    private static final Duration LIVE_CACHE_TTL = Duration.ofMinutes(10);
+    private static final String LATEST_EVENT_KEY = "match:%d:latest_event";
+    private static final String LIVE_SNAPSHOT_KEY = "match:%d:live_snapshot";
+
     private final StringRedisTemplate redisTemplate;
     private final ObjectMapper objectMapper;
 
-    // 최신 이벤트 데이터 업데이트 (프론트엔드 알림용)
     public void saveLatestEvent(MatchEventDto event) {
+        if (event.getFixtureId() == null) {
+            log.warn("fixtureId가 없는 이벤트는 Redis 최신 이벤트로 저장하지 않습니다. event={}", event);
+            return;
+        }
+
         try {
             String eventJson = objectMapper.writeValueAsString(event);
-            redisTemplate.opsForValue().set("match:latest_event", eventJson);
+            redisTemplate.opsForValue().set(latestEventKey(event.getFixtureId()), eventJson, LIVE_CACHE_TTL);
         } catch (JacksonException e) {
-            log.error("Redis 저장 중 JSON 변환 오류", e);
+            log.error("Redis 최신 이벤트 저장 중 JSON 변환 오류", e);
         }
     }
 
-    // 💡 API-Sports 규격에 맞춘 선수별/팀별 실시간 스탯 누적 (Goal, Card 위주)
-    public void updateEventStat(MatchEventDto event) {
-        Long fixtureId = event.getFixtureId();
+    public void saveLiveSnapshot(LiveMatchSnapshotDto snapshot) {
+        if (snapshot.getFixtureId() == null) {
+            log.warn("fixtureId가 없는 live snapshot은 Redis에 저장하지 않습니다.");
+            return;
+        }
 
-        // Null 방지 처리 (VAR 이벤트 등에서는 선수가 없을 수도 있음)
-        Long teamId = event.getTeam() != null ? event.getTeam().getId() : null;
-        Long playerId = event.getPlayer() != null ? event.getPlayer().getId() : null;
-        String eventType = event.getType();
-        String detail = event.getDetail();
-
-        if (fixtureId == null || teamId == null || eventType == null) return;
-
-        HashOperations<String, String, String> hashOps = redisTemplate.opsForHash();
-        String teamKey = "match:" + fixtureId + ":team:" + teamId;
-        String playerKey = playerId != null ? "match:" + fixtureId + ":player:" + playerId : null;
-
-        switch (eventType) {
-            case "Goal":
-                // 일반 필드골과 페널티킥만 득점으로 인정 (자책골 제외)
-                if ("Normal Goal".equals(detail) || "Penalty".equals(detail)) {
-                    hashOps.increment(teamKey, "goals", 1);
-                    if (playerKey != null) hashOps.increment(playerKey, "goals", 1);
-                }
-                break;
-
-            case "Card":
-                if ("Yellow Card".equals(detail)) {
-                    hashOps.increment(teamKey, "yellowCards", 1);
-                    if (playerKey != null) hashOps.increment(playerKey, "yellowCards", 1);
-                } else if ("Red card".equals(detail) || "Red Card".equals(detail)) {
-                    hashOps.increment(teamKey, "redCards", 1);
-                    if (playerKey != null) hashOps.increment(playerKey, "redCards", 1);
-                }
-                break;
+        try {
+            String snapshotJson = objectMapper.writeValueAsString(snapshot);
+            redisTemplate.opsForValue().set(liveSnapshotKey(snapshot.getFixtureId()), snapshotJson, LIVE_CACHE_TTL);
+        } catch (JacksonException e) {
+            log.error("Redis live snapshot 저장 중 JSON 변환 오류", e);
         }
     }
 
-    // 💡 파라미터 타입을 String -> Long으로 통일하고, 저장되는 데이터 규격에 맞춰 반환값 수정
+    public Optional<LiveMatchSnapshotDto> getLiveSnapshot(Long fixtureId) {
+        String snapshotJson = redisTemplate.opsForValue().get(liveSnapshotKey(fixtureId));
+        if (snapshotJson == null) {
+            return Optional.empty();
+        }
+
+        try {
+            return Optional.of(objectMapper.readValue(snapshotJson, LiveMatchSnapshotDto.class));
+        } catch (JacksonException e) {
+            log.error("Redis live snapshot 조회 중 JSON 변환 오류. fixtureId={}", fixtureId, e);
+            return Optional.empty();
+        }
+    }
+
     public MatchStatResponseDto.TeamStatSummary getTeamStatSummary(Long fixtureId, Long teamId) {
-        String key = "match:" + fixtureId + ":team:" + teamId;
-        var entries = redisTemplate.opsForHash().entries(key);
+        return getLiveSnapshot(fixtureId)
+                .map(snapshot -> findTeamStat(snapshot, teamId))
+                .orElseGet(() -> emptyTeamStat(teamId));
+    }
 
+    private MatchStatResponseDto.TeamStatSummary findTeamStat(LiveMatchSnapshotDto snapshot, Long teamId) {
+        if (snapshot.getHomeTeamStat() != null && teamId.equals(snapshot.getHomeTeamStat().getTeamId())) {
+            return snapshot.getHomeTeamStat();
+        }
+        if (snapshot.getAwayTeamStat() != null && teamId.equals(snapshot.getAwayTeamStat().getTeamId())) {
+            return snapshot.getAwayTeamStat();
+        }
+        return emptyTeamStat(teamId);
+    }
+
+    private MatchStatResponseDto.TeamStatSummary emptyTeamStat(Long teamId) {
         return MatchStatResponseDto.TeamStatSummary.builder()
                 .teamId(teamId)
-                .score(parseStat(entries.get("goals")))
-                .yellowCards(parseStat(entries.get("yellowCards")))
-                .redCards(parseStat(entries.get("redCards")))
                 .build();
     }
 
-    private int parseStat(Object value) {
-        return value == null ? 0 : Integer.parseInt(value.toString());
+    private String latestEventKey(Long fixtureId) {
+        return LATEST_EVENT_KEY.formatted(fixtureId);
+    }
+
+    private String liveSnapshotKey(Long fixtureId) {
+        return LIVE_SNAPSHOT_KEY.formatted(fixtureId);
     }
 }

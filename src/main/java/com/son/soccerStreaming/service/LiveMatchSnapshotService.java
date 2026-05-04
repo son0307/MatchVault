@@ -1,6 +1,7 @@
 package com.son.soccerStreaming.service;
 
-import com.son.soccerStreaming.dto.MatchStatResponseDto;
+import com.son.soccerStreaming.dto.LiveMatchSnapshotDto;
+import com.son.soccerStreaming.dto.MatchEventDto;
 import com.son.soccerStreaming.entity.MatchRecord;
 import com.son.soccerStreaming.entity.PlayerMatchStat;
 import com.son.soccerStreaming.exception.CustomException;
@@ -15,32 +16,41 @@ import java.util.List;
 
 @Service
 @RequiredArgsConstructor
-public class MatchStatService {
+public class LiveMatchSnapshotService {
 
     private final MatchRecordRepository matchRecordRepository;
     private final PlayerMatchStatRepository playerMatchStatRepository;
     private final MatchTeamStatAggregator matchTeamStatAggregator;
+    private final MatchRedisService matchRedisService;
 
     @Transactional(readOnly = true)
-    public MatchStatResponseDto getMatchStats(Long fixtureId) {
+    public LiveMatchSnapshotDto rebuildAndCacheSnapshot(Long fixtureId, MatchEventDto latestEvent) {
         MatchRecord matchRecord = matchRecordRepository.findByApiFixtureId(fixtureId)
                 .orElseThrow(() -> new CustomException(ErrorCode.MATCH_NOT_FOUND));
 
-        List<PlayerMatchStat> allStats = playerMatchStatRepository.findAllByMatchRecordApiFixtureId(fixtureId);
+        List<PlayerMatchStat> playerStats = playerMatchStatRepository.findAllByMatchRecordApiFixtureId(fixtureId);
 
-        return MatchStatResponseDto.builder()
-                .matchId(fixtureId)
+        LiveMatchSnapshotDto snapshot = LiveMatchSnapshotDto.builder()
+                .fixtureId(fixtureId)
+                .statusShort(matchRecord.getStatusShort())
+                .statusLong(matchRecord.getStatusLong())
+                .matchCategory(matchRecord.getMatchCategory())
+                .elapsed(matchRecord.getElapsed())
                 .homeTeamStat(matchTeamStatAggregator.aggregate(
                         matchRecord.getHomeTeam().getTeamApiId(),
                         valueOf(matchRecord.getHomeScore()),
-                        allStats
+                        playerStats
                 ))
                 .awayTeamStat(matchTeamStatAggregator.aggregate(
                         matchRecord.getAwayTeam().getTeamApiId(),
                         valueOf(matchRecord.getAwayScore()),
-                        allStats
+                        playerStats
                 ))
+                .latestEvent(latestEvent)
                 .build();
+
+        matchRedisService.saveLiveSnapshot(snapshot);
+        return snapshot;
     }
 
     private int valueOf(Integer value) {

@@ -61,6 +61,7 @@ public class DummyDataInitializer implements CommandLineRunner {
                         .lastname("Surname")
                         .age(random.nextInt(15) + 18)
                         .birthDate(LocalDate.now().minusYears(20).minusDays(random.nextInt(365)))
+                        .birthPlace("London")
                         .birthCountry("England")
                         .nationality("England")
                         .height((random.nextInt(30) + 165) + " cm")
@@ -97,7 +98,9 @@ public class DummyDataInitializer implements CommandLineRunner {
                     .venueId(homeTeam.getVenue().getVenueApiId())
                     .venueName(homeTeam.getVenue().getVenueName())
                     .venueCity(homeTeam.getVenue().getVenueCity())
-                    .status(MatchStatus.FINISHED)
+                    .statusShort("FT")
+                    .statusLong("Match Finished")
+                    .matchCategory("FINISHED")
                     .elapsed(90)
                     .homeScore(homeScore)
                     .awayScore(awayScore)
@@ -121,19 +124,19 @@ public class DummyDataInitializer implements CommandLineRunner {
         return Arrays.asList(
                 Team.builder().teamApiId(47L).name("Tottenham").code("TOT").country("England").founded(1882)
                         .logoUrl("https://media.api-sports.io/football/teams/47.png")
-                        .venue(Venue.builder().venueApiId(593L).venueName("Tottenham Hotspur Stadium").venueCity("London").capacity(62850).surface("grass").build()).build(),
+                        .venue(Venue.builder().venueApiId(593L).venueName("Tottenham Hotspur Stadium").venueAddress("782 High Road").venueCity("London").capacity(62850).surface("grass").venueImageUrl("https://media.api-sports.io/football/venues/593.png").build()).build(),
                 Team.builder().teamApiId(42L).name("Arsenal").code("ARS").country("England").founded(1886)
                         .logoUrl("https://media.api-sports.io/football/teams/42.png")
-                        .venue(Venue.builder().venueApiId(494L).venueName("Emirates Stadium").venueCity("London").capacity(60383).surface("grass").build()).build(),
+                        .venue(Venue.builder().venueApiId(494L).venueName("Emirates Stadium").venueAddress("Hornsey Road").venueCity("London").capacity(60383).surface("grass").venueImageUrl("https://media.api-sports.io/football/venues/494.png").build()).build(),
                 Team.builder().teamApiId(50L).name("Manchester City").code("MCI").country("England").founded(1880)
                         .logoUrl("https://media.api-sports.io/football/teams/50.png")
-                        .venue(Venue.builder().venueApiId(555L).venueName("Etihad Stadium").venueCity("Manchester").capacity(55097).surface("grass").build()).build(),
+                        .venue(Venue.builder().venueApiId(555L).venueName("Etihad Stadium").venueAddress("Rowsley Street").venueCity("Manchester").capacity(55097).surface("grass").venueImageUrl("https://media.api-sports.io/football/venues/555.png").build()).build(),
                 Team.builder().teamApiId(40L).name("Liverpool").code("LIV").country("England").founded(1892)
                         .logoUrl("https://media.api-sports.io/football/teams/40.png")
-                        .venue(Venue.builder().venueApiId(550L).venueName("Anfield").venueCity("Liverpool").capacity(61276).surface("grass").build()).build(),
+                        .venue(Venue.builder().venueApiId(550L).venueName("Anfield").venueAddress("Anfield Road").venueCity("Liverpool").capacity(61276).surface("grass").venueImageUrl("https://media.api-sports.io/football/venues/550.png").build()).build(),
                 Team.builder().teamApiId(49L).name("Chelsea").code("CHE").country("England").founded(1905)
                         .logoUrl("https://media.api-sports.io/football/teams/49.png")
-                        .venue(Venue.builder().venueApiId(519L).venueName("Stamford Bridge").venueCity("London").capacity(41841).surface("grass").build()).build()
+                        .venue(Venue.builder().venueApiId(519L).venueName("Stamford Bridge").venueAddress("Fulham Road").venueCity("London").capacity(41841).surface("grass").venueImageUrl("https://media.api-sports.io/football/venues/519.png").build()).build()
         );
     }
 

@@ -1,43 +1,79 @@
 package com.son.soccerStreaming.dto;
 
-import lombok.*;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Getter;
 
+import java.time.LocalDate;
 
 public class PlayerResponseDto {
 
     @Getter
     @Builder
     public static class Summary {
-        Long playerId;
-        String playerName;
-        int backNumber;
+        private Long playerId;
+        private String playerName;
+        private Integer backNumber;
+        private String position;
+        private String photoUrl;
     }
 
     @Getter
     @Builder
     public static class Details {
-        Long playerId;
-        String playerName;
-        int backNumber;
-        int age;
-        int height;
-        int weight;
-        String position;
+        private Long playerId;
+        private String playerName;
+        private String firstname;
+        private String lastname;
+        private Integer backNumber;
+        private Integer age;
+        private LocalDate birthDate;
+        private String birthPlace;
+        private String birthCountry;
+        private String nationality;
+        private String height;
+        private String weight;
+        private String position;
+        private String photoUrl;
+        private Long teamId;
+        private String teamName;
+        private String teamLogoUrl;
     }
 
     @Getter
     @Builder
     @AllArgsConstructor
     public static class SeasonStats {
-        Long playerId;
-        int totalMatches;
-        int goals;
-        int assists;
-        int shots;
-        int shotsOnTarget;
-        int totalPasses;
-        double passAccuracy;
-        int fouls;
-        int tackles;
+        private Long playerId;
+        private long totalMatches;
+        private int minutesPlayed;
+        private double averageRating;
+        private int goals;
+        private int assists;
+        private int conceded;
+        private int saves;
+        private int shots;
+        private int shotsOnTarget;
+        private int totalPasses;
+        private int keyPasses;
+        private double passAccuracy;
+        private int foulsDrawn;
+        private int foulsCommitted;
+        private int tackles;
+        private int blocks;
+        private int interceptions;
+        private int duelsTotal;
+        private int duelsWon;
+        private int dribblesAttempts;
+        private int dribblesSuccess;
+        private int dribblesPast;
+        private int yellowCards;
+        private int redCards;
+        private int offsides;
+        private int penaltyWon;
+        private int penaltyCommitted;
+        private int penaltyScored;
+        private int penaltyMissed;
+        private int penaltySaved;
     }
 }

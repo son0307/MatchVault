@@ -1,6 +1,5 @@
 package com.son.soccerStreaming.dto;
 
-import com.son.soccerStreaming.entity.MatchStatus;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -15,6 +14,6 @@ public class MatchResponseDto {
         private String awayTeamName;
         private int homeScore;
         private int awayScore;
-        private MatchStatus matchStatus;
+        private String matchStatus;
     }
 }
