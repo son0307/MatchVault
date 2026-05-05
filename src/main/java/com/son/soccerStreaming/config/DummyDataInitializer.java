@@ -24,6 +24,9 @@ public class DummyDataInitializer implements CommandLineRunner {
     private final MatchRecordRepository matchRecordRepository;
     private final MatchLineupRepository matchLineupRepository;
     private final PlayerMatchStatRepository playerMatchStatRepository;
+    private final TeamStandingRepository teamStandingRepository;
+    private final PlayerAbsenceRepository playerAbsenceRepository;
+    private final MatchEventRepository matchEventRepository;
 
     @Override
     @Transactional
@@ -39,6 +42,7 @@ public class DummyDataInitializer implements CommandLineRunner {
         // 1. 5개 팀 생성 (실제 API ID 기반)
         List<Team> teams = createTeams();
         teamRepository.saveAll(teams);
+        teamStandingRepository.saveAll(createStandings(teams));
 
         // 2. 각 팀당 15명의 선수 생성
         Map<Team, List<Player>> teamPlayersMap = new HashMap<>();
@@ -114,6 +118,8 @@ public class DummyDataInitializer implements CommandLineRunner {
             // 해당 경기의 라인업 및 스탯 생성
             generateLineupAndStats(match, homeTeam, teamPlayersMap.get(homeTeam), random);
             generateLineupAndStats(match, awayTeam, teamPlayersMap.get(awayTeam), random);
+            generateAbsences(match, homeTeam, awayTeam, teamPlayersMap, random);
+            generateEvents(match, homeTeam, awayTeam, teamPlayersMap, random);
         }
 
         log.info("✅ 5개 팀, 75명 선수, 7개 경기 및 통계 더미 데이터 생성 완료!");
@@ -138,6 +144,54 @@ public class DummyDataInitializer implements CommandLineRunner {
                         .logoUrl("https://media.api-sports.io/football/teams/49.png")
                         .venue(Venue.builder().venueApiId(519L).venueName("Stamford Bridge").venueAddress("Fulham Road").venueCity("London").capacity(41841).surface("grass").venueImageUrl("https://media.api-sports.io/football/venues/519.png").build()).build()
         );
+    }
+
+    private List<TeamStanding> createStandings(List<Team> teams) {
+        List<TeamStanding> standings = new ArrayList<>();
+        int[][] records = {
+                {1, 70, 41, 24, 23, 1, 0, 56, 15, 12, 12, 0, 0, 31, 9, 12, 11, 1, 0, 25, 6},
+                {2, 51, 36, 24, 16, 3, 5, 65, 29, 12, 8, 2, 2, 35, 14, 12, 8, 1, 3, 30, 15},
+                {3, 45, 18, 24, 13, 6, 5, 42, 24, 12, 7, 3, 2, 22, 11, 12, 6, 3, 3, 20, 13},
+                {4, 40, 10, 24, 11, 7, 6, 38, 28, 12, 6, 4, 2, 21, 12, 12, 5, 3, 4, 17, 16},
+                {5, 36, 6, 24, 10, 6, 8, 35, 29, 12, 6, 2, 4, 19, 13, 12, 4, 4, 4, 16, 16}
+        };
+        String[] forms = {"WWWWW", "WLWWW", "DWWLW", "LDWWW", "WLDLW"};
+
+        for (int i = 0; i < teams.size(); i++) {
+            int[] record = records[i % records.length];
+            standings.add(TeamStanding.builder()
+                    .team(teams.get(i))
+                    .season(2019)
+                    .rank(record[0])
+                    .points(record[1])
+                    .goalsDiff(record[2])
+                    .group("Premier League")
+                    .form(forms[i % forms.length])
+                    .status("same")
+                    .description(record[0] <= 4 ? "Promotion - Champions League (Group Stage)" : null)
+                    .played(record[3])
+                    .win(record[4])
+                    .draw(record[5])
+                    .lose(record[6])
+                    .goalsFor(record[7])
+                    .goalsAgainst(record[8])
+                    .homePlayed(record[9])
+                    .homeWin(record[10])
+                    .homeDraw(record[11])
+                    .homeLose(record[12])
+                    .homeGoalsFor(record[13])
+                    .homeGoalsAgainst(record[14])
+                    .awayPlayed(record[15])
+                    .awayWin(record[16])
+                    .awayDraw(record[17])
+                    .awayLose(record[18])
+                    .awayGoalsFor(record[19])
+                    .awayGoalsAgainst(record[20])
+                    .apiUpdatedAt(LocalDateTime.of(2020, 1, 29, 0, 0))
+                    .build());
+        }
+
+        return standings;
     }
 
     private void generateLineupAndStats(MatchRecord match, Team team, List<Player> teamPlayers, Random random) {
@@ -193,5 +247,88 @@ public class DummyDataInitializer implements CommandLineRunner {
                     .build();
             playerMatchStatRepository.save(stat);
         }
+    }
+
+    private void generateAbsences(MatchRecord match, Team homeTeam, Team awayTeam,
+                                  Map<Team, List<Player>> teamPlayersMap, Random random) {
+        List<PlayerAbsence> absences = new ArrayList<>();
+        absences.add(PlayerAbsence.builder()
+                .matchRecord(match)
+                .team(homeTeam)
+                .player(teamPlayersMap.get(homeTeam).get(13))
+                .absenceType("Missing Fixture")
+                .reason(random.nextBoolean() ? "Suspended" : "Hamstring Injury")
+                .build());
+        absences.add(PlayerAbsence.builder()
+                .matchRecord(match)
+                .team(awayTeam)
+                .player(teamPlayersMap.get(awayTeam).get(14))
+                .absenceType("Questionable")
+                .reason(random.nextBoolean() ? "Knock" : "Illness")
+                .build());
+
+        playerAbsenceRepository.saveAll(absences);
+    }
+
+    private void generateEvents(MatchRecord match, Team homeTeam, Team awayTeam,
+                                Map<Team, List<Player>> teamPlayersMap, Random random) {
+        List<Player> homePlayers = teamPlayersMap.get(homeTeam);
+        List<Player> awayPlayers = teamPlayersMap.get(awayTeam);
+        List<MatchEvent> events = new ArrayList<>();
+        int sequence = 1;
+
+        events.add(MatchEvent.builder()
+                .matchRecord(match)
+                .eventSequence(sequence++)
+                .elapsed(12)
+                .team(homeTeam)
+                .player(homePlayers.get(8))
+                .assistPlayer(homePlayers.get(5))
+                .eventType("Goal")
+                .eventDetail("Normal Goal")
+                .build());
+        events.add(MatchEvent.builder()
+                .matchRecord(match)
+                .eventSequence(sequence++)
+                .elapsed(27)
+                .team(awayTeam)
+                .player(awayPlayers.get(6))
+                .eventType("Card")
+                .eventDetail("Yellow Card")
+                .comments("Roughing")
+                .build());
+        events.add(MatchEvent.builder()
+                .matchRecord(match)
+                .eventSequence(sequence++)
+                .elapsed(45)
+                .extra(2)
+                .team(awayTeam)
+                .player(awayPlayers.get(9))
+                .assistPlayer(awayPlayers.get(7))
+                .eventType("Goal")
+                .eventDetail(random.nextBoolean() ? "Normal Goal" : "Penalty")
+                .build());
+        events.add(MatchEvent.builder()
+                .matchRecord(match)
+                .eventSequence(sequence++)
+                .elapsed(62)
+                .team(homeTeam)
+                .player(homePlayers.get(12))
+                .assistPlayer(homePlayers.get(4))
+                .eventType("subst")
+                .eventDetail("Substitution 1")
+                .comments("Tactical change")
+                .build());
+        events.add(MatchEvent.builder()
+                .matchRecord(match)
+                .eventSequence(sequence)
+                .elapsed(78)
+                .team(homeTeam)
+                .player(homePlayers.get(3))
+                .eventType("Card")
+                .eventDetail("Yellow Card")
+                .build());
+
+        matchEventRepository.saveAll(events);
     }
 }

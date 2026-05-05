@@ -11,6 +11,7 @@ public interface MatchLineupRepository extends JpaRepository<MatchLineup, Long> 
 
     @Query("select ml from MatchLineup ml " +
             "join fetch ml.player p " +
+            "join fetch ml.team t " +
             "where ml.matchRecord.apiFixtureId = :matchId")
     List<MatchLineup> findAllByMatchId(@Param("matchId") Long matchId);
 }
