@@ -12,9 +12,10 @@ public class SwaggerConfig {
     public OpenAPI openAPI() {
         return new OpenAPI()
                 .info(new Info()
-                        .title("⚽ 실시간 축구 스트리밍 & 통계 API")
-                        .description("대용량 트래픽 처리를 고려한 실시간 경기 스탯 누적 및 페이징 조회 API 명세서입니다.")
+                        .title("???ㅼ떆媛?異뺢뎄 ?ㅽ듃由щ컢 & ?듦퀎 API")
+                        .description("??⑸웾 ?몃옒??泥섎━瑜?怨좊젮???ㅼ떆媛?寃쎄린 ?ㅽ꺈 ?꾩쟻 諛??섏씠吏?議고쉶 API 紐낆꽭?쒖엯?덈떎.")
                         .version("v1.0.0")
                 );
     }
 }
+

@@ -16,7 +16,7 @@ public class Player {
     private Long id;
 
     @Column(nullable = false, unique = true)
-    private Long apiPlayerId;
+    private Long playerId;
 
     @Column(nullable = false)
     private String name;

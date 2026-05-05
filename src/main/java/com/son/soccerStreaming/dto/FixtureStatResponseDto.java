@@ -5,8 +5,8 @@ import lombok.Getter;
 
 @Getter
 @Builder
-public class MatchStatResponseDto {
-    private Long matchId;
+public class FixtureStatResponseDto {
+    private Long fixtureId;
     private TeamStatSummary homeTeamStat;
     private TeamStatSummary awayTeamStat;
 

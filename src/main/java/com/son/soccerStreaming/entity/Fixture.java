@@ -10,14 +10,14 @@ import java.time.LocalDateTime;
 @Builder
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @AllArgsConstructor(access = AccessLevel.PROTECTED)
-public class MatchRecord {
+public class Fixture {
 
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
     // API 통신용 고유 경기 ID
     @Column(nullable = false, unique = true)
-    private Long apiFixtureId;
+    private Long fixtureId;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "home_team_id", nullable = false)
@@ -29,7 +29,7 @@ public class MatchRecord {
 
     // 경기 메타데이터
     @Column(nullable = false)
-    private LocalDateTime matchDate;
+    private LocalDateTime fixtureDate;
     private String referee;
     private String round;
 
@@ -46,7 +46,7 @@ public class MatchRecord {
 
     // 조회를 간단히 하기 위한 매크로 상태
     @Column(length = 20)
-    private String matchCategory;
+    private String fixtureStatus;
 
     private Integer homeScore;
     private Integer awayScore;
@@ -62,11 +62,11 @@ public class MatchRecord {
     private String homeCoachName;
     private String awayCoachName;
 
-    public void updateMatchState(String statusShort, String statusLong, String matchCategory,
+    public void updateFixtureState(String statusShort, String statusLong, String fixtureStatus,
                                  Integer elapsed, Integer homeScore, Integer awayScore) {
         this.statusShort = statusShort;
         this.statusLong = statusLong;
-        this.matchCategory = matchCategory;
+        this.fixtureStatus = fixtureStatus;
         this.elapsed = elapsed;
         this.homeScore = homeScore;
         this.awayScore = awayScore;

@@ -29,11 +29,11 @@ public class TeamService {
     }
 
     public TeamResponseDto.Details getTeamDetails(Long teamId) {
-        Team team = teamRepository.findByTeamApiId(teamId)
+        Team team = teamRepository.findByTeamId(teamId)
                 .orElseThrow(() -> new CustomException(ErrorCode.TEAM_NOT_FOUND));
 
         return TeamResponseDto.Details.builder()
-                .teamId(team.getTeamApiId())
+                .teamId(team.getTeamId())
                 .teamName(team.getName())
                 .code(team.getCode())
                 .country(team.getCountry())
@@ -44,9 +44,9 @@ public class TeamService {
     }
 
     public List<PlayerResponseDto.Summary> getPlayersByTeam(Long teamId) {
-        return playerRepository.findAllByTeamTeamApiId(teamId).stream()
+        return playerRepository.findAllByTeamTeamId(teamId).stream()
                 .map(player -> PlayerResponseDto.Summary.builder()
-                        .playerId(player.getApiPlayerId())
+                        .playerId(player.getPlayerId())
                         .playerName(player.getName())
                         .backNumber(player.getDefaultNumber())
                         .position(player.getPosition())
@@ -57,7 +57,7 @@ public class TeamService {
 
     private TeamResponseDto.Summary toSummary(Team team) {
         return TeamResponseDto.Summary.builder()
-                .teamId(team.getTeamApiId())
+                .teamId(team.getTeamId())
                 .teamName(team.getName())
                 .code(team.getCode())
                 .logoUrl(team.getLogoUrl())
@@ -70,7 +70,7 @@ public class TeamService {
         }
 
         return TeamResponseDto.VenueInfo.builder()
-                .venueId(venue.getVenueApiId())
+                .venueId(venue.getVenueId())
                 .venueName(venue.getVenueName())
                 .venueAddress(venue.getVenueAddress())
                 .venueCity(venue.getVenueCity())

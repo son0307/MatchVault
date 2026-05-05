@@ -22,3 +22,4 @@ public class BulkDataController {
         return bulkDataService.bulkInsertPlayerStats(targetStatCount);
     }
 }
+

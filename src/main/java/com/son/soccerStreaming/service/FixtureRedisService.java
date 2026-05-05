@@ -1,8 +1,8 @@
 package com.son.soccerStreaming.service;
 
-import com.son.soccerStreaming.dto.LiveMatchSnapshotDto;
-import com.son.soccerStreaming.dto.MatchEventDto;
-import com.son.soccerStreaming.dto.MatchStatResponseDto;
+import com.son.soccerStreaming.dto.LiveFixtureSnapshotDto;
+import com.son.soccerStreaming.dto.FixtureEventDto;
+import com.son.soccerStreaming.dto.FixtureStatResponseDto;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -16,16 +16,16 @@ import java.util.Optional;
 @Slf4j
 @Service
 @RequiredArgsConstructor
-public class MatchRedisService {
+public class FixtureRedisService {
 
     private static final Duration LIVE_CACHE_TTL = Duration.ofMinutes(10);
-    private static final String LATEST_EVENT_KEY = "match:%d:latest_event";
-    private static final String LIVE_SNAPSHOT_KEY = "match:%d:live_snapshot";
+    private static final String LATEST_EVENT_KEY = "fixture:%d:latest_event";
+    private static final String LIVE_SNAPSHOT_KEY = "fixture:%d:live_snapshot";
 
     private final StringRedisTemplate redisTemplate;
     private final ObjectMapper objectMapper;
 
-    public void saveLatestEvent(MatchEventDto event) {
+    public void saveLatestEvent(FixtureEventDto event) {
         if (event.getFixtureId() == null) {
             log.warn("fixtureId가 없는 이벤트는 Redis 최신 이벤트로 저장하지 않습니다. event={}", event);
             return;
@@ -39,7 +39,7 @@ public class MatchRedisService {
         }
     }
 
-    public void saveLiveSnapshot(LiveMatchSnapshotDto snapshot) {
+    public void saveLiveSnapshot(LiveFixtureSnapshotDto snapshot) {
         if (snapshot.getFixtureId() == null) {
             log.warn("fixtureId가 없는 live snapshot은 Redis에 저장하지 않습니다.");
             return;
@@ -53,27 +53,27 @@ public class MatchRedisService {
         }
     }
 
-    public Optional<LiveMatchSnapshotDto> getLiveSnapshot(Long fixtureId) {
+    public Optional<LiveFixtureSnapshotDto> getLiveSnapshot(Long fixtureId) {
         String snapshotJson = redisTemplate.opsForValue().get(liveSnapshotKey(fixtureId));
         if (snapshotJson == null) {
             return Optional.empty();
         }
 
         try {
-            return Optional.of(objectMapper.readValue(snapshotJson, LiveMatchSnapshotDto.class));
+            return Optional.of(objectMapper.readValue(snapshotJson, LiveFixtureSnapshotDto.class));
         } catch (JacksonException e) {
             log.error("Redis live snapshot 조회 중 JSON 변환 오류. fixtureId={}", fixtureId, e);
             return Optional.empty();
         }
     }
 
-    public MatchStatResponseDto.TeamStatSummary getTeamStatSummary(Long fixtureId, Long teamId) {
+    public FixtureStatResponseDto.TeamStatSummary getTeamStatSummary(Long fixtureId, Long teamId) {
         return getLiveSnapshot(fixtureId)
                 .map(snapshot -> findTeamStat(snapshot, teamId))
                 .orElseGet(() -> emptyTeamStat(teamId));
     }
 
-    private MatchStatResponseDto.TeamStatSummary findTeamStat(LiveMatchSnapshotDto snapshot, Long teamId) {
+    private FixtureStatResponseDto.TeamStatSummary findTeamStat(LiveFixtureSnapshotDto snapshot, Long teamId) {
         if (snapshot.getHomeTeamStat() != null && teamId.equals(snapshot.getHomeTeamStat().getTeamId())) {
             return snapshot.getHomeTeamStat();
         }
@@ -83,8 +83,8 @@ public class MatchRedisService {
         return emptyTeamStat(teamId);
     }
 
-    private MatchStatResponseDto.TeamStatSummary emptyTeamStat(Long teamId) {
-        return MatchStatResponseDto.TeamStatSummary.builder()
+    private FixtureStatResponseDto.TeamStatSummary emptyTeamStat(Long teamId) {
+        return FixtureStatResponseDto.TeamStatSummary.builder()
                 .teamId(teamId)
                 .build();
     }

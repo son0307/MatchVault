@@ -9,7 +9,7 @@ import lombok.ToString;
 @NoArgsConstructor // 💡 Jackson이 JSON을 객체로 만들 때 사용하는 기본 생성자
 @ToString
 @JsonIgnoreProperties(ignoreUnknown = true)
-public class MatchEventDto {
+public class FixtureEventDto {
 
     // 파이썬 시뮬레이터가 이미 주입해서 보내준 경기 ID를 고스란히 받습니다.
     private Long fixtureId;

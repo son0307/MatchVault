@@ -14,7 +14,7 @@ public class Team {
     private Long id;
 
     @Column(nullable = false, unique = true)
-    private Long teamApiId;
+    private Long teamId;
 
     @Column(nullable = false)
     private String name;

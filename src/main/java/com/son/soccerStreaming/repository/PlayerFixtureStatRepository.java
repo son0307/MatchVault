@@ -1,18 +1,18 @@
 package com.son.soccerStreaming.repository;
 
-import com.son.soccerStreaming.entity.PlayerMatchStat;
+import com.son.soccerStreaming.entity.PlayerFixtureStat;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.util.List;
 
-public interface PlayerMatchStatRepository extends JpaRepository<PlayerMatchStat, Long> {
+public interface PlayerFixtureStatRepository extends JpaRepository<PlayerFixtureStat, Long> {
 
-    List<PlayerMatchStat> findAllByMatchRecordApiFixtureId(Long apiFixtureId);
+    List<PlayerFixtureStat> findAllByFixtureFixtureId(Long fixtureId);
 
     @Query("SELECT " +
-            "COUNT(s) as totalMatches, " +
+            "COUNT(s) as totalFixtures, " +
             "COALESCE(SUM(s.minutesPlayed), 0) as minutesPlayed, " +
             "COALESCE(AVG(s.rating), 0) as averageRating, " +
             "COALESCE(SUM(s.goals), 0) as goals, " +
@@ -42,12 +42,12 @@ public interface PlayerMatchStatRepository extends JpaRepository<PlayerMatchStat
             "COALESCE(SUM(s.penaltyScored), 0) as penaltyScored, " +
             "COALESCE(SUM(s.penaltyMissed), 0) as penaltyMissed, " +
             "COALESCE(SUM(s.penaltySaved), 0) as penaltySaved " +
-            "FROM PlayerMatchStat s " +
-            "WHERE s.player.apiPlayerId = :apiPlayerId")
+            "FROM PlayerFixtureStat s " +
+            "WHERE s.player.playerId = :apiPlayerId")
     SeasonStatSummary findSeasonStatSummaryByPlayerId(@Param("apiPlayerId") Long apiPlayerId);
 
     interface SeasonStatSummary {
-        long getTotalMatches();
+        long getTotalFixtures();
         int getMinutesPlayed();
         double getAverageRating();
         int getGoals();

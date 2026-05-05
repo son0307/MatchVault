@@ -9,5 +9,5 @@ import java.util.List;
 public interface PlayerAbsenceRepository extends JpaRepository<PlayerAbsence, Long> {
 
     @EntityGraph(attributePaths = {"player", "team"})
-    List<PlayerAbsence> findAllByMatchRecordApiFixtureId(Long apiFixtureId);
+    List<PlayerAbsence> findAllByFixtureFixtureId(Long fixtureId);
 }

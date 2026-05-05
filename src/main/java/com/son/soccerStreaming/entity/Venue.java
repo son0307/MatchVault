@@ -23,7 +23,7 @@ public class Venue {
     private Long id;
 
     @Column(nullable = false, unique = true)
-    private Long venueApiId;
+    private Long venueId;
 
     private String venueName;
     private String venueAddress;

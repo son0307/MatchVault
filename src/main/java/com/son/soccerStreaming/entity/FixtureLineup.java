@@ -4,19 +4,19 @@ import jakarta.persistence.*;
 import lombok.*;
 
 @Entity
-@Table(name = "match_lineup")
+@Table(name = "fixture_lineup")
 @Getter
 @Builder
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @AllArgsConstructor(access = AccessLevel.PROTECTED)
-public class MatchLineup {
+public class FixtureLineup {
 
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "match_record_id", nullable = false)
-    private MatchRecord matchRecord;
+    @JoinColumn(name = "fixture_id", nullable = false)
+    private Fixture fixture;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "team_id", nullable = false)

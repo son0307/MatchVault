@@ -5,12 +5,12 @@ import lombok.Getter;
 
 import java.util.List;
 
-public class MatchLineupResponseDto {
+public class FixtureLineupResponseDto {
 
     @Getter
     @Builder
     public static class Lineup {
-        private Long matchId;
+        private Long fixtureId;
         private TeamLineup homeTeam;
         private TeamLineup awayTeam;
     }

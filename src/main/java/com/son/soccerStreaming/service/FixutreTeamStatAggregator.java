@@ -1,22 +1,22 @@
 package com.son.soccerStreaming.service;
 
-import com.son.soccerStreaming.dto.MatchStatResponseDto;
-import com.son.soccerStreaming.entity.PlayerMatchStat;
+import com.son.soccerStreaming.dto.FixtureStatResponseDto;
+import com.son.soccerStreaming.entity.PlayerFixtureStat;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
 
 @Component
-public class MatchTeamStatAggregator {
+public class FixutreTeamStatAggregator {
 
-    public MatchStatResponseDto.TeamStatSummary aggregate(
+    public FixtureStatResponseDto.TeamStatSummary aggregate(
             Long teamApiId,
             int score,
-            List<PlayerMatchStat> matchStats
+            List<PlayerFixtureStat> fixtureStats
     ) {
-        List<PlayerMatchStat> teamStats = matchStats.stream()
+        List<PlayerFixtureStat> teamStats = fixtureStats.stream()
                 .filter(stat -> stat.getTeam() != null)
-                .filter(stat -> teamApiId.equals(stat.getTeam().getTeamApiId()))
+                .filter(stat -> teamApiId.equals(stat.getTeam().getTeamId()))
                 .toList();
 
         int totalShots = teamStats.stream().mapToInt(stat -> valueOf(stat.getShotsTotal())).sum();
@@ -29,7 +29,7 @@ public class MatchTeamStatAggregator {
 
         double passAccuracy = calculateWeightedPassAccuracy(teamStats, totalPasses);
 
-        return MatchStatResponseDto.TeamStatSummary.builder()
+        return FixtureStatResponseDto.TeamStatSummary.builder()
                 .teamId(teamApiId)
                 .score(score)
                 .totalShots(totalShots)
@@ -43,7 +43,7 @@ public class MatchTeamStatAggregator {
                 .build();
     }
 
-    private double calculateWeightedPassAccuracy(List<PlayerMatchStat> teamStats, int totalPasses) {
+    private double calculateWeightedPassAccuracy(List<PlayerFixtureStat> teamStats, int totalPasses) {
         if (totalPasses == 0) {
             return 0;
         }

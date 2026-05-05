@@ -30,7 +30,7 @@ public class TeamStandingService {
                 .season(standing.getSeason())
                 .rank(standing.getRank())
                 .team(TeamStandingResponseDto.TeamInfo.builder()
-                        .id(team.getTeamApiId())
+                        .id(team.getTeamId())
                         .name(team.getName())
                         .logo(team.getLogoUrl())
                         .build())

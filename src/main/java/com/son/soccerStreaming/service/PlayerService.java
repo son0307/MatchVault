@@ -5,7 +5,7 @@ import com.son.soccerStreaming.entity.Player;
 import com.son.soccerStreaming.entity.Team;
 import com.son.soccerStreaming.exception.CustomException;
 import com.son.soccerStreaming.exception.ErrorCode;
-import com.son.soccerStreaming.repository.PlayerMatchStatRepository;
+import com.son.soccerStreaming.repository.PlayerFixtureStatRepository;
 import com.son.soccerStreaming.repository.PlayerRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.cache.annotation.Cacheable;
@@ -17,17 +17,17 @@ import org.springframework.transaction.annotation.Transactional;
 public class PlayerService {
 
     private final PlayerRepository playerRepository;
-    private final PlayerMatchStatRepository playerMatchStatRepository;
+    private final PlayerFixtureStatRepository playerFixtureStatRepository;
 
     @Transactional(readOnly = true)
     public PlayerResponseDto.Details getPlayerDetails(Long playerId) {
-        Player player = playerRepository.findByApiPlayerId(playerId)
+        Player player = playerRepository.findByPlayerId(playerId)
                 .orElseThrow(() -> new CustomException(ErrorCode.PLAYER_NOT_FOUND));
 
         Team team = player.getTeam();
 
         return PlayerResponseDto.Details.builder()
-                .playerId(player.getApiPlayerId())
+                .playerId(player.getPlayerId())
                 .playerName(player.getName())
                 .firstname(player.getFirstname())
                 .lastname(player.getLastname())
@@ -41,7 +41,7 @@ public class PlayerService {
                 .weight(player.getWeight())
                 .position(player.getPosition())
                 .photoUrl(player.getPhotoUrl())
-                .teamId(team != null ? team.getTeamApiId() : null)
+                .teamId(team != null ? team.getTeamId() : null)
                 .teamName(team != null ? team.getName() : null)
                 .teamLogoUrl(team != null ? team.getLogoUrl() : null)
                 .build();
@@ -50,15 +50,15 @@ public class PlayerService {
     @Cacheable(value = "playerStats", key = "#playerId")
     @Transactional(readOnly = true)
     public PlayerResponseDto.SeasonStats getPlayerSeasonStats(Long playerId) {
-        Player player = playerRepository.findByApiPlayerId(playerId)
+        Player player = playerRepository.findByPlayerId(playerId)
                 .orElseThrow(() -> new CustomException(ErrorCode.PLAYER_NOT_FOUND));
 
-        PlayerMatchStatRepository.SeasonStatSummary stats =
-                playerMatchStatRepository.findSeasonStatSummaryByPlayerId(playerId);
+        PlayerFixtureStatRepository.SeasonStatSummary stats =
+                playerFixtureStatRepository.findSeasonStatSummaryByPlayerId(playerId);
 
         return PlayerResponseDto.SeasonStats.builder()
-                .playerId(player.getApiPlayerId())
-                .totalMatches(stats.getTotalMatches())
+                .playerId(player.getPlayerId())
+                .totalFixtures(stats.getTotalFixtures())
                 .minutesPlayed(stats.getMinutesPlayed())
                 .averageRating(roundToOneDecimal(stats.getAverageRating()))
                 .goals(stats.getGoals())

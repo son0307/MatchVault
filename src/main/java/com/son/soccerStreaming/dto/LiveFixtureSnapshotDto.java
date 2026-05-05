@@ -9,14 +9,14 @@ import lombok.NoArgsConstructor;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class LiveMatchSnapshotDto {
+public class LiveFixtureSnapshotDto {
 
     private Long fixtureId;
     private String statusShort;
     private String statusLong;
-    private String matchCategory;
+    private String fixtureStatus;
     private Integer elapsed;
-    private MatchStatResponseDto.TeamStatSummary homeTeamStat;
-    private MatchStatResponseDto.TeamStatSummary awayTeamStat;
-    private MatchEventDto latestEvent;
+    private FixtureStatResponseDto.TeamStatSummary homeTeamStat;
+    private FixtureStatResponseDto.TeamStatSummary awayTeamStat;
+    private FixtureEventDto latestEvent;
 }

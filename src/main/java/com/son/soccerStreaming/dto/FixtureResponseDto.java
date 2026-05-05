@@ -4,16 +4,16 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
 
-public class MatchResponseDto {
+public class FixtureResponseDto {
     @Getter
     @Builder
     @AllArgsConstructor
     public static class Summary {
-        private Long matchId;
+        private Long fixtureId;
         private String homeTeamName;
         private String awayTeamName;
         private int homeScore;
         private int awayScore;
-        private String matchStatus;
+        private String fixtureStatus;
     }
 }

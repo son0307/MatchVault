@@ -1,14 +1,14 @@
 package com.son.soccerStreaming.service;
 
-import com.son.soccerStreaming.dto.MatchLineupResponseDto;
-import com.son.soccerStreaming.entity.MatchLineup;
-import com.son.soccerStreaming.entity.MatchRecord;
+import com.son.soccerStreaming.dto.FixtureLineupResponseDto;
+import com.son.soccerStreaming.entity.FixtureLineup;
+import com.son.soccerStreaming.entity.Fixture;
 import com.son.soccerStreaming.entity.PlayerAbsence;
 import com.son.soccerStreaming.entity.Team;
 import com.son.soccerStreaming.exception.CustomException;
 import com.son.soccerStreaming.exception.ErrorCode;
-import com.son.soccerStreaming.repository.MatchLineupRepository;
-import com.son.soccerStreaming.repository.MatchRecordRepository;
+import com.son.soccerStreaming.repository.FixtureLineupRepository;
+import com.son.soccerStreaming.repository.FixtureRecordRepository;
 import com.son.soccerStreaming.repository.PlayerAbsenceRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -19,63 +19,63 @@ import java.util.List;
 @Service
 @Transactional(readOnly = true)
 @RequiredArgsConstructor
-public class MatchLineupService {
+public class FixtureLineupService {
 
-    private final MatchLineupRepository matchLineupRepository;
-    private final MatchRecordRepository matchRecordRepository;
+    private final FixtureLineupRepository fixtureLineupRepository;
+    private final FixtureRecordRepository fixtureRecordRepository;
     private final PlayerAbsenceRepository playerAbsenceRepository;
 
-    public MatchLineupResponseDto.Lineup getMatchLineups(Long matchId) {
-        MatchRecord match = matchRecordRepository.findByApiFixtureId(matchId)
-                .orElseThrow(() -> new CustomException(ErrorCode.MATCH_NOT_FOUND));
-        List<MatchLineup> lineups = matchLineupRepository.findAllByMatchId(matchId);
-        List<PlayerAbsence> absences = playerAbsenceRepository.findAllByMatchRecordApiFixtureId(matchId);
+    public FixtureLineupResponseDto.Lineup getFixtureLineups(Long fixtureId) {
+        Fixture fixture = fixtureRecordRepository.findByFixtureId(fixtureId)
+                .orElseThrow(() -> new CustomException(ErrorCode.FIXTURE_NOT_FOUND));
+        List<FixtureLineup> lineups = fixtureLineupRepository.findAllByFixtureId(fixtureId);
+        List<PlayerAbsence> absences = playerAbsenceRepository.findAllByFixtureFixtureId(fixtureId);
 
-        return MatchLineupResponseDto.Lineup.builder()
-                .matchId(matchId)
+        return FixtureLineupResponseDto.Lineup.builder()
+                .fixtureId(fixtureId)
                 .homeTeam(buildTeamLineup(
-                        match.getHomeTeam(),
-                        match.getHomeFormation(),
-                        match.getHomeCoachName(),
+                        fixture.getHomeTeam(),
+                        fixture.getHomeFormation(),
+                        fixture.getHomeCoachName(),
                         lineups,
                         absences
                 ))
                 .awayTeam(buildTeamLineup(
-                        match.getAwayTeam(),
-                        match.getAwayFormation(),
-                        match.getAwayCoachName(),
+                        fixture.getAwayTeam(),
+                        fixture.getAwayFormation(),
+                        fixture.getAwayCoachName(),
                         lineups,
                         absences
                 ))
                 .build();
     }
 
-    private MatchLineupResponseDto.TeamLineup buildTeamLineup(
+    private FixtureLineupResponseDto.TeamLineup buildTeamLineup(
             Team team,
             String formation,
             String coachName,
-            List<MatchLineup> lineups,
+            List<FixtureLineup> lineups,
             List<PlayerAbsence> absences
     ) {
-        List<MatchLineupResponseDto.PlayerLineup> starters = lineups.stream()
+        List<FixtureLineupResponseDto.PlayerLineup> starters = lineups.stream()
                 .filter(lineup -> team.getId().equals(lineup.getTeam().getId()))
-                .filter(MatchLineup::isStarter)
+                .filter(FixtureLineup::isStarter)
                 .map(this::toPlayerLineup)
                 .toList();
 
-        List<MatchLineupResponseDto.PlayerLineup> substitutes = lineups.stream()
+        List<FixtureLineupResponseDto.PlayerLineup> substitutes = lineups.stream()
                 .filter(lineup -> team.getId().equals(lineup.getTeam().getId()))
                 .filter(lineup -> !lineup.isStarter())
                 .map(this::toPlayerLineup)
                 .toList();
 
-        List<MatchLineupResponseDto.PlayerAbsenceInfo> teamAbsences = absences.stream()
+        List<FixtureLineupResponseDto.PlayerAbsenceInfo> teamAbsences = absences.stream()
                 .filter(absence -> team.getId().equals(absence.getTeam().getId()))
                 .map(this::toAbsenceInfo)
                 .toList();
 
-        return MatchLineupResponseDto.TeamLineup.builder()
-                .teamId(team.getTeamApiId())
+        return FixtureLineupResponseDto.TeamLineup.builder()
+                .teamId(team.getTeamId())
                 .teamName(team.getName())
                 .formation(formation)
                 .coachName(coachName)
@@ -85,9 +85,9 @@ public class MatchLineupService {
                 .build();
     }
 
-    private MatchLineupResponseDto.PlayerLineup toPlayerLineup(MatchLineup lineup) {
-        return MatchLineupResponseDto.PlayerLineup.builder()
-                .playerId(lineup.getPlayer().getApiPlayerId())
+    private FixtureLineupResponseDto.PlayerLineup toPlayerLineup(FixtureLineup lineup) {
+        return FixtureLineupResponseDto.PlayerLineup.builder()
+                .playerId(lineup.getPlayer().getPlayerId())
                 .playerName(lineup.getPlayer().getName())
                 .backNumber(lineup.getJerseyNumber())
                 .position(lineup.getPosition())
@@ -96,11 +96,11 @@ public class MatchLineupService {
                 .build();
     }
 
-    private MatchLineupResponseDto.PlayerAbsenceInfo toAbsenceInfo(PlayerAbsence absence) {
-        return MatchLineupResponseDto.PlayerAbsenceInfo.builder()
-                .playerId(absence.getPlayer().getApiPlayerId())
+    private FixtureLineupResponseDto.PlayerAbsenceInfo toAbsenceInfo(PlayerAbsence absence) {
+        return FixtureLineupResponseDto.PlayerAbsenceInfo.builder()
+                .playerId(absence.getPlayer().getPlayerId())
                 .playerName(absence.getPlayer().getName())
-                .teamId(absence.getTeam().getTeamApiId())
+                .teamId(absence.getTeam().getTeamId())
                 .teamName(absence.getTeam().getName())
                 .absenceType(absence.getAbsenceType())
                 .reason(absence.getReason())

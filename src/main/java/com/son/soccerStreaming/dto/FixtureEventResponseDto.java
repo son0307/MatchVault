@@ -7,9 +7,9 @@ import java.util.List;
 
 @Getter
 @Builder
-public class MatchEventResponseDto {
+public class FixtureEventResponseDto {
 
-    private Long matchId;
+    private Long fixtureId;
     private List<Event> events;
 
     @Getter

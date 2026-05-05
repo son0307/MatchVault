@@ -7,6 +7,6 @@ import java.util.List;
 import java.util.Optional;
 
 public interface PlayerRepository extends JpaRepository<Player, Long> {
-    List<Player> findAllByTeamTeamApiId(Long teamId);
-    Optional<Player> findByApiPlayerId(Long playerId);
+    List<Player> findAllByTeamTeamId(Long teamId);
+    Optional<Player> findByPlayerId(Long playerId);
 }

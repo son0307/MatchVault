@@ -43,7 +43,7 @@ public class BulkDataService {
         });
 
         int statsPerMatch = PLAYERS_PER_TEAM_IN_MATCH * 2;
-        int matchCount = Math.max(1, (int) Math.ceil(targetStatCount / (double) statsPerMatch));
+        int fixtureCount = Math.max(1, (int) Math.ceil(targetStatCount / (double) statsPerMatch));
 
         Random random = new Random();
         long nextFixtureId = nextBulkFixtureId();
@@ -52,7 +52,7 @@ public class BulkDataService {
         int insertedStats = 0;
         int insertedLineups = 0;
 
-        for (int i = 0; i < matchCount; i++) {
+        for (int i = 0; i < fixtureCount; i++) {
             TeamSeed homeTeam = teams.get(i % teams.size());
             TeamSeed awayTeam = teams.get((i + 1) % teams.size());
 
@@ -73,9 +73,9 @@ public class BulkDataService {
 
         long elapsedMillis = System.currentTimeMillis() - startTime;
         log.info("벌크 데이터 생성 완료. matches={}, lineups={}, stats={}, elapsed={}ms",
-                matchCount, insertedLineups, insertedStats, elapsedMillis);
+                fixtureCount, insertedLineups, insertedStats, elapsedMillis);
 
-        return new BulkInsertResult(matchCount, insertedLineups, insertedStats, elapsedMillis);
+        return new BulkInsertResult(fixtureCount, insertedLineups, insertedStats, elapsedMillis);
     }
 
     private List<TeamSeed> loadTeams() {
@@ -126,7 +126,7 @@ public class BulkDataService {
 
     private long nextBulkFixtureId() {
         Long maxFixtureId = jdbcTemplate.queryForObject(
-                "SELECT COALESCE(MAX(api_fixture_id), ?) FROM match_record",
+                "SELECT COALESCE(MAX(fixture_id), ?) FROM match_record",
                 Long.class,
                 BULK_FIXTURE_ID_START - 1
         );
@@ -137,7 +137,7 @@ public class BulkDataService {
     private Long insertMatchRecord(long fixtureId, TeamSeed homeTeam, TeamSeed awayTeam, int index, Random random) {
         String sql = """
                 INSERT INTO match_record
-                (api_fixture_id, home_team_id, away_team_id, match_date, referee, round,
+                (fixture_id, home_team_id, away_team_id, match_date, referee, round,
                  venue_id, venue_name, venue_city, status_short, status_long, elapsed,
                  match_category, home_score, away_score, home_formation, away_formation,
                  home_coach_name, away_coach_name)
@@ -171,7 +171,7 @@ public class BulkDataService {
 
         Number generatedId = keyHolder.getKey();
         if (generatedId == null) {
-            throw new IllegalStateException("match_record generated key를 가져오지 못했습니다.");
+            throw new IllegalStateException("fixture generated key를 가져오지 못했습니다.");
         }
         return generatedId.longValue();
     }
@@ -329,3 +329,4 @@ public class BulkDataService {
     ) {
     }
 }
+

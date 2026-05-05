@@ -10,7 +10,7 @@ import java.util.Optional;
 public interface TeamRepository extends JpaRepository<Team, Long> {
 
     @EntityGraph(attributePaths = "venue")
-    Optional<Team> findByTeamApiId(Long teamId);
+    Optional<Team> findByTeamId(Long teamId);
 
     List<Team> findAllByOrderByNameAsc();
 }

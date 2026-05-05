@@ -15,18 +15,18 @@ import java.util.*;
 
 @Slf4j
 @Component
-@Profile("local") // 🚨 로컬 환경 보호
+@Profile("local") // ?슚 濡쒖뺄 ?섍꼍 蹂댄샇
 @RequiredArgsConstructor
 public class DummyDataInitializer implements CommandLineRunner {
 
     private final TeamRepository teamRepository;
     private final PlayerRepository playerRepository;
-    private final MatchRecordRepository matchRecordRepository;
-    private final MatchLineupRepository matchLineupRepository;
-    private final PlayerMatchStatRepository playerMatchStatRepository;
+    private final FixtureRecordRepository fixtureRecordRepository;
+    private final FixtureLineupRepository fixtureLineupRepository;
+    private final PlayerFixtureStatRepository playerFixtureStatRepository;
     private final TeamStandingRepository teamStandingRepository;
     private final PlayerAbsenceRepository playerAbsenceRepository;
-    private final MatchEventRepository matchEventRepository;
+    private final FixtureEventRepository fixtureEventRepository;
 
     @Override
     @Transactional
@@ -59,7 +59,7 @@ public class DummyDataInitializer implements CommandLineRunner {
                 if (i == 1) pos = "Goalkeeper";
 
                 Player player = Player.builder()
-                        .apiPlayerId(playerIdCounter++)
+                        .playerId(playerIdCounter++)
                         .name(team.getCode() + " Player " + i)
                         .firstname("Name" + i)
                         .lastname("Surname")
@@ -92,19 +92,19 @@ public class DummyDataInitializer implements CommandLineRunner {
             int homeScore = random.nextInt(4);
             int awayScore = random.nextInt(4);
 
-            MatchRecord match = MatchRecord.builder()
-                    .apiFixtureId(fixtureIdCounter++)
+            Fixture fixture = Fixture.builder()
+                    .fixtureId(fixtureIdCounter++)
                     .homeTeam(homeTeam)
                     .awayTeam(awayTeam)
-                    .matchDate(LocalDateTime.now().minusDays(random.nextInt(30)))
+                    .fixtureDate(LocalDateTime.now().minusDays(random.nextInt(30)))
                     .referee("Michael Oliver")
                     .round("Regular Season - 1")
-                    .venueId(homeTeam.getVenue().getVenueApiId())
+                    .venueId(homeTeam.getVenue().getVenueId())
                     .venueName(homeTeam.getVenue().getVenueName())
                     .venueCity(homeTeam.getVenue().getVenueCity())
                     .statusShort("FT")
                     .statusLong("Match Finished")
-                    .matchCategory("FINISHED")
+                    .fixtureStatus("FINISHED")
                     .elapsed(90)
                     .homeScore(homeScore)
                     .awayScore(awayScore)
@@ -113,13 +113,13 @@ public class DummyDataInitializer implements CommandLineRunner {
                     .homeCoachName("Home Coach")
                     .awayCoachName("Away Coach")
                     .build();
-            matchRecordRepository.save(match);
+            fixtureRecordRepository.save(fixture);
 
             // 해당 경기의 라인업 및 스탯 생성
-            generateLineupAndStats(match, homeTeam, teamPlayersMap.get(homeTeam), random);
-            generateLineupAndStats(match, awayTeam, teamPlayersMap.get(awayTeam), random);
-            generateAbsences(match, homeTeam, awayTeam, teamPlayersMap, random);
-            generateEvents(match, homeTeam, awayTeam, teamPlayersMap, random);
+            generateLineupAndStats(fixture, homeTeam, teamPlayersMap.get(homeTeam), random);
+            generateLineupAndStats(fixture, awayTeam, teamPlayersMap.get(awayTeam), random);
+            generateAbsences(fixture, homeTeam, awayTeam, teamPlayersMap, random);
+            generateEvents(fixture, homeTeam, awayTeam, teamPlayersMap, random);
         }
 
         log.info("✅ 5개 팀, 75명 선수, 7개 경기 및 통계 더미 데이터 생성 완료!");
@@ -128,21 +128,21 @@ public class DummyDataInitializer implements CommandLineRunner {
     // 💡 새로운 Team 및 임베디드 Venue 엔티티 규격 적용
     private List<Team> createTeams() {
         return Arrays.asList(
-                Team.builder().teamApiId(47L).name("Tottenham").code("TOT").country("England").founded(1882)
+                Team.builder().teamId(47L).name("Tottenham").code("TOT").country("England").founded(1882)
                         .logoUrl("https://media.api-sports.io/football/teams/47.png")
-                        .venue(Venue.builder().venueApiId(593L).venueName("Tottenham Hotspur Stadium").venueAddress("782 High Road").venueCity("London").capacity(62850).surface("grass").venueImageUrl("https://media.api-sports.io/football/venues/593.png").build()).build(),
-                Team.builder().teamApiId(42L).name("Arsenal").code("ARS").country("England").founded(1886)
+                        .venue(Venue.builder().venueId(593L).venueName("Tottenham Hotspur Stadium").venueAddress("782 High Road").venueCity("London").capacity(62850).surface("grass").venueImageUrl("https://media.api-sports.io/football/venues/593.png").build()).build(),
+                Team.builder().teamId(42L).name("Arsenal").code("ARS").country("England").founded(1886)
                         .logoUrl("https://media.api-sports.io/football/teams/42.png")
-                        .venue(Venue.builder().venueApiId(494L).venueName("Emirates Stadium").venueAddress("Hornsey Road").venueCity("London").capacity(60383).surface("grass").venueImageUrl("https://media.api-sports.io/football/venues/494.png").build()).build(),
-                Team.builder().teamApiId(50L).name("Manchester City").code("MCI").country("England").founded(1880)
+                        .venue(Venue.builder().venueId(494L).venueName("Emirates Stadium").venueAddress("Hornsey Road").venueCity("London").capacity(60383).surface("grass").venueImageUrl("https://media.api-sports.io/football/venues/494.png").build()).build(),
+                Team.builder().teamId(50L).name("Manchester City").code("MCI").country("England").founded(1880)
                         .logoUrl("https://media.api-sports.io/football/teams/50.png")
-                        .venue(Venue.builder().venueApiId(555L).venueName("Etihad Stadium").venueAddress("Rowsley Street").venueCity("Manchester").capacity(55097).surface("grass").venueImageUrl("https://media.api-sports.io/football/venues/555.png").build()).build(),
-                Team.builder().teamApiId(40L).name("Liverpool").code("LIV").country("England").founded(1892)
+                        .venue(Venue.builder().venueId(555L).venueName("Etihad Stadium").venueAddress("Rowsley Street").venueCity("Manchester").capacity(55097).surface("grass").venueImageUrl("https://media.api-sports.io/football/venues/555.png").build()).build(),
+                Team.builder().teamId(40L).name("Liverpool").code("LIV").country("England").founded(1892)
                         .logoUrl("https://media.api-sports.io/football/teams/40.png")
-                        .venue(Venue.builder().venueApiId(550L).venueName("Anfield").venueAddress("Anfield Road").venueCity("Liverpool").capacity(61276).surface("grass").venueImageUrl("https://media.api-sports.io/football/venues/550.png").build()).build(),
-                Team.builder().teamApiId(49L).name("Chelsea").code("CHE").country("England").founded(1905)
+                        .venue(Venue.builder().venueId(550L).venueName("Anfield").venueAddress("Anfield Road").venueCity("Liverpool").capacity(61276).surface("grass").venueImageUrl("https://media.api-sports.io/football/venues/550.png").build()).build(),
+                Team.builder().teamId(49L).name("Chelsea").code("CHE").country("England").founded(1905)
                         .logoUrl("https://media.api-sports.io/football/teams/49.png")
-                        .venue(Venue.builder().venueApiId(519L).venueName("Stamford Bridge").venueAddress("Fulham Road").venueCity("London").capacity(41841).surface("grass").venueImageUrl("https://media.api-sports.io/football/venues/519.png").build()).build()
+                        .venue(Venue.builder().venueId(519L).venueName("Stamford Bridge").venueAddress("Fulham Road").venueCity("London").capacity(41841).surface("grass").venueImageUrl("https://media.api-sports.io/football/venues/519.png").build()).build()
         );
     }
 
@@ -194,7 +194,7 @@ public class DummyDataInitializer implements CommandLineRunner {
         return standings;
     }
 
-    private void generateLineupAndStats(MatchRecord match, Team team, List<Player> teamPlayers, Random random) {
+    private void generateLineupAndStats(Fixture fixture, Team team, List<Player> teamPlayers, Random random) {
         // 11명 선발, 4명 교체
         for (int i = 0; i < 15; i++) {
             Player player = teamPlayers.get(i);
@@ -206,8 +206,8 @@ public class DummyDataInitializer implements CommandLineRunner {
             String grid = isStarter ? (random.nextInt(4) + 1) + ":" + (random.nextInt(4) + 1) : null;
 
             // 1. 👕 라인업 저장
-            MatchLineup lineup = MatchLineup.builder()
-                    .matchRecord(match)
+            FixtureLineup lineup = FixtureLineup.builder()
+                    .fixture(fixture)
                     .team(team)
                     .player(player)
                     .jerseyNumber(player.getDefaultNumber())
@@ -215,12 +215,12 @@ public class DummyDataInitializer implements CommandLineRunner {
                     .grid(grid)
                     .isStarter(isStarter)
                     .build();
-            matchLineupRepository.save(lineup);
+            fixtureLineupRepository.save(lineup);
 
             // 2. 📊 방대한 경기 스탯 저장
             int passes = random.nextInt(40) + 20;
-            PlayerMatchStat stat = PlayerMatchStat.builder()
-                    .matchRecord(match)
+            PlayerFixtureStat stat = PlayerFixtureStat.builder()
+                    .fixture(fixture)
                     .team(team)
                     .player(player)
                     .minutesPlayed(isStarter ? 90 : random.nextInt(45))
@@ -245,22 +245,22 @@ public class DummyDataInitializer implements CommandLineRunner {
                     .yellowCards(random.nextInt(100) > 85 ? 1 : 0)
                     .redCards(0)
                     .build();
-            playerMatchStatRepository.save(stat);
+            playerFixtureStatRepository.save(stat);
         }
     }
 
-    private void generateAbsences(MatchRecord match, Team homeTeam, Team awayTeam,
+    private void generateAbsences(Fixture fixture, Team homeTeam, Team awayTeam,
                                   Map<Team, List<Player>> teamPlayersMap, Random random) {
         List<PlayerAbsence> absences = new ArrayList<>();
         absences.add(PlayerAbsence.builder()
-                .matchRecord(match)
+                .fixture(fixture)
                 .team(homeTeam)
                 .player(teamPlayersMap.get(homeTeam).get(13))
                 .absenceType("Missing Fixture")
                 .reason(random.nextBoolean() ? "Suspended" : "Hamstring Injury")
                 .build());
         absences.add(PlayerAbsence.builder()
-                .matchRecord(match)
+                .fixture(fixture)
                 .team(awayTeam)
                 .player(teamPlayersMap.get(awayTeam).get(14))
                 .absenceType("Questionable")
@@ -270,15 +270,15 @@ public class DummyDataInitializer implements CommandLineRunner {
         playerAbsenceRepository.saveAll(absences);
     }
 
-    private void generateEvents(MatchRecord match, Team homeTeam, Team awayTeam,
+    private void generateEvents(Fixture fixture, Team homeTeam, Team awayTeam,
                                 Map<Team, List<Player>> teamPlayersMap, Random random) {
         List<Player> homePlayers = teamPlayersMap.get(homeTeam);
         List<Player> awayPlayers = teamPlayersMap.get(awayTeam);
-        List<MatchEvent> events = new ArrayList<>();
+        List<FixtureEvent> events = new ArrayList<>();
         int sequence = 1;
 
-        events.add(MatchEvent.builder()
-                .matchRecord(match)
+        events.add(FixtureEvent.builder()
+                .fixture(fixture)
                 .eventSequence(sequence++)
                 .elapsed(12)
                 .team(homeTeam)
@@ -287,8 +287,8 @@ public class DummyDataInitializer implements CommandLineRunner {
                 .eventType("Goal")
                 .eventDetail("Normal Goal")
                 .build());
-        events.add(MatchEvent.builder()
-                .matchRecord(match)
+        events.add(FixtureEvent.builder()
+                .fixture(fixture)
                 .eventSequence(sequence++)
                 .elapsed(27)
                 .team(awayTeam)
@@ -297,8 +297,8 @@ public class DummyDataInitializer implements CommandLineRunner {
                 .eventDetail("Yellow Card")
                 .comments("Roughing")
                 .build());
-        events.add(MatchEvent.builder()
-                .matchRecord(match)
+        events.add(FixtureEvent.builder()
+                .fixture(fixture)
                 .eventSequence(sequence++)
                 .elapsed(45)
                 .extra(2)
@@ -308,8 +308,8 @@ public class DummyDataInitializer implements CommandLineRunner {
                 .eventType("Goal")
                 .eventDetail(random.nextBoolean() ? "Normal Goal" : "Penalty")
                 .build());
-        events.add(MatchEvent.builder()
-                .matchRecord(match)
+        events.add(FixtureEvent.builder()
+                .fixture(fixture)
                 .eventSequence(sequence++)
                 .elapsed(62)
                 .team(homeTeam)
@@ -319,8 +319,8 @@ public class DummyDataInitializer implements CommandLineRunner {
                 .eventDetail("Substitution 1")
                 .comments("Tactical change")
                 .build());
-        events.add(MatchEvent.builder()
-                .matchRecord(match)
+        events.add(FixtureEvent.builder()
+                .fixture(fixture)
                 .eventSequence(sequence)
                 .elapsed(78)
                 .team(homeTeam)
@@ -329,6 +329,6 @@ public class DummyDataInitializer implements CommandLineRunner {
                 .eventDetail("Yellow Card")
                 .build());
 
-        matchEventRepository.saveAll(events);
+        fixtureEventRepository.saveAll(events);
     }
 }

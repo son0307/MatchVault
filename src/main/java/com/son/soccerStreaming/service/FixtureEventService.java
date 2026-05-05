@@ -1,13 +1,13 @@
 package com.son.soccerStreaming.service;
 
-import com.son.soccerStreaming.dto.MatchEventResponseDto;
-import com.son.soccerStreaming.entity.MatchEvent;
+import com.son.soccerStreaming.dto.FixtureEventResponseDto;
+import com.son.soccerStreaming.entity.FixtureEvent;
 import com.son.soccerStreaming.entity.Player;
 import com.son.soccerStreaming.entity.Team;
 import com.son.soccerStreaming.exception.CustomException;
 import com.son.soccerStreaming.exception.ErrorCode;
-import com.son.soccerStreaming.repository.MatchEventRepository;
-import com.son.soccerStreaming.repository.MatchRecordRepository;
+import com.son.soccerStreaming.repository.FixtureEventRepository;
+import com.son.soccerStreaming.repository.FixtureRecordRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -16,33 +16,33 @@ import java.util.List;
 
 @Service
 @RequiredArgsConstructor
-public class MatchEventService {
+public class FixtureEventService {
 
-    private final MatchRecordRepository matchRecordRepository;
-    private final MatchEventRepository matchEventRepository;
+    private final FixtureRecordRepository fixtureRecordRepository;
+    private final FixtureEventRepository fixtureEventRepository;
 
     @Transactional(readOnly = true)
-    public MatchEventResponseDto getMatchEvents(Long fixtureId) {
-        if (matchRecordRepository.findByApiFixtureId(fixtureId).isEmpty()) {
-            throw new CustomException(ErrorCode.MATCH_NOT_FOUND);
+    public FixtureEventResponseDto getFixtureEvents(Long fixtureId) {
+        if (fixtureRecordRepository.findByFixtureId(fixtureId).isEmpty()) {
+            throw new CustomException(ErrorCode.FIXTURE_NOT_FOUND);
         }
 
-        List<MatchEventResponseDto.Event> events = matchEventRepository
-                .findAllByMatchRecordApiFixtureIdOrderByElapsedAscEventSequenceAsc(fixtureId)
+        List<FixtureEventResponseDto.Event> events = fixtureEventRepository
+                .findAllByFixtureFixtureIdOrderByElapsedAscEventSequenceAsc(fixtureId)
                 .stream()
                 .map(this::toEvent)
                 .toList();
 
-        return MatchEventResponseDto.builder()
-                .matchId(fixtureId)
+        return FixtureEventResponseDto.builder()
+                .fixtureId(fixtureId)
                 .events(events)
                 .build();
     }
 
-    private MatchEventResponseDto.Event toEvent(MatchEvent event) {
-        return MatchEventResponseDto.Event.builder()
+    private FixtureEventResponseDto.Event toEvent(FixtureEvent event) {
+        return FixtureEventResponseDto.Event.builder()
                 .sequence(event.getEventSequence())
-                .time(MatchEventResponseDto.TimeInfo.builder()
+                .time(FixtureEventResponseDto.TimeInfo.builder()
                         .elapsed(event.getElapsed())
                         .extra(event.getExtra())
                         .build())
@@ -55,25 +55,25 @@ public class MatchEventService {
                 .build();
     }
 
-    private MatchEventResponseDto.TeamInfo toTeamInfo(Team team) {
+    private FixtureEventResponseDto.TeamInfo toTeamInfo(Team team) {
         if (team == null) {
             return null;
         }
 
-        return MatchEventResponseDto.TeamInfo.builder()
-                .id(team.getTeamApiId())
+        return FixtureEventResponseDto.TeamInfo.builder()
+                .id(team.getTeamId())
                 .name(team.getName())
                 .logo(team.getLogoUrl())
                 .build();
     }
 
-    private MatchEventResponseDto.PlayerInfo toPlayerInfo(Player player) {
+    private FixtureEventResponseDto.PlayerInfo toPlayerInfo(Player player) {
         if (player == null) {
             return null;
         }
 
-        return MatchEventResponseDto.PlayerInfo.builder()
-                .id(player.getApiPlayerId())
+        return FixtureEventResponseDto.PlayerInfo.builder()
+                .id(player.getPlayerId())
                 .name(player.getName())
                 .build();
     }

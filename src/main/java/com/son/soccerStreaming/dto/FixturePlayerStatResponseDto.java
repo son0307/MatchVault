@@ -7,9 +7,9 @@ import java.util.List;
 
 @Getter
 @Builder
-public class MatchPlayerStatResponseDto {
+public class FixturePlayerStatResponseDto {
 
-    private Long matchId;
+    private Long fixtureId;
     private TeamPlayerStats homeTeam;
     private TeamPlayerStats awayTeam;
 

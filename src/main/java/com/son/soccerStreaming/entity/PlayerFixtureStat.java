@@ -4,11 +4,11 @@ import jakarta.persistence.*;
 import lombok.*;
 
 @Entity
-@Table(name = "player_match_stat", uniqueConstraints = {
-        @UniqueConstraint(columnNames = {"match_record_id", "player_id"})
+@Table(name = "player_fixture_stat", uniqueConstraints = {
+        @UniqueConstraint(columnNames = {"fixture_id", "player_id"})
 }
     , indexes = {
-        @Index(name = "idx_match_record_id", columnList = "match_record_id"),
+        @Index(name = "idx_fixture_id", columnList = "fixture_id"),
         @Index(name = "idx_team_id", columnList = "team_id"),
         @Index(name = "idx_player_id", columnList = "player_id")
 })
@@ -16,15 +16,15 @@ import lombok.*;
 @Builder
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @AllArgsConstructor(access = AccessLevel.PROTECTED)
-public class PlayerMatchStat {
+public class PlayerFixtureStat {
 
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
     // 💡 연관관계 설정
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "match_record_id", nullable = false, foreignKey = @ForeignKey(ConstraintMode.NO_CONSTRAINT))
-    private MatchRecord matchRecord;
+    @JoinColumn(name = "fixture_id", nullable = false, foreignKey = @ForeignKey(ConstraintMode.NO_CONSTRAINT))
+    private Fixture fixture;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "team_id", nullable = false, foreignKey = @ForeignKey(ConstraintMode.NO_CONSTRAINT))

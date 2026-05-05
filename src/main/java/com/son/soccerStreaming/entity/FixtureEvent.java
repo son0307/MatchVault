@@ -17,22 +17,22 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 
 @Entity
-@Table(name = "match_event", uniqueConstraints = {
-        @UniqueConstraint(columnNames = {"match_record_id", "event_sequence"})
+@Table(name = "fixture_event", uniqueConstraints = {
+        @UniqueConstraint(columnNames = {"fixture_record_id", "event_sequence"})
 })
 @Getter
 @Builder
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @AllArgsConstructor(access = AccessLevel.PROTECTED)
-public class MatchEvent {
+public class FixtureEvent {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "match_record_id", nullable = false)
-    private MatchRecord matchRecord;
+    @JoinColumn(name = "fixture_record_id", nullable = false)
+    private Fixture fixture;
 
     @Column(nullable = false)
     private Integer eventSequence;

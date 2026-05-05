@@ -45,7 +45,7 @@ public class PlayerResponseDto {
     @AllArgsConstructor
     public static class SeasonStats {
         private Long playerId;
-        private long totalMatches;
+        private long totalFixtures;
         private int minutesPlayed;
         private double averageRating;
         private int goals;
