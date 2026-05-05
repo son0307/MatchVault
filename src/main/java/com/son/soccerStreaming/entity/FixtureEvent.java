@@ -10,6 +10,8 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
+import jakarta.persistence.ForeignKey;
+import jakarta.persistence.ConstraintMode;
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -18,7 +20,7 @@ import lombok.NoArgsConstructor;
 
 @Entity
 @Table(name = "fixture_event", uniqueConstraints = {
-        @UniqueConstraint(columnNames = {"fixture_record_id", "event_sequence"})
+        @UniqueConstraint(columnNames = {"fixture_id", "event_sequence"})
 })
 @Getter
 @Builder
@@ -31,7 +33,7 @@ public class FixtureEvent {
     private Long id;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "fixture_record_id", nullable = false)
+    @JoinColumn(name = "fixture_id", nullable = false, foreignKey = @ForeignKey(ConstraintMode.NO_CONSTRAINT))
     private Fixture fixture;
 
     @Column(nullable = false)
@@ -41,15 +43,15 @@ public class FixtureEvent {
     private Integer extra;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "team_id")
+    @JoinColumn(name = "team_id", foreignKey = @ForeignKey(ConstraintMode.NO_CONSTRAINT))
     private Team team;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "player_id")
+    @JoinColumn(name = "player_id", foreignKey = @ForeignKey(ConstraintMode.NO_CONSTRAINT))
     private Player player;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "assist_player_id")
+    @JoinColumn(name = "assist_player_id", foreignKey = @ForeignKey(ConstraintMode.NO_CONSTRAINT))
     private Player assistPlayer;
 
     @Column(length = 50)
