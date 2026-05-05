@@ -36,6 +36,16 @@ public class LiveFixtureSnapshotService {
                 .statusLong(fixture.getStatusLong())
                 .fixtureStatus(fixture.getFixtureStatus())
                 .elapsed(fixture.getElapsed())
+                .homeWinner(fixture.getHomeWinner())
+                .awayWinner(fixture.getAwayWinner())
+                .halftimeHomeScore(fixture.getHalftimeHomeScore())
+                .halftimeAwayScore(fixture.getHalftimeAwayScore())
+                .fulltimeHomeScore(fixture.getFulltimeHomeScore())
+                .fulltimeAwayScore(fixture.getFulltimeAwayScore())
+                .extratimeHomeScore(fixture.getExtratimeHomeScore())
+                .extratimeAwayScore(fixture.getExtratimeAwayScore())
+                .penaltyHomeScore(fixture.getPenaltyHomeScore())
+                .penaltyAwayScore(fixture.getPenaltyAwayScore())
                 .homeTeamStat(fixutreTeamStatAggregator.aggregate(
                         fixture.getHomeTeam().getTeamId(),
                         valueOf(fixture.getHomeScore()),

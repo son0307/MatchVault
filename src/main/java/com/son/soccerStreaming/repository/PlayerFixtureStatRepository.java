@@ -6,10 +6,13 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.util.List;
+import java.util.Optional;
 
 public interface PlayerFixtureStatRepository extends JpaRepository<PlayerFixtureStat, Long> {
 
     List<PlayerFixtureStat> findAllByFixtureFixtureId(Long fixtureId);
+
+    Optional<PlayerFixtureStat> findByFixtureFixtureIdAndPlayerPlayerId(Long fixtureId, Long playerId);
 
     @Query("SELECT " +
             "COUNT(s) as totalFixtures, " +

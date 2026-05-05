@@ -31,6 +31,10 @@ public class Fixture {
     @Column(nullable = false)
     private LocalDateTime fixtureDate;
     private String referee;
+    private String timezone;
+    private Long timestamp;
+    private Long firstPeriod;
+    private Long secondPeriod;
     private String round;
 
     // 경기장 정보
@@ -50,6 +54,17 @@ public class Fixture {
 
     private Integer homeScore;
     private Integer awayScore;
+    private Boolean homeWinner;
+    private Boolean awayWinner;
+
+    private Integer halftimeHomeScore;
+    private Integer halftimeAwayScore;
+    private Integer fulltimeHomeScore;
+    private Integer fulltimeAwayScore;
+    private Integer extratimeHomeScore;
+    private Integer extratimeAwayScore;
+    private Integer penaltyHomeScore;
+    private Integer penaltyAwayScore;
 
     // 포메이션 정보
     @Column(length = 20)
@@ -70,6 +85,39 @@ public class Fixture {
         this.elapsed = elapsed;
         this.homeScore = homeScore;
         this.awayScore = awayScore;
+    }
+
+    public void updateFixtureMetadata(LocalDateTime fixtureDate, String referee, String timezone,
+                                      Long timestamp, Long firstPeriod, Long secondPeriod,
+                                      Long venueId, String venueName, String venueCity) {
+        this.fixtureDate = fixtureDate;
+        this.referee = referee;
+        this.timezone = timezone;
+        this.timestamp = timestamp;
+        this.firstPeriod = firstPeriod;
+        this.secondPeriod = secondPeriod;
+        this.venueId = venueId;
+        this.venueName = venueName;
+        this.venueCity = venueCity;
+    }
+
+    public void updateTeamResult(Boolean homeWinner, Boolean awayWinner) {
+        this.homeWinner = homeWinner;
+        this.awayWinner = awayWinner;
+    }
+
+    public void updateScoreBreakdown(Integer halftimeHomeScore, Integer halftimeAwayScore,
+                                     Integer fulltimeHomeScore, Integer fulltimeAwayScore,
+                                     Integer extratimeHomeScore, Integer extratimeAwayScore,
+                                     Integer penaltyHomeScore, Integer penaltyAwayScore) {
+        this.halftimeHomeScore = halftimeHomeScore;
+        this.halftimeAwayScore = halftimeAwayScore;
+        this.fulltimeHomeScore = fulltimeHomeScore;
+        this.fulltimeAwayScore = fulltimeAwayScore;
+        this.extratimeHomeScore = extratimeHomeScore;
+        this.extratimeAwayScore = extratimeAwayScore;
+        this.penaltyHomeScore = penaltyHomeScore;
+        this.penaltyAwayScore = penaltyAwayScore;
     }
 
     public void updateTactics(String homeFormation, String awayFormation,

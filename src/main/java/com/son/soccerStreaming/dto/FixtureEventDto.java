@@ -1,17 +1,20 @@
 package com.son.soccerStreaming.dto;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.ToString;
 
 @Getter
-@NoArgsConstructor // 💡 Jackson이 JSON을 객체로 만들 때 사용하는 기본 생성자
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
 @ToString
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class FixtureEventDto {
 
-    // 파이썬 시뮬레이터가 이미 주입해서 보내준 경기 ID를 고스란히 받습니다.
     private Long fixtureId;
 
     private TimeInfo time;
@@ -24,7 +27,9 @@ public class FixtureEventDto {
     private String comments;
 
     @Getter
+    @Builder
     @NoArgsConstructor
+    @AllArgsConstructor
     @ToString
     public static class TimeInfo {
         private Integer elapsed;
@@ -32,7 +37,9 @@ public class FixtureEventDto {
     }
 
     @Getter
+    @Builder
     @NoArgsConstructor
+    @AllArgsConstructor
     @ToString
     public static class TeamInfo {
         private Long id;
@@ -41,7 +48,9 @@ public class FixtureEventDto {
     }
 
     @Getter
+    @Builder
     @NoArgsConstructor
+    @AllArgsConstructor
     @ToString
     public static class PlayerInfo {
         private Long id;

@@ -80,4 +80,46 @@ public class PlayerFixtureStat {
     private Integer penaltyScored; // 페널티킥 득점
     private Integer penaltyMissed; // 페널티킥 실축
     private Integer penaltySaved;  // 페널티킥 선방 (골키퍼)
+    public void updateLiveStat(Integer minutesPlayed, Double rating, Boolean isCaptain, Boolean isSubstitute,
+                               Integer goals, Integer assists, Integer conceded, Integer saves,
+                               Integer shotsTotal, Integer shotsOnTarget, Integer passesTotal,
+                               Integer passesKey, Integer passAccuracy, Integer tacklesTotal,
+                               Integer blocks, Integer interceptions, Integer duelsTotal,
+                               Integer duelsWon, Integer dribblesAttempts, Integer dribblesSuccess,
+                               Integer dribblesPast, Integer foulsDrawn, Integer foulsCommitted,
+                               Integer yellowCards, Integer redCards, Integer offsides,
+                               Integer penaltyWon, Integer penaltyCommitted, Integer penaltyScored,
+                               Integer penaltyMissed, Integer penaltySaved) {
+        this.minutesPlayed = minutesPlayed;
+        this.rating = rating;
+        this.isCaptain = isCaptain;
+        this.isSubstitute = isSubstitute;
+        this.goals = goals;
+        this.assists = assists;
+        this.conceded = conceded;
+        this.saves = saves;
+        this.shotsTotal = shotsTotal;
+        this.shotsOnTarget = shotsOnTarget;
+        this.passesTotal = passesTotal;
+        this.passesKey = passesKey;
+        this.passAccuracy = passAccuracy;
+        this.tacklesTotal = tacklesTotal;
+        this.blocks = blocks;
+        this.interceptions = interceptions;
+        this.duelsTotal = duelsTotal;
+        this.duelsWon = duelsWon;
+        this.dribblesAttempts = dribblesAttempts;
+        this.dribblesSuccess = dribblesSuccess;
+        this.dribblesPast = dribblesPast;
+        this.foulsDrawn = foulsDrawn;
+        this.foulsCommitted = foulsCommitted;
+        this.yellowCards = yellowCards;
+        this.redCards = redCards;
+        this.offsides = offsides;
+        this.penaltyWon = penaltyWon;
+        this.penaltyCommitted = penaltyCommitted;
+        this.penaltyScored = penaltyScored;
+        this.penaltyMissed = penaltyMissed;
+        this.penaltySaved = penaltySaved;
+    }
 }

@@ -14,6 +14,16 @@ public class FixtureResponseDto {
         private String awayTeamName;
         private int homeScore;
         private int awayScore;
+        private Boolean homeWinner;
+        private Boolean awayWinner;
+        private Integer halftimeHomeScore;
+        private Integer halftimeAwayScore;
+        private Integer fulltimeHomeScore;
+        private Integer fulltimeAwayScore;
+        private Integer extratimeHomeScore;
+        private Integer extratimeAwayScore;
+        private Integer penaltyHomeScore;
+        private Integer penaltyAwayScore;
         private String fixtureStatus;
     }
 }

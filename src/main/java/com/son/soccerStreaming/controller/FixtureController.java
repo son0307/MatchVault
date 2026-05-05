@@ -9,6 +9,7 @@ import com.son.soccerStreaming.dto.FixtureStatResponseDto;
 import com.son.soccerStreaming.service.FixtureEventService;
 import com.son.soccerStreaming.service.FixtureLineupService;
 import com.son.soccerStreaming.service.FixturePlayerStatService;
+import com.son.soccerStreaming.service.FixtureRedisService;
 import com.son.soccerStreaming.service.FixtureService;
 import com.son.soccerStreaming.service.FixtureStatService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -33,6 +34,7 @@ public class FixtureController {
     private final FixturePlayerStatService fixturePlayerStatService;
     private final FixtureEventService fixtureEventService;
     private final FixtureService fixtureService;
+    private final FixtureRedisService fixtureRedisService;
 
     @Operation(summary = "List recent fixtures", description = "Returns fixtures with cursor-based pagination.")
     @GetMapping
@@ -56,7 +58,13 @@ public class FixtureController {
     @Operation(summary = "특정 경기 팀 스탯 조회", description = "특정 경기의 팀별 집계 스탯을 조회합니다.")
     @GetMapping("/{fixtureId}/stats")
     public ResponseEntity<FixtureStatResponseDto> getFixtureStats(@PathVariable Long fixtureId) {
-        return ResponseEntity.ok(fixtureStatService.getFixtureStats(fixtureId));
+        return fixtureRedisService.getLiveSnapshot(fixtureId)
+                .map(snapshot -> ResponseEntity.ok(FixtureStatResponseDto.builder()
+                        .fixtureId(snapshot.getFixtureId())
+                        .homeTeamStat(snapshot.getHomeTeamStat())
+                        .awayTeamStat(snapshot.getAwayTeamStat())
+                        .build()))
+                .orElseGet(() -> ResponseEntity.ok(fixtureStatService.getFixtureStats(fixtureId)));
     }
 
     @Operation(summary = "특정 경기 선수별 스탯 조회", description = "특정 경기의 모든 선수 스탯을 팀별로 조회합니다.")
@@ -64,7 +72,9 @@ public class FixtureController {
     public ResponseEntity<FixturePlayerStatResponseDto> getFixturePlayerStats(
             @Parameter(description = "조회할 경기의 API fixture ID", example = "1208000")
             @PathVariable Long fixtureId) {
-        return ResponseEntity.ok(fixturePlayerStatService.getFixturePlayerStats(fixtureId));
+        return fixtureRedisService.getPlayerStats(fixtureId)
+                .map(ResponseEntity::ok)
+                .orElseGet(() -> ResponseEntity.ok(fixturePlayerStatService.getFixturePlayerStats(fixtureId)));
     }
 
     @Operation(summary = "특정 경기 이벤트 조회", description = "특정 경기에서 발생한 골, 카드, 교체 등 이벤트 목록을 조회합니다.")

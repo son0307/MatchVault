@@ -1,7 +1,9 @@
 package com.son.soccerStreaming.controller;
 
+import com.son.soccerStreaming.dto.FixturePlayerStatResponseDto;
 import com.son.soccerStreaming.dto.FixtureStatResponseDto;
 import com.son.soccerStreaming.service.FixtureRedisService;
+import com.son.soccerStreaming.service.FixturePlayerStatService;
 import com.son.soccerStreaming.service.FixtureStatService;
 import com.son.soccerStreaming.service.SseService;
 import lombok.RequiredArgsConstructor;
@@ -23,6 +25,7 @@ public class LiveFixtureController {
     private final SseService sseService;
     private final FixtureRedisService fixtureRedisService;
     private final FixtureStatService fixtureStatService;
+    private final FixturePlayerStatService fixturePlayerStatService;
 
     // 클라이언트가 SSE 연결을 맺는 엔드포인트
     @GetMapping(path = "/stream/fixtures/{fixtureId}", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
@@ -40,5 +43,12 @@ public class LiveFixtureController {
                         .awayTeamStat(snapshot.getAwayTeamStat())
                         .build()))
                 .orElseGet(() -> ResponseEntity.ok(fixtureStatService.getFixtureStats(fixtureId)));
+    }
+
+    @GetMapping("/fixtures/{fixtureId}/player-stats")
+    public ResponseEntity<FixturePlayerStatResponseDto> getFixturePlayerStats(@PathVariable Long fixtureId) {
+        return fixtureRedisService.getPlayerStats(fixtureId)
+                .map(ResponseEntity::ok)
+                .orElseGet(() -> ResponseEntity.ok(fixturePlayerStatService.getFixturePlayerStats(fixtureId)));
     }
 }

@@ -39,6 +39,10 @@ public class SseService {
 
     // Kafka로부터 새 이벤트 수신 -> 클라이언트들에게 전송
     public void broadcastToFixture(String fixtureId, String jsonMessage) {
+        broadcastToFixture(fixtureId, "FIXTURE_EVENT", jsonMessage);
+    }
+
+    public void broadcastToFixture(String fixtureId, String eventName, String jsonMessage) {
         Set<SseEmitter> room = fixtureEmitters.get(fixtureId);
 
         if (room == null || room.isEmpty()) {
@@ -48,7 +52,7 @@ public class SseService {
         for (SseEmitter emitter : room) {
             try {
                 emitter.send(SseEmitter.event()
-                        .name("FIXTURE_EVENT")
+                        .name(eventName)
                         .data(jsonMessage));
             } catch (IOException e) {
                 // 전송 실패한 파이프는 죽은 클라이언트이므로 제거

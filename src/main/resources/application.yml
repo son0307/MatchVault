@@ -21,3 +21,13 @@ spring:
     url: ${DB_URL}
     username: ${DB_USERNAME}
     password: ${DB_PASSWORD}
+
+live:
+  api-football:
+    base-url: ${LIVE_API_FOOTBALL_BASE_URL:http://localhost:8000}
+    api-key: ${API_FOOTBALL_KEY:}
+    api-host: ${API_FOOTBALL_HOST:}
+  sync:
+    enabled: ${LIVE_SYNC_ENABLED:false}
+    interval-ms: ${LIVE_SYNC_INTERVAL_MS:5000}
+    fixture-ids: ${LIVE_SYNC_FIXTURE_IDS:1208000}

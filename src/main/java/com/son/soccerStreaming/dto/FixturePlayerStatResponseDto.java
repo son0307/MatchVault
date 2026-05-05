@@ -2,11 +2,15 @@ package com.son.soccerStreaming.dto;
 
 import lombok.Builder;
 import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.AllArgsConstructor;
 
 import java.util.List;
 
 @Getter
 @Builder
+@NoArgsConstructor
+@AllArgsConstructor
 public class FixturePlayerStatResponseDto {
 
     private Long fixtureId;
@@ -15,6 +19,8 @@ public class FixturePlayerStatResponseDto {
 
     @Getter
     @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
     public static class TeamPlayerStats {
         private Long teamId;
         private String teamName;
@@ -23,6 +29,8 @@ public class FixturePlayerStatResponseDto {
 
     @Getter
     @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
     public static class PlayerStat {
         private Long playerId;
         private String playerName;
