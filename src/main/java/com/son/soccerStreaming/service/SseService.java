@@ -37,7 +37,7 @@ public class SseService {
         return emitter;
     }
 
-    // Kafka로부터 새 이벤트 수신 -> 클라이언트들에게 전송
+    // Broadcast live fixture updates to connected clients.
     public void broadcastToFixture(String fixtureId, String jsonMessage) {
         broadcastToFixture(fixtureId, "FIXTURE_EVENT", jsonMessage);
     }

@@ -10,13 +10,13 @@ import java.util.List;
 public class FixutreTeamStatAggregator {
 
     public FixtureStatResponseDto.TeamStatSummary aggregate(
-            Long teamApiId,
+            Long teamId,
             int score,
             List<PlayerFixtureStat> fixtureStats
     ) {
         List<PlayerFixtureStat> teamStats = fixtureStats.stream()
                 .filter(stat -> stat.getTeam() != null)
-                .filter(stat -> teamApiId.equals(stat.getTeam().getTeamId()))
+                .filter(stat -> teamId.equals(stat.getTeam().getTeamId()))
                 .toList();
 
         int totalShots = teamStats.stream().mapToInt(stat -> valueOf(stat.getShotsTotal())).sum();
@@ -30,7 +30,7 @@ public class FixutreTeamStatAggregator {
         double passAccuracy = calculateWeightedPassAccuracy(teamStats, totalPasses);
 
         return FixtureStatResponseDto.TeamStatSummary.builder()
-                .teamId(teamApiId)
+                .teamId(teamId)
                 .score(score)
                 .totalShots(totalShots)
                 .shotsOnTarget(shotsOnTarget)

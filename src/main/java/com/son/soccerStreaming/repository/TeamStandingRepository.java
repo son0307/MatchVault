@@ -12,5 +12,5 @@ public interface TeamStandingRepository extends JpaRepository<TeamStanding, Long
     @EntityGraph(attributePaths = "team")
     List<TeamStanding> findAllBySeasonOrderByRankAsc(Integer season);
 
-    Optional<TeamStanding> findByTeamTeamIdAndSeason(Long teamApiId, Integer season);
+    Optional<TeamStanding> findByTeamTeamIdAndSeason(Long teamId, Integer season);
 }

@@ -80,8 +80,8 @@ public class BulkDataService {
 
     private List<TeamSeed> loadTeams() {
         String sql = """
-                SELECT t.id, t.team_api_id, t.name, t.code,
-                       v.venue_api_id, v.venue_name, v.venue_city
+                SELECT t.id, t.team_id, t.name, t.code,
+                       v.venue_id, v.venue_name, v.venue_city
                 FROM team t
                 LEFT JOIN venue v ON t.venue_id = v.id
                 ORDER BY t.id
@@ -126,7 +126,7 @@ public class BulkDataService {
 
     private long nextBulkFixtureId() {
         Long maxFixtureId = jdbcTemplate.queryForObject(
-                "SELECT COALESCE(MAX(fixture_id), ?) FROM match_record",
+                "SELECT COALESCE(MAX(fixture_id), ?) FROM fixture",
                 Long.class,
                 BULK_FIXTURE_ID_START - 1
         );
@@ -136,10 +136,10 @@ public class BulkDataService {
 
     private Long insertMatchRecord(long fixtureId, TeamSeed homeTeam, TeamSeed awayTeam, int index, Random random) {
         String sql = """
-                INSERT INTO match_record
-                (fixture_id, home_team_id, away_team_id, match_date, referee, round,
+                INSERT INTO fixture
+                (fixture_id, home_team_id, away_team_id, fixture_date, referee, round,
                  venue_id, venue_name, venue_city, status_short, status_long, elapsed,
-                 match_category, home_score, away_score, home_formation, away_formation,
+                 fixture_status, home_score, away_score, home_formation, away_formation,
                  home_coach_name, away_coach_name)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """;
@@ -153,7 +153,7 @@ public class BulkDataService {
             ps.setTimestamp(4, Timestamp.valueOf(LocalDateTime.now().minusDays(index % 180L)));
             ps.setString(5, "Bulk Referee " + (index % 12 + 1));
             ps.setString(6, "Regular Season - " + (index % 38 + 1));
-            ps.setLong(7, homeTeam.venueApiId());
+            ps.setLong(7, homeTeam.venueId());
             ps.setString(8, homeTeam.venueName());
             ps.setString(9, homeTeam.venueCity());
             ps.setString(10, "FT");
@@ -178,8 +178,8 @@ public class BulkDataService {
 
     private int insertLineups(Long matchRecordId, Long teamId, List<PlayerSeed> players) {
         String sql = """
-                INSERT INTO match_lineup
-                (match_record_id, team_id, player_id, jersey_number, position, grid, is_starter)
+                INSERT INTO fixture_lineup
+                (fixture_id, team_id, player_id, jersey_number, position, grid, is_starter)
                 VALUES (?, ?, ?, ?, ?, ?, ?)
                 """;
 
@@ -199,8 +199,8 @@ public class BulkDataService {
 
     private int insertPlayerStats(Long matchRecordId, Long teamId, List<PlayerSeed> players, Random random) {
         String sql = """
-                INSERT INTO player_match_stat
-                (match_record_id, team_id, player_id, minutes_played, rating, is_captain, is_substitute,
+                INSERT INTO player_fixture_stat
+                (fixture_id, team_id, player_id, minutes_played, rating, is_captain, is_substitute,
                  goals, assists, conceded, saves, shots_total, shots_on_target, passes_total, passes_key,
                  pass_accuracy, tackles_total, blocks, interceptions, duels_total, duels_won,
                  dribbles_attempts, dribbles_success, dribbles_past, fouls_drawn, fouls_committed,
@@ -304,10 +304,10 @@ public class BulkDataService {
 
     private record TeamSeed(
             Long id,
-            Long teamApiId,
+            Long teamId,
             String name,
             String code,
-            Long venueApiId,
+            Long venueId,
             String venueName,
             String venueCity
     ) {
