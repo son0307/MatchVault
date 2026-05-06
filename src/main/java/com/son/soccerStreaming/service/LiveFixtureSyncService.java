@@ -1,6 +1,8 @@
 package com.son.soccerStreaming.service;
 
-import com.son.soccerStreaming.dto.ApiFootballLiveDto;
+import com.son.soccerStreaming.apifootball.client.ApiFootballClient;
+import com.son.soccerStreaming.apifootball.dto.ApiFootballLiveDto;
+import com.son.soccerStreaming.apifootball.service.ApiFootballStandingLocalUpdateService;
 import com.son.soccerStreaming.dto.FixtureEventDto;
 import com.son.soccerStreaming.dto.FixturePlayerStatResponseDto;
 import com.son.soccerStreaming.dto.LiveFixtureSnapshotDto;
@@ -34,7 +36,7 @@ import java.util.Optional;
 @RequiredArgsConstructor
 public class LiveFixtureSyncService {
 
-    private final LiveApiFootballClient liveApiFootballClient;
+    private final ApiFootballClient apiFootballClient;
     private final FixtureRecordRepository fixtureRecordRepository;
     private final FixtureEventRepository fixtureEventRepository;
     private final PlayerFixtureStatRepository playerFixtureStatRepository;
@@ -42,6 +44,7 @@ public class LiveFixtureSyncService {
     private final PlayerRepository playerRepository;
     private final FixtureRedisService fixtureRedisService;
     private final LiveFixtureSnapshotService liveFixtureSnapshotService;
+    private final ApiFootballStandingLocalUpdateService apiFootballStandingLocalUpdateService;
     private final FixtureEventService fixtureEventService;
     private final FixturePlayerStatService fixturePlayerStatService;
     private final SseService sseService;
@@ -52,14 +55,18 @@ public class LiveFixtureSyncService {
         Fixture fixture = fixtureRecordRepository.findByFixtureId(fixtureId)
                 .orElseThrow(() -> new CustomException(ErrorCode.FIXTURE_NOT_FOUND));
 
-        List<ApiFootballLiveDto.FixtureResponse> fixtureResponses = liveApiFootballClient.getFixture(fixtureId);
-        fixtureResponses.stream().findFirst().ifPresent(response -> updateFixtureState(fixture, response));
+        List<ApiFootballLiveDto.FixtureResponse> fixtureResponses = apiFootballClient.getFixture(fixtureId);
+        fixtureResponses.stream()
+                .findFirst()
+                .ifPresent(response -> updateFixtureState(fixture, response));
 
-        List<ApiFootballLiveDto.EventResponse> eventResponses = liveApiFootballClient.getEvents(fixtureId);
+        List<ApiFootballLiveDto.EventResponse> eventResponses = apiFootballClient.getEvents(fixtureId);
         FixtureEventDto latestEvent = upsertEvents(fixture, eventResponses);
 
-        List<ApiFootballLiveDto.FixturePlayersResponse> playerStatResponses = liveApiFootballClient.getPlayerStats(fixtureId);
+        List<ApiFootballLiveDto.FixturePlayersResponse> playerStatResponses = apiFootballClient.getPlayerStats(fixtureId);
         upsertPlayerStats(fixture, playerStatResponses);
+
+        apiFootballStandingLocalUpdateService.applyFixtureState(fixture);
 
         LiveFixtureSnapshotDto snapshot = liveFixtureSnapshotService.rebuildAndCacheSnapshot(fixtureId, latestEvent);
         FixturePlayerStatResponseDto playerStats = fixturePlayerStatService.getFixturePlayerStats(fixtureId);

@@ -1,0 +1,15 @@
+api-football:
+  sync:
+    teams:
+      enabled: false
+      run-on-startup: false
+    standings:
+      enabled: false
+      run-on-startup: false
+      local-finished-update-enabled: false
+      local-live-update-enabled: false
+      local-live-impact-ttl-hours: 6
+
+live:
+  sync:
+    enabled: false

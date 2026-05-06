@@ -7,4 +7,6 @@ import java.util.Optional;
 
 public interface FixtureRecordRepository extends JpaRepository<Fixture, Long>, FixtureRecordRepositoryCustom {
     Optional<Fixture> findByFixtureId(Long fixtureId);
+
+    boolean existsByFixtureStatus(String fixtureStatus);
 }

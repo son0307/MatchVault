@@ -1,0 +1,26 @@
+live:
+  api-football:
+    base-url: ${LIVE_API_FOOTBALL_BASE_URL:https://v3.football.api-sports.io}
+    api-key: ${API_FOOTBALL_KEY}
+    api-host: ${API_FOOTBALL_HOST:}
+  sync:
+    enabled: ${LIVE_SYNC_ENABLED:false}
+
+api-football:
+  sync:
+    teams:
+      enabled: ${API_FOOTBALL_TEAMS_SYNC_ENABLED:true}
+      run-on-startup: ${API_FOOTBALL_TEAMS_SYNC_RUN_ON_STARTUP:true}
+      league: ${API_FOOTBALL_TEAMS_LEAGUE:39}
+      season: ${API_FOOTBALL_TEAMS_SEASON:2024}
+      cron: ${API_FOOTBALL_TEAMS_SYNC_CRON:0 0 4 * * *}
+    standings:
+      enabled: ${API_FOOTBALL_STANDINGS_SYNC_ENABLED:true}
+      run-on-startup: ${API_FOOTBALL_STANDINGS_SYNC_RUN_ON_STARTUP:true}
+      local-finished-update-enabled: ${API_FOOTBALL_STANDINGS_LOCAL_FINISHED_UPDATE_ENABLED:true}
+      local-live-update-enabled: ${API_FOOTBALL_STANDINGS_LOCAL_LIVE_UPDATE_ENABLED:true}
+      local-live-impact-ttl-hours: ${API_FOOTBALL_STANDINGS_LOCAL_LIVE_IMPACT_TTL_HOURS:6}
+      league: ${API_FOOTBALL_STANDINGS_LEAGUE:39}
+      season: ${API_FOOTBALL_STANDINGS_SEASON:2024}
+      daily-cron: ${API_FOOTBALL_STANDINGS_DAILY_CRON:0 10 4 * * *}
+      live-cron: ${API_FOOTBALL_STANDINGS_LIVE_CRON:0 0 * * * *}

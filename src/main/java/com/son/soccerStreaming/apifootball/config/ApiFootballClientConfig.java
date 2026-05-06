@@ -1,14 +1,14 @@
-package com.son.soccerStreaming.config;
+package com.son.soccerStreaming.apifootball.config;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.client.RestClient;
 
 @Configuration
-public class LiveApiClientConfig {
+public class ApiFootballClientConfig {
 
     @Bean
-    public RestClient liveApiRestClient() {
+    public RestClient apiFootballRestClient() {
         return RestClient.builder().build();
     }
 }
