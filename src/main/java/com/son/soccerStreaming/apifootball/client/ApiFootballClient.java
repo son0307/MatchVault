@@ -38,6 +38,28 @@ public class ApiFootballClient {
         return responseOf(body);
     }
 
+    public List<ApiFootballLiveDto.FixtureResponse> getFixtures(Integer league, Integer season) {
+        ApiFootballLiveDto.ApiResponse<ApiFootballLiveDto.FixtureResponse> body = apiFootballRestClient.get()
+                .uri(baseUrl + "/fixtures?league={league}&season={season}", league, season)
+                .headers(this::setApiHeaders)
+                .retrieve()
+                .body(new ParameterizedTypeReference<>() {
+                });
+
+        return responseOf(body);
+    }
+
+    public List<ApiFootballLiveDto.FixtureResponse> getLiveFixtures(Integer league) {
+        ApiFootballLiveDto.ApiResponse<ApiFootballLiveDto.FixtureResponse> body = apiFootballRestClient.get()
+                .uri(baseUrl + "/fixtures?league={league}&live=all", league)
+                .headers(this::setApiHeaders)
+                .retrieve()
+                .body(new ParameterizedTypeReference<>() {
+                });
+
+        return responseOf(body);
+    }
+
     public List<ApiFootballLiveDto.EventResponse> getEvents(Long fixtureId) {
         ApiFootballLiveDto.ApiResponse<ApiFootballLiveDto.EventResponse> body = apiFootballRestClient.get()
                 .uri(baseUrl + "/fixtures/events?fixture={fixtureId}", fixtureId)

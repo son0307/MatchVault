@@ -39,3 +39,12 @@ api-football:
       season: ${API_FOOTBALL_STANDINGS_SEASON:2024}
       daily-cron: ${API_FOOTBALL_STANDINGS_DAILY_CRON:0 10 4 * * *}
       live-cron: ${API_FOOTBALL_STANDINGS_LIVE_CRON:0 0 * * * *}
+    fixtures:
+      enabled: ${API_FOOTBALL_FIXTURES_SYNC_ENABLED:false}
+      run-on-startup: ${API_FOOTBALL_FIXTURES_SYNC_RUN_ON_STARTUP:false}
+      league: ${API_FOOTBALL_FIXTURES_LEAGUE:39}
+      season: ${API_FOOTBALL_FIXTURES_SEASON:2024}
+      daily-cron: ${API_FOOTBALL_FIXTURES_DAILY_CRON:0 20 4 * * *}
+      live-cron: ${API_FOOTBALL_FIXTURES_LIVE_CRON:0 * * * * *}
+      live-window-before-minutes: ${API_FOOTBALL_FIXTURES_LIVE_WINDOW_BEFORE_MINUTES:10}
+      live-window-after-hours: ${API_FOOTBALL_FIXTURES_LIVE_WINDOW_AFTER_HOURS:4}

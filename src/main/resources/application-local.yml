@@ -9,6 +9,9 @@ api-football:
       local-finished-update-enabled: false
       local-live-update-enabled: false
       local-live-impact-ttl-hours: 6
+    fixtures:
+      enabled: false
+      run-on-startup: false
 
 live:
   sync:

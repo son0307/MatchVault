@@ -127,4 +127,8 @@ public class Fixture {
         this.homeCoachName = homeCoachName;
         this.awayCoachName = awayCoachName;
     }
+
+    public void updateRound(String round) {
+        this.round = round;
+    }
 }

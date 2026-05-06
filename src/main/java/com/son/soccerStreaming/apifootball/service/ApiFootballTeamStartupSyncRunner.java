@@ -28,6 +28,7 @@ public class ApiFootballTeamStartupSyncRunner implements CommandLineRunner {
     @Override
     public void run(String... args) {
         try {
+            log.info("Sync team starting up...");
             apiFootballTeamSyncService.syncTeams(league, season);
         } catch (Exception e) {
             log.error("API-Football startup team sync failed. league={}, season={}", league, season, e);

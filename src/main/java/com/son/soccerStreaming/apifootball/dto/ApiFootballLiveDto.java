@@ -24,9 +24,23 @@ public final class ApiFootballLiveDto {
     @JsonIgnoreProperties(ignoreUnknown = true)
     public static class FixtureResponse {
         private FixtureInfo fixture;
+        private LeagueInfo league;
         private Teams teams;
         private Goals goals;
         private Score score;
+    }
+
+    @Getter
+    @NoArgsConstructor
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public static class LeagueInfo {
+        private Long id;
+        private String name;
+        private String country;
+        private String logo;
+        private String flag;
+        private Integer season;
+        private String round;
     }
 
     @Getter
