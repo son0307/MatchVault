@@ -2,21 +2,20 @@ package com.son.soccerStreaming.service;
 
 import com.son.soccerStreaming.apifootball.client.ApiFootballClient;
 import com.son.soccerStreaming.apifootball.dto.ApiFootballLiveDto;
+import com.son.soccerStreaming.apifootball.service.ApiFootballFixtureEventSyncService;
+import com.son.soccerStreaming.apifootball.service.ApiFootballPlayerSyncService;
 import com.son.soccerStreaming.apifootball.service.ApiFootballStandingLocalUpdateService;
 import com.son.soccerStreaming.dto.FixtureEventDto;
 import com.son.soccerStreaming.dto.FixturePlayerStatResponseDto;
 import com.son.soccerStreaming.dto.LiveFixtureSnapshotDto;
 import com.son.soccerStreaming.entity.Fixture;
-import com.son.soccerStreaming.entity.FixtureEvent;
 import com.son.soccerStreaming.entity.Player;
 import com.son.soccerStreaming.entity.PlayerFixtureStat;
 import com.son.soccerStreaming.entity.Team;
 import com.son.soccerStreaming.exception.CustomException;
 import com.son.soccerStreaming.exception.ErrorCode;
-import com.son.soccerStreaming.repository.FixtureEventRepository;
 import com.son.soccerStreaming.repository.FixtureRecordRepository;
 import com.son.soccerStreaming.repository.PlayerFixtureStatRepository;
-import com.son.soccerStreaming.repository.PlayerRepository;
 import com.son.soccerStreaming.repository.TeamRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -38,13 +37,13 @@ public class LiveFixtureSyncService {
 
     private final ApiFootballClient apiFootballClient;
     private final FixtureRecordRepository fixtureRecordRepository;
-    private final FixtureEventRepository fixtureEventRepository;
     private final PlayerFixtureStatRepository playerFixtureStatRepository;
     private final TeamRepository teamRepository;
-    private final PlayerRepository playerRepository;
     private final FixtureRedisService fixtureRedisService;
     private final LiveFixtureSnapshotService liveFixtureSnapshotService;
     private final ApiFootballStandingLocalUpdateService apiFootballStandingLocalUpdateService;
+    private final ApiFootballFixtureEventSyncService apiFootballFixtureEventSyncService;
+    private final ApiFootballPlayerSyncService apiFootballPlayerSyncService;
     private final FixtureEventService fixtureEventService;
     private final FixturePlayerStatService fixturePlayerStatService;
     private final SseService sseService;
@@ -60,8 +59,7 @@ public class LiveFixtureSyncService {
                 .findFirst()
                 .ifPresent(response -> updateFixtureState(fixture, response));
 
-        List<ApiFootballLiveDto.EventResponse> eventResponses = apiFootballClient.getEvents(fixtureId);
-        FixtureEventDto latestEvent = upsertEvents(fixture, eventResponses);
+        FixtureEventDto latestEvent = apiFootballFixtureEventSyncService.syncEvents(fixtureId);
 
         List<ApiFootballLiveDto.FixturePlayersResponse> playerStatResponses = apiFootballClient.getPlayerStats(fixtureId);
         upsertPlayerStats(fixture, playerStatResponses);
@@ -132,40 +130,6 @@ public class LiveFixtureSyncService {
         }
     }
 
-    private FixtureEventDto upsertEvents(Fixture fixture, List<ApiFootballLiveDto.EventResponse> events) {
-        FixtureEventDto latestEvent = null;
-        int sequence = 1;
-
-        for (ApiFootballLiveDto.EventResponse event : events) {
-            latestEvent = toFixtureEventDto(fixture.getFixtureId(), event);
-
-            if (fixtureEventRepository.findByFixtureFixtureIdAndEventSequence(fixture.getFixtureId(), sequence).isPresent()) {
-                sequence++;
-                continue;
-            }
-
-            Team team = findTeam(event.getTeam()).orElse(null);
-            Player player = findPlayer(event.getPlayer()).orElse(null);
-            Player assistPlayer = findPlayer(event.getAssist()).orElse(null);
-
-            fixtureEventRepository.save(FixtureEvent.builder()
-                    .fixture(fixture)
-                    .eventSequence(sequence)
-                    .elapsed(event.getTime() != null ? event.getTime().getElapsed() : null)
-                    .extra(event.getTime() != null ? event.getTime().getExtra() : null)
-                    .team(team)
-                    .player(player)
-                    .assistPlayer(assistPlayer)
-                    .eventType(event.getType())
-                    .eventDetail(event.getDetail())
-                    .comments(event.getComments())
-                    .build());
-            sequence++;
-        }
-
-        return latestEvent;
-    }
-
     private void upsertPlayerStats(Fixture fixture, List<ApiFootballLiveDto.FixturePlayersResponse> teamStats) {
         for (ApiFootballLiveDto.FixturePlayersResponse teamStat : teamStats) {
             Optional<Team> team = findTeam(teamStat.getTeam());
@@ -174,7 +138,7 @@ public class LiveFixtureSyncService {
             }
 
             for (ApiFootballLiveDto.PlayerStatResponse playerStat : teamStat.getPlayers()) {
-                Optional<Player> player = findPlayer(playerStat.getPlayer());
+                Optional<Player> player = findPlayer(playerStat.getPlayer(), team.get());
                 if (player.isEmpty()) {
                     log.warn("Skip live player stat because player does not exist. fixtureId={}, playerId={}",
                             fixture.getFixtureId(), playerStat.getPlayer() != null ? playerStat.getPlayer().getId() : null);
@@ -246,43 +210,6 @@ public class LiveFixtureSyncService {
         );
     }
 
-    private FixtureEventDto toFixtureEventDto(Long fixtureId, ApiFootballLiveDto.EventResponse event) {
-        return FixtureEventDto.builder()
-                .fixtureId(fixtureId)
-                .time(event.getTime() == null ? null : FixtureEventDto.TimeInfo.builder()
-                        .elapsed(event.getTime().getElapsed())
-                        .extra(event.getTime().getExtra())
-                        .build())
-                .team(toTeamInfo(event.getTeam()))
-                .player(toPlayerInfo(event.getPlayer()))
-                .assist(toPlayerInfo(event.getAssist()))
-                .type(event.getType())
-                .detail(event.getDetail())
-                .comments(event.getComments())
-                .build();
-    }
-
-    private FixtureEventDto.TeamInfo toTeamInfo(ApiFootballLiveDto.TeamInfo team) {
-        if (team == null) {
-            return null;
-        }
-        return FixtureEventDto.TeamInfo.builder()
-                .id(team.getId())
-                .name(team.getName())
-                .logo(team.getLogo())
-                .build();
-    }
-
-    private FixtureEventDto.PlayerInfo toPlayerInfo(ApiFootballLiveDto.PlayerInfo player) {
-        if (player == null) {
-            return null;
-        }
-        return FixtureEventDto.PlayerInfo.builder()
-                .id(player.getId())
-                .name(player.getName())
-                .build();
-    }
-
     private Optional<Team> findTeam(ApiFootballLiveDto.TeamInfo team) {
         if (team == null || team.getId() == null) {
             return Optional.empty();
@@ -291,10 +218,21 @@ public class LiveFixtureSyncService {
     }
 
     private Optional<Player> findPlayer(ApiFootballLiveDto.PlayerInfo player) {
+        return findPlayer(player, null);
+    }
+
+    private Optional<Player> findPlayer(ApiFootballLiveDto.PlayerInfo player, Team team) {
         if (player == null || player.getId() == null) {
             return Optional.empty();
         }
-        return playerRepository.findByPlayerId(player.getId());
+        return apiFootballPlayerSyncService.findOrFetchPlayer(
+                player.getId(),
+                player.getName(),
+                team,
+                null,
+                null,
+                player.getPhoto()
+        );
     }
 
     private ApiFootballLiveDto.PlayerStatistics firstStat(ApiFootballLiveDto.PlayerStatResponse playerStat) {

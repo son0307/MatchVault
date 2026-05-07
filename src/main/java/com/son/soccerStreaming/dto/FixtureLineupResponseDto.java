@@ -22,9 +22,25 @@ public class FixtureLineupResponseDto {
         private String teamName;
         private String formation;
         private String coachName;
+        private UniformColors colors;
         private List<PlayerLineup> starters;
         private List<PlayerLineup> substitutes;
         private List<PlayerAbsenceInfo> absences;
+    }
+
+    @Getter
+    @Builder
+    public static class UniformColors {
+        private ColorInfo player;
+        private ColorInfo goalkeeper;
+    }
+
+    @Getter
+    @Builder
+    public static class ColorInfo {
+        private String primary;
+        private String number;
+        private String border;
     }
 
     @Getter

@@ -12,6 +12,16 @@ api-football:
     fixtures:
       enabled: false
       run-on-startup: false
+    fixture-events:
+      enabled: false
+      test-runner-enabled: false
+    fixture-lineups:
+      enabled: false
+    players:
+      profile-fallback-enabled: false
+      squads:
+        enabled: false
+        test-runner-enabled: false
 
 live:
   sync:

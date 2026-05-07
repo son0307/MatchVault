@@ -77,6 +77,31 @@ public class Fixture {
     private String homeCoachName;
     private String awayCoachName;
 
+    @Column(length = 20)
+    private String homePlayerColorPrimary;
+    @Column(length = 20)
+    private String homePlayerColorNumber;
+    @Column(length = 20)
+    private String homePlayerColorBorder;
+    @Column(length = 20)
+    private String homeGoalkeeperColorPrimary;
+    @Column(length = 20)
+    private String homeGoalkeeperColorNumber;
+    @Column(length = 20)
+    private String homeGoalkeeperColorBorder;
+    @Column(length = 20)
+    private String awayPlayerColorPrimary;
+    @Column(length = 20)
+    private String awayPlayerColorNumber;
+    @Column(length = 20)
+    private String awayPlayerColorBorder;
+    @Column(length = 20)
+    private String awayGoalkeeperColorPrimary;
+    @Column(length = 20)
+    private String awayGoalkeeperColorNumber;
+    @Column(length = 20)
+    private String awayGoalkeeperColorBorder;
+
     public void updateFixtureState(String statusShort, String statusLong, String fixtureStatus,
                                  Integer elapsed, Integer homeScore, Integer awayScore) {
         this.statusShort = statusShort;
@@ -130,5 +155,25 @@ public class Fixture {
 
     public void updateRound(String round) {
         this.round = round;
+    }
+
+    public void updateHomeLineupColors(String playerPrimary, String playerNumber, String playerBorder,
+                                       String goalkeeperPrimary, String goalkeeperNumber, String goalkeeperBorder) {
+        this.homePlayerColorPrimary = playerPrimary;
+        this.homePlayerColorNumber = playerNumber;
+        this.homePlayerColorBorder = playerBorder;
+        this.homeGoalkeeperColorPrimary = goalkeeperPrimary;
+        this.homeGoalkeeperColorNumber = goalkeeperNumber;
+        this.homeGoalkeeperColorBorder = goalkeeperBorder;
+    }
+
+    public void updateAwayLineupColors(String playerPrimary, String playerNumber, String playerBorder,
+                                       String goalkeeperPrimary, String goalkeeperNumber, String goalkeeperBorder) {
+        this.awayPlayerColorPrimary = playerPrimary;
+        this.awayPlayerColorNumber = playerNumber;
+        this.awayPlayerColorBorder = playerBorder;
+        this.awayGoalkeeperColorPrimary = goalkeeperPrimary;
+        this.awayGoalkeeperColorNumber = goalkeeperNumber;
+        this.awayGoalkeeperColorBorder = goalkeeperBorder;
     }
 }

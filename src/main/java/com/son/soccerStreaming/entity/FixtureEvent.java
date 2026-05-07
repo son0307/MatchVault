@@ -61,4 +61,16 @@ public class FixtureEvent {
     private String eventDetail;
 
     private String comments;
+
+    public void updateEvent(Integer elapsed, Integer extra, Team team, Player player, Player assistPlayer,
+                            String eventType, String eventDetail, String comments) {
+        this.elapsed = elapsed;
+        this.extra = extra;
+        this.team = team;
+        this.player = player;
+        this.assistPlayer = assistPlayer;
+        this.eventType = eventType;
+        this.eventDetail = eventDetail;
+        this.comments = comments;
+    }
 }

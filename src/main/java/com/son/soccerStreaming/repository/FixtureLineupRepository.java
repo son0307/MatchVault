@@ -6,6 +6,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.util.List;
+import java.util.Optional;
 
 public interface FixtureLineupRepository extends JpaRepository<FixtureLineup, Long> {
 
@@ -14,4 +15,6 @@ public interface FixtureLineupRepository extends JpaRepository<FixtureLineup, Lo
             "join fetch fl.team t " +
             "where fl.fixture.fixtureId = :fixtureId")
     List<FixtureLineup> findAllByFixtureId(@Param("fixtureId") Long fixtureId);
+
+    Optional<FixtureLineup> findByFixtureFixtureIdAndTeamTeamIdAndPlayerPlayerId(Long fixtureId, Long teamId, Long playerId);
 }

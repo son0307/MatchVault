@@ -5,6 +5,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.time.LocalDateTime;
 import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 
 public interface FixtureRecordRepository extends JpaRepository<Fixture, Long>, FixtureRecordRepositoryCustom {
@@ -13,4 +14,10 @@ public interface FixtureRecordRepository extends JpaRepository<Fixture, Long>, F
     boolean existsByFixtureStatus(String fixtureStatus);
 
     boolean existsByFixtureDateBetweenAndFixtureStatusIn(LocalDateTime start, LocalDateTime end, Collection<String> fixtureStatuses);
+
+    List<Fixture> findAllByFixtureDateBetweenAndFixtureStatusIn(LocalDateTime start, LocalDateTime end, Collection<String> fixtureStatuses);
+
+    List<Fixture> findAllByFixtureStatus(String fixtureStatus);
+
+    List<Fixture> findAllByFixtureStatusNot(String fixtureStatus);
 }

@@ -1,6 +1,8 @@
 package com.son.soccerStreaming.apifootball.client;
 
+import com.son.soccerStreaming.apifootball.dto.ApiFootballLineupDto;
 import com.son.soccerStreaming.apifootball.dto.ApiFootballLiveDto;
+import com.son.soccerStreaming.apifootball.dto.ApiFootballPlayerDto;
 import com.son.soccerStreaming.apifootball.dto.ApiFootballStandingDto;
 import com.son.soccerStreaming.apifootball.dto.ApiFootballTeamDto;
 import lombok.RequiredArgsConstructor;
@@ -71,6 +73,39 @@ public class ApiFootballClient {
         return responseOf(body);
     }
 
+    public List<ApiFootballLineupDto.LineupResponse> getLineups(Long fixtureId) {
+        ApiFootballLineupDto.ApiResponse<ApiFootballLineupDto.LineupResponse> body = apiFootballRestClient.get()
+                .uri(baseUrl + "/fixtures/lineups?fixture={fixtureId}", fixtureId)
+                .headers(this::setApiHeaders)
+                .retrieve()
+                .body(new ParameterizedTypeReference<>() {
+                });
+
+        return lineupResponseOf(body);
+    }
+
+    public List<ApiFootballPlayerDto.ProfileResponse> getPlayerProfiles(Long playerId) {
+        ApiFootballPlayerDto.ApiResponse<ApiFootballPlayerDto.ProfileResponse> body = apiFootballRestClient.get()
+                .uri(baseUrl + "/players/profiles?player={playerId}", playerId)
+                .headers(this::setApiHeaders)
+                .retrieve()
+                .body(new ParameterizedTypeReference<>() {
+                });
+
+        return playerResponseOf(body);
+    }
+
+    public List<ApiFootballPlayerDto.SquadResponse> getPlayerSquad(Long teamId) {
+        ApiFootballPlayerDto.ApiResponse<ApiFootballPlayerDto.SquadResponse> body = apiFootballRestClient.get()
+                .uri(baseUrl + "/players/squads?team={teamId}", teamId)
+                .headers(this::setApiHeaders)
+                .retrieve()
+                .body(new ParameterizedTypeReference<>() {
+                });
+
+        return playerResponseOf(body);
+    }
+
     public List<ApiFootballLiveDto.FixturePlayersResponse> getPlayerStats(Long fixtureId) {
         ApiFootballLiveDto.ApiResponse<ApiFootballLiveDto.FixturePlayersResponse> body = apiFootballRestClient.get()
                 .uri(baseUrl + "/fixtures/players?fixture={fixtureId}", fixtureId)
@@ -129,6 +164,20 @@ public class ApiFootballClient {
     }
 
     private <T> List<T> standingResponseOf(ApiFootballStandingDto.ApiResponse<T> body) {
+        if (body == null || body.getResponse() == null) {
+            return List.of();
+        }
+        return body.getResponse();
+    }
+
+    private <T> List<T> lineupResponseOf(ApiFootballLineupDto.ApiResponse<T> body) {
+        if (body == null || body.getResponse() == null) {
+            return List.of();
+        }
+        return body.getResponse();
+    }
+
+    private <T> List<T> playerResponseOf(ApiFootballPlayerDto.ApiResponse<T> body) {
         if (body == null || body.getResponse() == null) {
             return List.of();
         }

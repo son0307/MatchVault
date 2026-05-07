@@ -1,7 +1,22 @@
 package com.son.soccerStreaming.entity;
 
-import jakarta.persistence.*;
-import lombok.*;
+import jakarta.persistence.Column;
+import jakarta.persistence.ConstraintMode;
+import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.ForeignKey;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.Index;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.Table;
+import lombok.AccessLevel;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
 
 @Entity
 @Table(name = "fixture_lineup", indexes = {
@@ -14,7 +29,8 @@ import lombok.*;
 @AllArgsConstructor(access = AccessLevel.PROTECTED)
 public class FixtureLineup {
 
-    @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
     @ManyToOne(fetch = FetchType.LAZY)
@@ -29,16 +45,22 @@ public class FixtureLineup {
     @JoinColumn(name = "player_id", nullable = false, foreignKey = @ForeignKey(ConstraintMode.NO_CONSTRAINT))
     private Player player;
 
-    // 라인업 정보
     @Column(nullable = false)
-    private Integer jerseyNumber;   // 등번호 (예: 17)
+    private Integer jerseyNumber;
 
     @Column(nullable = false, length = 10)
-    private String position;        // 포지션 (G: 골키퍼, D: 수비수, M: 미드필더, F: 공격수)
+    private String position;
 
     @Column(length = 10)
-    private String grid;            // 포메이션 위치 (예: "3:3" / 교체선수는 null)
+    private String grid;
 
     @Column(nullable = false)
-    private boolean isStarter;      // true: 선발(startXI), false: 교체(substitutes)
+    private boolean isStarter;
+
+    public void updateLineup(Integer jerseyNumber, String position, String grid, boolean isStarter) {
+        this.jerseyNumber = jerseyNumber;
+        this.position = position;
+        this.grid = grid;
+        this.isStarter = isStarter;
+    }
 }

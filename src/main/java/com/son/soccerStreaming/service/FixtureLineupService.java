@@ -34,6 +34,7 @@ public class FixtureLineupService {
         return FixtureLineupResponseDto.Lineup.builder()
                 .fixtureId(fixtureId)
                 .homeTeam(buildTeamLineup(
+                        fixture,
                         fixture.getHomeTeam(),
                         fixture.getHomeFormation(),
                         fixture.getHomeCoachName(),
@@ -41,6 +42,7 @@ public class FixtureLineupService {
                         absences
                 ))
                 .awayTeam(buildTeamLineup(
+                        fixture,
                         fixture.getAwayTeam(),
                         fixture.getAwayFormation(),
                         fixture.getAwayCoachName(),
@@ -51,6 +53,7 @@ public class FixtureLineupService {
     }
 
     private FixtureLineupResponseDto.TeamLineup buildTeamLineup(
+            Fixture fixture,
             Team team,
             String formation,
             String coachName,
@@ -79,9 +82,48 @@ public class FixtureLineupService {
                 .teamName(team.getName())
                 .formation(formation)
                 .coachName(coachName)
+                .colors(colorsOf(fixture, team))
                 .starters(starters)
                 .substitutes(substitutes)
                 .absences(teamAbsences)
+                .build();
+    }
+
+    private FixtureLineupResponseDto.UniformColors colorsOf(Fixture fixture, Team team) {
+        if (fixture.getHomeTeam().getTeamId().equals(team.getTeamId())) {
+            return FixtureLineupResponseDto.UniformColors.builder()
+                    .player(colorOf(
+                            fixture.getHomePlayerColorPrimary(),
+                            fixture.getHomePlayerColorNumber(),
+                            fixture.getHomePlayerColorBorder()
+                    ))
+                    .goalkeeper(colorOf(
+                            fixture.getHomeGoalkeeperColorPrimary(),
+                            fixture.getHomeGoalkeeperColorNumber(),
+                            fixture.getHomeGoalkeeperColorBorder()
+                    ))
+                    .build();
+        }
+
+        return FixtureLineupResponseDto.UniformColors.builder()
+                .player(colorOf(
+                        fixture.getAwayPlayerColorPrimary(),
+                        fixture.getAwayPlayerColorNumber(),
+                        fixture.getAwayPlayerColorBorder()
+                ))
+                .goalkeeper(colorOf(
+                        fixture.getAwayGoalkeeperColorPrimary(),
+                        fixture.getAwayGoalkeeperColorNumber(),
+                        fixture.getAwayGoalkeeperColorBorder()
+                ))
+                .build();
+    }
+
+    private FixtureLineupResponseDto.ColorInfo colorOf(String primary, String number, String border) {
+        return FixtureLineupResponseDto.ColorInfo.builder()
+                .primary(primary)
+                .number(number)
+                .border(border)
                 .build();
     }
 
