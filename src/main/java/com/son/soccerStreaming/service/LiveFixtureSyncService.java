@@ -3,6 +3,7 @@ package com.son.soccerStreaming.service;
 import com.son.soccerStreaming.apifootball.client.ApiFootballClient;
 import com.son.soccerStreaming.apifootball.dto.ApiFootballLiveDto;
 import com.son.soccerStreaming.apifootball.service.ApiFootballFixtureEventSyncService;
+import com.son.soccerStreaming.apifootball.service.ApiFootballFixtureStatSyncService;
 import com.son.soccerStreaming.apifootball.service.ApiFootballFixturePlayerStatSyncService;
 import com.son.soccerStreaming.apifootball.service.ApiFootballStandingLocalUpdateService;
 import com.son.soccerStreaming.dto.FixtureEventDto;
@@ -36,6 +37,7 @@ public class LiveFixtureSyncService {
     private final LiveFixtureSnapshotService liveFixtureSnapshotService;
     private final ApiFootballStandingLocalUpdateService apiFootballStandingLocalUpdateService;
     private final ApiFootballFixtureEventSyncService apiFootballFixtureEventSyncService;
+    private final ApiFootballFixtureStatSyncService apiFootballFixtureStatSyncService;
     private final ApiFootballFixturePlayerStatSyncService apiFootballFixturePlayerStatSyncService;
     private final FixtureEventService fixtureEventService;
     private final FixturePlayerStatService fixturePlayerStatService;
@@ -53,6 +55,8 @@ public class LiveFixtureSyncService {
                 .ifPresent(response -> updateFixtureState(fixture, response));
 
         FixtureEventDto latestEvent = apiFootballFixtureEventSyncService.syncEvents(fixtureId);
+
+        apiFootballFixtureStatSyncService.syncFixtureStats(fixtureId);
 
         apiFootballFixturePlayerStatSyncService.syncPlayerStats(fixtureId);
 

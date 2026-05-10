@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="ko">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Soccer Streaming Dashboard</title>
+    <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+<div class="app-shell">
+    <header class="topbar">
+        <div>
+            <p class="eyebrow">API Football Data</p>
+            <h1>Soccer Streaming</h1>
+        </div>
+        <div class="toolbar">
+            <label class="season-control">
+                <span>Season</span>
+                <input id="seasonInput" type="number" min="1990" max="2100" value="2024">
+            </label>
+            <button id="refreshButton" type="button">새로고침</button>
+        </div>
+    </header>
+
+    <main>
+        <section class="summary-grid" aria-label="데이터 요약">
+            <article class="metric">
+                <span class="metric-label">Teams</span>
+                <strong id="teamCount">-</strong>
+            </article>
+            <article class="metric">
+                <span class="metric-label">Fixtures</span>
+                <strong id="fixtureCount">-</strong>
+            </article>
+            <article class="metric">
+                <span class="metric-label">Standings</span>
+                <strong id="standingCount">-</strong>
+            </article>
+            <article class="metric status-metric">
+                <span class="metric-label">API Status</span>
+                <strong id="apiStatus">Loading</strong>
+            </article>
+        </section>
+
+        <section class="content-grid">
+            <div class="panel fixtures-panel">
+                <div class="panel-heading">
+                    <div>
+                        <p class="eyebrow">Matches</p>
+                        <h2>최근 경기</h2>
+                    </div>
+                    <button id="loadMoreFixtures" type="button" class="ghost-button">더 보기</button>
+                </div>
+                <div id="fixturesList" class="fixture-list" aria-live="polite"></div>
+            </div>
+
+            <aside class="panel detail-panel">
+                <div class="panel-heading">
+                    <div>
+                        <p class="eyebrow">Fixture</p>
+                        <h2 id="detailTitle">경기 상세</h2>
+                    </div>
+                </div>
+                <div id="fixtureDetail" class="detail-empty">
+                    왼쪽 경기 목록에서 하나를 선택하면 저장된 통계, 이벤트, 라인업을 표시합니다.
+                </div>
+            </aside>
+        </section>
+
+        <section class="content-grid lower-grid">
+            <div class="panel standings-panel">
+                <div class="panel-heading">
+                    <div>
+                        <p class="eyebrow">Table</p>
+                        <h2>리그 순위</h2>
+                    </div>
+                </div>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>팀</th>
+                            <th>경기</th>
+                            <th>승점</th>
+                            <th>득실</th>
+                            <th>최근</th>
+                        </tr>
+                        </thead>
+                        <tbody id="standingsTable"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <aside class="panel teams-panel">
+                <div class="panel-heading">
+                    <div>
+                        <p class="eyebrow">Clubs</p>
+                        <h2>팀 목록</h2>
+                    </div>
+                </div>
+                <div id="teamsList" class="team-grid"></div>
+                <div id="teamDetail" class="team-detail"></div>
+            </aside>
+        </section>
+    </main>
+</div>
+
+<template id="loadingTemplate">
+    <div class="loading">데이터를 불러오는 중입니다.</div>
+</template>
+
+<script src="/app.js" defer></script>
+</body>
+</html>

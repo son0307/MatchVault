@@ -3,32 +3,25 @@ package com.son.soccerStreaming.service;
 import com.son.soccerStreaming.dto.LiveFixtureSnapshotDto;
 import com.son.soccerStreaming.dto.FixtureEventDto;
 import com.son.soccerStreaming.entity.Fixture;
-import com.son.soccerStreaming.entity.PlayerFixtureStat;
 import com.son.soccerStreaming.exception.CustomException;
 import com.son.soccerStreaming.exception.ErrorCode;
 import com.son.soccerStreaming.repository.FixtureRecordRepository;
-import com.son.soccerStreaming.repository.PlayerFixtureStatRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
-import java.util.List;
 
 @Service
 @RequiredArgsConstructor
 public class LiveFixtureSnapshotService {
 
     private final FixtureRecordRepository fixtureRecordRepository;
-    private final PlayerFixtureStatRepository playerFixtureStatRepository;
-    private final FixutreTeamStatAggregator fixutreTeamStatAggregator;
+    private final FixtureStatService fixtureStatService;
     private final FixtureRedisService fixtureRedisService;
 
     @Transactional(readOnly = true)
     public LiveFixtureSnapshotDto rebuildAndCacheSnapshot(Long fixtureId, FixtureEventDto latestEvent) {
         Fixture fixture = fixtureRecordRepository.findByFixtureId(fixtureId)
                 .orElseThrow(() -> new CustomException(ErrorCode.FIXTURE_NOT_FOUND));
-
-        List<PlayerFixtureStat> playerStats = playerFixtureStatRepository.findAllByFixtureFixtureId(fixtureId);
 
         LiveFixtureSnapshotDto snapshot = LiveFixtureSnapshotDto.builder()
                 .fixtureId(fixtureId)
@@ -46,15 +39,15 @@ public class LiveFixtureSnapshotService {
                 .extratimeAwayScore(fixture.getExtratimeAwayScore())
                 .penaltyHomeScore(fixture.getPenaltyHomeScore())
                 .penaltyAwayScore(fixture.getPenaltyAwayScore())
-                .homeTeamStat(fixutreTeamStatAggregator.aggregate(
+                .homeTeamStat(fixtureStatService.getTeamStatSummary(
+                        fixtureId,
                         fixture.getHomeTeam().getTeamId(),
-                        valueOf(fixture.getHomeScore()),
-                        playerStats
+                        valueOf(fixture.getHomeScore())
                 ))
-                .awayTeamStat(fixutreTeamStatAggregator.aggregate(
+                .awayTeamStat(fixtureStatService.getTeamStatSummary(
+                        fixtureId,
                         fixture.getAwayTeam().getTeamId(),
-                        valueOf(fixture.getAwayScore()),
-                        playerStats
+                        valueOf(fixture.getAwayScore())
                 ))
                 .latestEvent(latestEvent)
                 .build();

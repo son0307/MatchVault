@@ -13,7 +13,7 @@ import org.springframework.stereotype.Component;
 @Slf4j
 @Component
 @Profile("prod")
-@Order(7)
+@Order(8)
 @RequiredArgsConstructor
 @ConditionalOnProperty(name = "api-football.sync.injuries.run-on-startup", havingValue = "true")
 public class ApiFootballInjuryStartupSyncRunner implements CommandLineRunner {

@@ -21,6 +21,9 @@ api-football:
     fixture-player-stats:
       enabled: false
       run-on-startup: false
+    fixture-statistics:
+      enabled: false
+      run-on-startup: false
     players:
       profile-fallback-enabled: false
       squads:

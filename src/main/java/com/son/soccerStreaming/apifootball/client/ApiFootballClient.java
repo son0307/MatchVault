@@ -1,6 +1,7 @@
 package com.son.soccerStreaming.apifootball.client;
 
 import com.son.soccerStreaming.apifootball.dto.ApiFootballInjuryDto;
+import com.son.soccerStreaming.apifootball.dto.ApiFootballFixtureStatisticsDto;
 import com.son.soccerStreaming.apifootball.dto.ApiFootballLineupDto;
 import com.son.soccerStreaming.apifootball.dto.ApiFootballLiveDto;
 import com.son.soccerStreaming.apifootball.dto.ApiFootballPlayerDto;
@@ -129,6 +130,17 @@ public class ApiFootballClient {
         return responseOf(body);
     }
 
+    public List<ApiFootballFixtureStatisticsDto.FixtureStatisticsResponse> getFixtureStatistics(Long fixtureId) {
+        ApiFootballFixtureStatisticsDto.ApiResponse<ApiFootballFixtureStatisticsDto.FixtureStatisticsResponse> body = apiFootballRestClient.get()
+                .uri(baseUrl + "/fixtures/statistics?fixture={fixtureId}", fixtureId)
+                .headers(this::setApiHeaders)
+                .retrieve()
+                .body(new ParameterizedTypeReference<>() {
+                });
+
+        return fixtureStatisticsResponseOf(body);
+    }
+
     public List<ApiFootballTeamDto.TeamResponse> getTeams(Integer league, Integer season) {
         ApiFootballTeamDto.ApiResponse<ApiFootballTeamDto.TeamResponse> body = apiFootballRestClient.get()
                 .uri(baseUrl + "/teams?league={league}&season={season}", league, season)
@@ -197,6 +209,13 @@ public class ApiFootballClient {
     }
 
     private <T> List<T> injuryResponseOf(ApiFootballInjuryDto.ApiResponse<T> body) {
+        if (body == null || body.getResponse() == null) {
+            return List.of();
+        }
+        return body.getResponse();
+    }
+
+    private <T> List<T> fixtureStatisticsResponseOf(ApiFootballFixtureStatisticsDto.ApiResponse<T> body) {
         if (body == null || body.getResponse() == null) {
             return List.of();
         }
