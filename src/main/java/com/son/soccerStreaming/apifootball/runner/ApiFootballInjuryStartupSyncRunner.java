@@ -1,17 +1,22 @@
-package com.son.soccerStreaming.apifootball.service;
+package com.son.soccerStreaming.apifootball.runner;
 
+import com.son.soccerStreaming.apifootball.service.ApiFootballInjurySyncService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.CommandLineRunner;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
-import org.springframework.scheduling.annotation.Scheduled;
+import org.springframework.context.annotation.Profile;
+import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 
 @Slf4j
 @Component
+@Profile("prod")
+@Order(7)
 @RequiredArgsConstructor
-@ConditionalOnProperty(name = "api-football.sync.injuries.enabled", havingValue = "true")
-public class ApiFootballInjurySyncScheduler {
+@ConditionalOnProperty(name = "api-football.sync.injuries.run-on-startup", havingValue = "true")
+public class ApiFootballInjuryStartupSyncRunner implements CommandLineRunner {
 
     private final ApiFootballInjurySyncService apiFootballInjurySyncService;
 
@@ -21,12 +26,12 @@ public class ApiFootballInjurySyncScheduler {
     @Value("${api-football.sync.injuries.season:2024}")
     private Integer season;
 
-    @Scheduled(cron = "${api-football.sync.injuries.daily-cron:0 0 5 * * *}")
-    public void syncInjuriesDaily() {
+    @Override
+    public void run(String... args) {
         try {
             apiFootballInjurySyncService.syncInjuries(league, season);
         } catch (Exception e) {
-            log.error("API-Football injury sync failed. league={}, season={}", league, season, e);
+            log.error("API-Football startup injury sync failed. league={}, season={}", league, season, e);
         }
     }
 }

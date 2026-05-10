@@ -1,6 +1,7 @@
-package com.son.soccerStreaming.apifootball.service;
+package com.son.soccerStreaming.apifootball.scheduler;
 
 import com.son.soccerStreaming.entity.Team;
+import com.son.soccerStreaming.apifootball.service.ApiFootballPlayerSyncService;
 import com.son.soccerStreaming.repository.TeamRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

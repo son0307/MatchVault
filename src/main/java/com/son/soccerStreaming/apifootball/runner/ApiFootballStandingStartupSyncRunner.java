@@ -1,5 +1,6 @@
-package com.son.soccerStreaming.apifootball.service;
+package com.son.soccerStreaming.apifootball.runner;
 
+import com.son.soccerStreaming.apifootball.service.ApiFootballStandingSyncService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;

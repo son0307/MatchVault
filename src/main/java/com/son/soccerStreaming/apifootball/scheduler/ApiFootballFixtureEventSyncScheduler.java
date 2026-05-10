@@ -1,6 +1,7 @@
-package com.son.soccerStreaming.apifootball.service;
+package com.son.soccerStreaming.apifootball.scheduler;
 
 import com.son.soccerStreaming.entity.Fixture;
+import com.son.soccerStreaming.apifootball.service.ApiFootballFixtureEventSyncService;
 import com.son.soccerStreaming.repository.FixtureRecordRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

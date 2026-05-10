@@ -1,5 +1,6 @@
-package com.son.soccerStreaming.apifootball.service;
+package com.son.soccerStreaming.apifootball.runner;
 
+import com.son.soccerStreaming.apifootball.service.ApiFootballFixturePlayerStatSyncService;
 import com.son.soccerStreaming.entity.Fixture;
 import com.son.soccerStreaming.repository.FixtureRecordRepository;
 import lombok.RequiredArgsConstructor;
@@ -14,26 +15,26 @@ import org.springframework.stereotype.Component;
 @Slf4j
 @Component
 @Profile("prod")
-@Order(4)
+@Order(6)
 @RequiredArgsConstructor
-@ConditionalOnProperty(name = "api-football.sync.fixture-events.test-runner-enabled", havingValue = "true")
-public class ApiFootballFixtureEventTestSyncRunner implements CommandLineRunner {
+@ConditionalOnProperty(name = "api-football.sync.fixture-player-stats.run-on-startup", havingValue = "true")
+public class ApiFootballFixturePlayerStatStartupSyncRunner implements CommandLineRunner {
 
-    private final ApiFootballFixtureEventSyncService apiFootballFixtureEventSyncService;
+    private final ApiFootballFixturePlayerStatSyncService apiFootballFixturePlayerStatSyncService;
     private final FixtureRecordRepository fixtureRecordRepository;
 
-    @Value("${api-football.sync.fixture-events.startup-delay-ms:300}")
+    @Value("${api-football.sync.fixture-player-stats.startup-delay-ms:300}")
     private Long delayMs;
 
     @Override
     public void run(String... args) {
-        log.info("API-Football startup fixture event sync started.");
+        log.info("API-Football startup fixture player stat sync started.");
         for (Fixture fixture : fixtureRecordRepository.findAllByOrderByFixtureDateAsc()) {
             try {
-                apiFootballFixtureEventSyncService.syncEvents(fixture.getFixtureId());
+                apiFootballFixturePlayerStatSyncService.syncPlayerStats(fixture.getFixtureId());
                 sleepBetweenRequests();
             } catch (Exception e) {
-                log.error("API-Football startup fixture event sync failed. fixtureId={}", fixture.getFixtureId(), e);
+                log.error("API-Football startup fixture player stat sync failed. fixtureId={}", fixture.getFixtureId(), e);
             }
         }
     }
