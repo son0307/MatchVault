@@ -39,7 +39,7 @@ public class Player {
 
     // 포지션 및 기본 등번호
     private String position;
-    private Integer defaultNumber;
+    private Integer number;
 
     // 이미지 정보
     private String photoUrl;
@@ -53,7 +53,7 @@ public class Player {
     public void updateProfile(String name, String firstname, String lastname, Integer age,
                               LocalDate birthDate, String birthPlace, String birthCountry,
                               String nationality, String height, String weight,
-                              String position, Integer defaultNumber, String photoUrl) {
+                              String position, Integer number, String photoUrl) {
         this.name = name;
         this.firstname = firstname;
         this.lastname = lastname;
@@ -65,7 +65,7 @@ public class Player {
         this.height = height;
         this.weight = weight;
         this.position = position;
-        this.defaultNumber = defaultNumber;
+        this.number = number;
         this.photoUrl = photoUrl;
     }
 

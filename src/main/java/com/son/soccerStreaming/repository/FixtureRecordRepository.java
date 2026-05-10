@@ -11,6 +11,8 @@ import java.util.Optional;
 public interface FixtureRecordRepository extends JpaRepository<Fixture, Long>, FixtureRecordRepositoryCustom {
     Optional<Fixture> findByFixtureId(Long fixtureId);
 
+    List<Fixture> findAllByOrderByFixtureDateAsc();
+
     boolean existsByFixtureStatus(String fixtureStatus);
 
     boolean existsByFixtureDateBetweenAndFixtureStatusIn(LocalDateTime start, LocalDateTime end, Collection<String> fixtureStatuses);

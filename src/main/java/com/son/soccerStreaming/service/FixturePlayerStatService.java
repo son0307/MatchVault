@@ -38,7 +38,7 @@ public class FixturePlayerStatService {
     private FixturePlayerStatResponseDto.TeamPlayerStats buildTeamStats(Team team, List<PlayerFixtureStat> allStats) {
         List<FixturePlayerStatResponseDto.PlayerStat> players = allStats.stream()
                 .filter(stat -> stat.getTeam() != null && team.getId().equals(stat.getTeam().getId()))
-                .sorted(Comparator.comparing(stat -> stat.getPlayer().getDefaultNumber(), Comparator.nullsLast(Integer::compareTo)))
+                .sorted(Comparator.comparing(stat -> stat.getPlayer().getNumber(), Comparator.nullsLast(Integer::compareTo)))
                 .map(this::toPlayerStat)
                 .toList();
 
@@ -53,7 +53,7 @@ public class FixturePlayerStatService {
         return FixturePlayerStatResponseDto.PlayerStat.builder()
                 .playerId(stat.getPlayer().getPlayerId())
                 .playerName(stat.getPlayer().getName())
-                .jerseyNumber(stat.getPlayer().getDefaultNumber())
+                .jerseyNumber(stat.getPlayer().getNumber())
                 .position(stat.getPlayer().getPosition())
                 .minutesPlayed(valueOfInt(stat.getMinutesPlayed()))
                 .rating(valueOfDouble(stat.getRating()))

@@ -17,11 +17,18 @@ api-football:
       test-runner-enabled: false
     fixture-lineups:
       enabled: false
+      run-on-startup: false
+    fixture-player-stats:
+      enabled: false
+      run-on-startup: false
     players:
       profile-fallback-enabled: false
       squads:
         enabled: false
         test-runner-enabled: false
+    injuries:
+      enabled: false
+      run-on-startup: false
 
 live:
   sync:

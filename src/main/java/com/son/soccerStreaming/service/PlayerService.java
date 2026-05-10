@@ -31,7 +31,7 @@ public class PlayerService {
                 .playerName(player.getName())
                 .firstname(player.getFirstname())
                 .lastname(player.getLastname())
-                .backNumber(player.getDefaultNumber())
+                .backNumber(player.getNumber())
                 .age(player.getAge())
                 .birthDate(player.getBirthDate())
                 .birthPlace(player.getBirthPlace())

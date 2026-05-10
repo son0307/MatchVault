@@ -48,7 +48,7 @@ public class TeamService {
                 .map(player -> PlayerResponseDto.Summary.builder()
                         .playerId(player.getPlayerId())
                         .playerName(player.getName())
-                        .backNumber(player.getDefaultNumber())
+                        .backNumber(player.getNumber())
                         .position(player.getPosition())
                         .photoUrl(player.getPhotoUrl())
                         .build())

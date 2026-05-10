@@ -14,26 +14,26 @@ import org.springframework.stereotype.Component;
 @Slf4j
 @Component
 @Profile("prod")
-@Order(4)
+@Order(5)
 @RequiredArgsConstructor
-@ConditionalOnProperty(name = "api-football.sync.fixture-events.test-runner-enabled", havingValue = "true")
-public class ApiFootballFixtureEventTestSyncRunner implements CommandLineRunner {
+@ConditionalOnProperty(name = "api-football.sync.fixture-lineups.run-on-startup", havingValue = "true")
+public class ApiFootballFixtureLineupStartupSyncRunner implements CommandLineRunner {
 
-    private final ApiFootballFixtureEventSyncService apiFootballFixtureEventSyncService;
+    private final ApiFootballFixtureLineupSyncService apiFootballFixtureLineupSyncService;
     private final FixtureRecordRepository fixtureRecordRepository;
 
-    @Value("${api-football.sync.fixture-events.startup-delay-ms:300}")
+    @Value("${api-football.sync.fixture-lineups.startup-delay-ms:300}")
     private Long delayMs;
 
     @Override
     public void run(String... args) {
-        log.info("API-Football startup fixture event sync started.");
+        log.info("API-Football startup fixture lineup sync started.");
         for (Fixture fixture : fixtureRecordRepository.findAllByOrderByFixtureDateAsc()) {
             try {
-                apiFootballFixtureEventSyncService.syncEvents(fixture.getFixtureId());
+                apiFootballFixtureLineupSyncService.syncLineups(fixture.getFixtureId());
                 sleepBetweenRequests();
             } catch (Exception e) {
-                log.error("API-Football startup fixture event sync failed. fixtureId={}", fixture.getFixtureId(), e);
+                log.error("API-Football startup fixture lineup sync failed. fixtureId={}", fixture.getFixtureId(), e);
             }
         }
     }

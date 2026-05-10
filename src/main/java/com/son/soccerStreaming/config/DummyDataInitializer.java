@@ -71,7 +71,7 @@ public class DummyDataInitializer implements CommandLineRunner {
                         .height((random.nextInt(30) + 165) + " cm")
                         .weight((random.nextInt(25) + 65) + " kg")
                         .position(pos)
-                        .defaultNumber(i)
+                        .number(i)
                         .photoUrl("https://media.api-sports.io/football/players/" + (playerIdCounter - 1) + ".png")
                         .team(team)
                         .build();
@@ -210,7 +210,7 @@ public class DummyDataInitializer implements CommandLineRunner {
                     .fixture(fixture)
                     .team(team)
                     .player(player)
-                    .jerseyNumber(player.getDefaultNumber())
+                    .jerseyNumber(player.getNumber())
                     .position(posShort)
                     .grid(grid)
                     .isStarter(isStarter)

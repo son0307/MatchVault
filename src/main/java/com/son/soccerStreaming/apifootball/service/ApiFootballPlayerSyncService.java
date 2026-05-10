@@ -58,7 +58,7 @@ public class ApiFootballPlayerSyncService {
 
     @Transactional
     public Optional<Player> findOrFetchPlayer(Long playerId, String fallbackName, Team team,
-                                              Integer defaultNumber, String position, String photoUrl) {
+                                              Integer number, String position, String photoUrl) {
         if (playerId == null) {
             return Optional.empty();
         }
@@ -69,7 +69,7 @@ public class ApiFootballPlayerSyncService {
         }
 
         if (profileFallbackEnabled) {
-            Optional<Player> fetched = fetchProfile(playerId, team, defaultNumber, position);
+            Optional<Player> fetched = fetchProfile(playerId, team, number, position);
             if (fetched.isPresent()) {
                 return fetched;
             }
@@ -79,16 +79,16 @@ public class ApiFootballPlayerSyncService {
             return Optional.empty();
         }
 
-        return Optional.of(saveMinimalPlayer(playerId, fallbackName, team, defaultNumber, position, photoUrl));
+        return Optional.of(saveMinimalPlayer(playerId, fallbackName, team, number, position, photoUrl));
     }
 
     @Transactional
-    public Optional<Player> fetchProfile(Long playerId, Team team, Integer defaultNumber, String position) {
+    public Optional<Player> fetchProfile(Long playerId, Team team, Integer number, String position) {
         return apiFootballClient.getPlayerProfiles(playerId).stream()
                 .map(ApiFootballPlayerDto.ProfileResponse::getPlayer)
                 .filter(player -> player != null && player.getId() != null)
                 .findFirst()
-                .map(player -> upsertProfilePlayer(player, team, defaultNumber, position));
+                .map(player -> upsertProfilePlayer(player, team, number, position));
     }
 
     private Player upsertSquadPlayer(ApiFootballPlayerDto.SquadPlayer playerInfo, Team team) {
@@ -118,7 +118,7 @@ public class ApiFootballPlayerSyncService {
     }
 
     private Player upsertProfilePlayer(ApiFootballPlayerDto.ProfilePlayer playerInfo, Team team,
-                                       Integer defaultNumber, String position) {
+                                       Integer number, String position) {
         Player player = playerRepository.findByPlayerId(playerInfo.getId())
                 .orElseGet(() -> Player.builder()
                         .playerId(playerInfo.getId())
@@ -137,8 +137,8 @@ public class ApiFootballPlayerSyncService {
                 playerInfo.getNationality(),
                 playerInfo.getHeight(),
                 playerInfo.getWeight(),
-                position != null ? position : player.getPosition(),
-                defaultNumber != null ? defaultNumber : player.getDefaultNumber(),
+                position != null ? position : playerInfo.getPosition(),
+                number != null ? number : playerInfo.getNumber(),
                 playerInfo.getPhoto()
         );
         if (team != null) {
@@ -147,12 +147,12 @@ public class ApiFootballPlayerSyncService {
         return playerRepository.save(player);
     }
 
-    private Player saveMinimalPlayer(Long playerId, String name, Team team, Integer defaultNumber,
+    private Player saveMinimalPlayer(Long playerId, String name, Team team, Integer number,
                                      String position, String photoUrl) {
         Player player = Player.builder()
                 .playerId(playerId)
                 .name(name)
-                .defaultNumber(defaultNumber)
+                .number(number)
                 .position(position)
                 .photoUrl(photoUrl)
                 .team(team)

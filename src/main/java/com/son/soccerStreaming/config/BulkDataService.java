@@ -118,7 +118,7 @@ public class BulkDataService {
                         java.util.stream.Collectors.collectingAndThen(
                                 java.util.stream.Collectors.toList(),
                                 list -> list.stream()
-                                        .sorted(Comparator.comparing(PlayerSeed::defaultNumber, Comparator.nullsLast(Integer::compareTo)))
+                                        .sorted(Comparator.comparing(PlayerSeed::number, Comparator.nullsLast(Integer::compareTo)))
                                         .toList()
                         )
                 ));
@@ -188,7 +188,7 @@ public class BulkDataService {
             ps.setLong(1, matchRecordId);
             ps.setLong(2, teamId);
             ps.setLong(3, player.id());
-            ps.setInt(4, player.defaultNumber());
+            ps.setInt(4, player.number());
             ps.setString(5, positionCode(player.position()));
             ps.setString(6, starter ? gridFor(players.indexOf(player)) : null);
             ps.setBoolean(7, starter);
@@ -316,7 +316,7 @@ public class BulkDataService {
     private record PlayerSeed(
             Long id,
             Long teamId,
-            Integer defaultNumber,
+            Integer number,
             String position
     ) {
     }
