@@ -29,7 +29,7 @@ public class ApiFootballFixtureStartupSyncRunner implements CommandLineRunner {
     @Override
     public void run(String... args) {
         try {
-            log.info("Sync fixture starting up...");
+            log.info("API-Football startup fixture sync started.");
             apiFootballFixtureSyncService.syncSeasonFixtures(league, season);
         } catch (Exception e) {
             log.error("API-Football startup fixture sync failed. league={}, season={}", league, season, e);

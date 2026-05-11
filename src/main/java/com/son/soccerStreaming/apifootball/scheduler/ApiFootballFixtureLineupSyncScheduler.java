@@ -6,17 +6,18 @@ import com.son.soccerStreaming.repository.FixtureRecordRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnExpression;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.List;
 
 @Slf4j
 @Component
 @RequiredArgsConstructor
-@ConditionalOnProperty(name = "api-football.sync.fixture-lineups.enabled", havingValue = "true")
+@ConditionalOnExpression("${api-football.sync.fixture-lineups.enabled:false} && !${api-football.sync.fixture-details.enabled:false}")
 public class ApiFootballFixtureLineupSyncScheduler {
 
     private static final List<String> LINEUP_WINDOW_STATUSES = List.of("SCHEDULED", "LIVE");
@@ -32,7 +33,7 @@ public class ApiFootballFixtureLineupSyncScheduler {
 
     @Scheduled(cron = "${api-football.sync.fixture-lineups.live-cron:0 */15 * * * *}")
     public void syncLineupsInMatchWindow() {
-        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime now = LocalDateTime.now(ZoneOffset.UTC);
         List<Fixture> fixtures = fixtureRecordRepository.findAllByFixtureDateBetweenAndFixtureStatusIn(
                 now.minusHours(windowAfterHours),
                 now.plusMinutes(windowBeforeMinutes),

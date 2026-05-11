@@ -48,11 +48,16 @@ api-football:
       live-cron: ${API_FOOTBALL_FIXTURES_LIVE_CRON:0 * * * * *}
       live-window-before-minutes: ${API_FOOTBALL_FIXTURES_LIVE_WINDOW_BEFORE_MINUTES:10}
       live-window-after-hours: ${API_FOOTBALL_FIXTURES_LIVE_WINDOW_AFTER_HOURS:4}
+    fixture-details:
+      enabled: ${API_FOOTBALL_FIXTURE_DETAILS_SYNC_ENABLED:false}
+      run-on-startup: ${API_FOOTBALL_FIXTURE_DETAILS_SYNC_RUN_ON_STARTUP:false}
+      live-cron: ${API_FOOTBALL_FIXTURE_DETAILS_LIVE_CRON:0 * * * * *}
+      daily-cron: ${API_FOOTBALL_FIXTURE_DETAILS_DAILY_CRON:0 55 4 * * *}
     fixture-events:
       enabled: ${API_FOOTBALL_FIXTURE_EVENTS_SYNC_ENABLED:false}
       live-cron: ${API_FOOTBALL_FIXTURE_EVENTS_LIVE_CRON:0 * * * * *}
       daily-cron: ${API_FOOTBALL_FIXTURE_EVENTS_DAILY_CRON:0 30 4 * * *}
-      test-runner-enabled: ${API_FOOTBALL_FIXTURE_EVENTS_TEST_RUNNER_ENABLED:false}
+      run-on-startup: ${API_FOOTBALL_FIXTURE_EVENTS_SYNC_RUN_ON_STARTUP:false}
       startup-delay-ms: ${API_FOOTBALL_FIXTURE_EVENTS_STARTUP_DELAY_MS:300}
     fixture-lineups:
       enabled: ${API_FOOTBALL_FIXTURE_LINEUPS_SYNC_ENABLED:false}
@@ -80,8 +85,8 @@ api-football:
         enabled: ${API_FOOTBALL_PLAYERS_SQUADS_SYNC_ENABLED:false}
         cron: ${API_FOOTBALL_PLAYERS_SQUADS_SYNC_CRON:0 50 4 * * SUN}
         delay-ms: ${API_FOOTBALL_PLAYERS_SQUADS_SYNC_DELAY_MS:7000}
-        test-runner-enabled: ${API_FOOTBALL_PLAYERS_SQUADS_TEST_RUNNER_ENABLED:false}
-        test-runner-delay-ms: ${API_FOOTBALL_PLAYERS_SQUADS_TEST_RUNNER_DELAY_MS:7000}
+        run-on-startup: ${API_FOOTBALL_PLAYERS_SQUADS_SYNC_RUN_ON_STARTUP:false}
+        startup-delay-ms: ${API_FOOTBALL_PLAYERS_SQUADS_STARTUP_DELAY_MS:7000}
     injuries:
       enabled: ${API_FOOTBALL_INJURIES_SYNC_ENABLED:false}
       run-on-startup: ${API_FOOTBALL_INJURIES_SYNC_RUN_ON_STARTUP:false}

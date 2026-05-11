@@ -13,6 +13,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.time.format.DateTimeParseException;
 import java.util.List;
 import java.util.Optional;
@@ -39,6 +40,15 @@ public class ApiFootballFixtureSyncService {
                 .toList();
 
         return upsertFixtures(liveFixtures, true);
+    }
+
+    @Transactional
+    public Optional<Fixture> syncFixtureResponse(ApiFootballLiveDto.FixtureResponse response, boolean applyLiveStandingImpact) {
+        Optional<Fixture> fixture = upsertFixture(response);
+        if (fixture.isPresent() && applyLiveStandingImpact) {
+            apiFootballStandingLocalUpdateService.applyFixtureState(fixture.get());
+        }
+        return fixture;
     }
 
     private int upsertFixtures(List<ApiFootballLiveDto.FixtureResponse> responses, boolean applyLiveStandingImpact) {
@@ -83,7 +93,7 @@ public class ApiFootballFixtureSyncService {
                         .fixtureId(fixtureInfo.getId())
                         .homeTeam(homeTeam.get())
                         .awayTeam(awayTeam.get())
-                        .fixtureDate(parseFixtureDate(fixtureInfo.getDate(), LocalDateTime.now()))
+                        .fixtureDate(parseFixtureDate(fixtureInfo.getDate(), LocalDateTime.now(ZoneOffset.UTC)))
                         .build());
 
         updateFixture(fixture, response);
@@ -154,6 +164,10 @@ public class ApiFootballFixtureSyncService {
         if (league != null && league.getRound() != null) {
             fixture.updateRound(league.getRound());
         }
+
+        if (league != null && league.getSeason() != null) {
+            fixture.updateSeason(league.getSeason());
+        }
     }
 
     private String fixtureStatusOf(String statusShort) {
@@ -171,7 +185,7 @@ public class ApiFootballFixtureSyncService {
             return fallback;
         }
         try {
-            return OffsetDateTime.parse(date).toLocalDateTime();
+            return OffsetDateTime.parse(date).withOffsetSameInstant(ZoneOffset.UTC).toLocalDateTime();
         } catch (DateTimeParseException e) {
             log.warn("Failed to parse API-Football fixture date. date={}", date);
             return fallback;

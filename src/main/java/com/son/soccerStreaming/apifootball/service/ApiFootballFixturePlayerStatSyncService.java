@@ -36,6 +36,22 @@ public class ApiFootballFixturePlayerStatSyncService {
                 .orElseThrow(() -> new CustomException(ErrorCode.FIXTURE_NOT_FOUND));
 
         List<ApiFootballLiveDto.FixturePlayersResponse> teamStats = apiFootballClient.getPlayerStats(fixtureId);
+        return syncPlayerStats(fixture, teamStats);
+    }
+
+    @Transactional
+    public int syncPlayerStats(Long fixtureId, List<ApiFootballLiveDto.FixturePlayersResponse> teamStats) {
+        Fixture fixture = fixtureRecordRepository.findByFixtureId(fixtureId)
+                .orElseThrow(() -> new CustomException(ErrorCode.FIXTURE_NOT_FOUND));
+        return syncPlayerStats(fixture, teamStats);
+    }
+
+    @Transactional
+    public int syncPlayerStats(Fixture fixture, List<ApiFootballLiveDto.FixturePlayersResponse> teamStats) {
+        if (teamStats == null || teamStats.isEmpty()) {
+            return 0;
+        }
+
         int syncedCount = 0;
 
         for (ApiFootballLiveDto.FixturePlayersResponse teamStat : teamStats) {

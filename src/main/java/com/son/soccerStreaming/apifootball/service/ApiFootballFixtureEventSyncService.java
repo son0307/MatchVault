@@ -37,8 +37,24 @@ public class ApiFootballFixtureEventSyncService {
                 .orElseThrow(() -> new CustomException(ErrorCode.FIXTURE_NOT_FOUND));
 
         List<ApiFootballLiveDto.EventResponse> events = apiFootballClient.getEvents(fixtureId);
+        return syncEvents(fixture, events);
+    }
+
+    @Transactional
+    public FixtureEventDto syncEvents(Long fixtureId, List<ApiFootballLiveDto.EventResponse> events) {
+        Fixture fixture = fixtureRecordRepository.findByFixtureId(fixtureId)
+                .orElseThrow(() -> new CustomException(ErrorCode.FIXTURE_NOT_FOUND));
+        return syncEvents(fixture, events);
+    }
+
+    @Transactional
+    public FixtureEventDto syncEvents(Fixture fixture, List<ApiFootballLiveDto.EventResponse> events) {
         FixtureEventDto latestEvent = null;
         int sequence = 1;
+
+        if (events == null || events.isEmpty()) {
+            return null;
+        }
 
         for (ApiFootballLiveDto.EventResponse event : events) {
             latestEvent = toFixtureEventDto(fixture.getFixtureId(), event);

@@ -13,7 +13,7 @@ import org.springframework.stereotype.Component;
 @Slf4j
 @Component
 @Profile("prod")
-@Order(8)
+@Order(9)
 @RequiredArgsConstructor
 @ConditionalOnProperty(name = "api-football.sync.injuries.run-on-startup", havingValue = "true")
 public class ApiFootballInjuryStartupSyncRunner implements CommandLineRunner {
@@ -28,6 +28,7 @@ public class ApiFootballInjuryStartupSyncRunner implements CommandLineRunner {
 
     @Override
     public void run(String... args) {
+        log.info("API-Football startup injury sync started.");
         try {
             apiFootballInjurySyncService.syncInjuries(league, season);
         } catch (Exception e) {

@@ -5,7 +5,7 @@ import com.son.soccerStreaming.apifootball.service.ApiFootballFixtureEventSyncSe
 import com.son.soccerStreaming.repository.FixtureRecordRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnExpression;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
@@ -14,7 +14,7 @@ import java.util.List;
 @Slf4j
 @Component
 @RequiredArgsConstructor
-@ConditionalOnProperty(name = "api-football.sync.fixture-events.enabled", havingValue = "true")
+@ConditionalOnExpression("${api-football.sync.fixture-events.enabled:false} && !${api-football.sync.fixture-details.enabled:false}")
 public class ApiFootballFixtureEventSyncScheduler {
 
     private final ApiFootballFixtureEventSyncService apiFootballFixtureEventSyncService;

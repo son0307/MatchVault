@@ -6,6 +6,14 @@ const state = {
     hasNext: false,
     selectedFixtureId: null,
     selectedTeamId: null,
+    liveFixtureId: null,
+    liveSource: null,
+    liveData: {
+        snapshot: null,
+        events: null,
+        lineups: null,
+        playerStats: null,
+    },
 };
 
 const elements = {
@@ -22,11 +30,19 @@ const elements = {
     standingsTable: document.querySelector("#standingsTable"),
     teamsList: document.querySelector("#teamsList"),
     teamDetail: document.querySelector("#teamDetail"),
+    liveFixtureInput: document.querySelector("#liveFixtureInput"),
+    liveConnectButton: document.querySelector("#liveConnectButton"),
+    liveDisconnectButton: document.querySelector("#liveDisconnectButton"),
+    liveConnectionStatus: document.querySelector("#liveConnectionStatus"),
+    liveFixtureLabel: document.querySelector("#liveFixtureLabel"),
+    liveFixtureDetail: document.querySelector("#liveFixtureDetail"),
 };
 
 document.addEventListener("DOMContentLoaded", () => {
     elements.refreshButton.addEventListener("click", refreshAll);
     elements.loadMoreFixtures.addEventListener("click", () => loadFixtures(false));
+    elements.liveConnectButton.addEventListener("click", connectLiveFixture);
+    elements.liveDisconnectButton.addEventListener("click", disconnectLiveFixture);
     refreshAll();
 });
 
@@ -149,6 +165,7 @@ function renderFixtures() {
 
 async function selectFixture(fixtureId) {
     state.selectedFixtureId = fixtureId;
+    elements.liveFixtureInput.value = fixtureId;
     renderFixtures();
 
     const fixture = state.fixtures.find((item) => item.fixtureId === fixtureId);
@@ -171,6 +188,149 @@ async function selectFixture(fixtureId) {
         renderLineups(settledValue(lineups)),
         renderPlayerStats(settledValue(playerStats)),
     ].join("");
+}
+
+async function connectLiveFixture() {
+    const fixtureId = Number(elements.liveFixtureInput.value);
+    if (!fixtureId) {
+        elements.liveFixtureDetail.innerHTML = errorMarkup(new Error("fixture ID를 입력하세요."));
+        return;
+    }
+
+    disconnectLiveFixture();
+    state.liveFixtureId = fixtureId;
+    state.liveData = {
+        snapshot: null,
+        events: null,
+        lineups: null,
+        playerStats: null,
+    };
+
+    setLiveStatus("Connecting");
+    elements.liveFixtureLabel.textContent = `Fixture #${fixtureId}`;
+    elements.liveFixtureDetail.className = "detail-stack";
+    elements.liveFixtureDetail.innerHTML = loadingMarkup();
+
+    await loadLiveInitialState(fixtureId);
+    openLiveStream(fixtureId);
+}
+
+function openLiveStream(fixtureId) {
+    const source = new EventSource(`/api/v1/live/stream/fixtures/${fixtureId}`);
+    state.liveSource = source;
+    elements.liveConnectButton.disabled = true;
+    elements.liveDisconnectButton.disabled = false;
+
+    source.addEventListener("CONNECT", () => {
+        setLiveStatus("Connected");
+    });
+
+    source.addEventListener("LIVE_SNAPSHOT", (event) => {
+        state.liveData.snapshot = parseEventData(event);
+        renderLiveFixture();
+    });
+
+    source.addEventListener("FIXTURE_EVENTS", (event) => {
+        state.liveData.events = parseEventData(event);
+        renderLiveFixture();
+    });
+
+    source.addEventListener("PLAYER_STATS", (event) => {
+        state.liveData.playerStats = parseEventData(event);
+        renderLiveFixture();
+    });
+
+    source.onerror = () => {
+        setLiveStatus("Reconnecting");
+    };
+}
+
+function disconnectLiveFixture() {
+    if (state.liveSource) {
+        state.liveSource.close();
+        state.liveSource = null;
+    }
+    elements.liveConnectButton.disabled = false;
+    elements.liveDisconnectButton.disabled = true;
+    if (state.liveFixtureId) {
+        setLiveStatus("Disconnected");
+    }
+}
+
+async function loadLiveInitialState(fixtureId) {
+    const [stats, events, lineups, playerStats] = await Promise.allSettled([
+        requestJson(`/api/v1/live/fixtures/${fixtureId}/stats`),
+        requestJson(`/api/v1/fixtures/${fixtureId}/events`),
+        requestJson(`/api/v1/fixtures/${fixtureId}/lineups`),
+        requestJson(`/api/v1/live/fixtures/${fixtureId}/player-stats`),
+    ]);
+
+    const statValue = settledValue(stats);
+    state.liveData.snapshot = statValue
+        ? {
+            fixtureId: statValue.fixtureId,
+            homeTeamStat: statValue.homeTeamStat,
+            awayTeamStat: statValue.awayTeamStat,
+        }
+        : null;
+    state.liveData.events = settledValue(events);
+    state.liveData.lineups = settledValue(lineups);
+    state.liveData.playerStats = settledValue(playerStats);
+    renderLiveFixture();
+}
+
+function renderLiveFixture() {
+    const snapshot = state.liveData.snapshot;
+    const stats = snapshot
+        ? {
+            fixtureId: snapshot.fixtureId,
+            homeTeamStat: snapshot.homeTeamStat,
+            awayTeamStat: snapshot.awayTeamStat,
+        }
+        : null;
+
+    elements.liveFixtureDetail.className = "detail-stack";
+    elements.liveFixtureDetail.innerHTML = [
+        renderLiveSnapshot(snapshot),
+        renderStats(stats),
+        renderEvents(state.liveData.events),
+        renderLineups(state.liveData.lineups),
+        renderPlayerStats(state.liveData.playerStats),
+    ].join("");
+}
+
+function renderLiveSnapshot(snapshot) {
+    if (!snapshot || !snapshot.fixtureId) {
+        return sectionMarkup("경기 상태", emptyMarkup("아직 수신된 실시간 경기 상태가 없습니다."));
+    }
+
+    return sectionMarkup("경기 상태", `
+        <div class="live-scoreboard">
+            <span class="team-side">
+                <span class="team-name">Home</span>
+                <span class="status-pill">${escapeHtml(snapshot.statusShort || "LIVE")}</span>
+            </span>
+            <span class="score-box">
+                <span>${numberText(snapshot.homeTeamStat?.score ?? snapshot.fulltimeHomeScore)}</span>
+                <span>:</span>
+                <span>${numberText(snapshot.awayTeamStat?.score ?? snapshot.fulltimeAwayScore)}</span>
+            </span>
+            <span class="team-side away">
+                <span class="team-name">Away</span>
+                <span class="status-pill">${numberText(snapshot.elapsed)}'</span>
+            </span>
+        </div>
+        ${snapshot.latestEvent ? `
+            <div class="event-item">
+                <div class="event-meta">
+                    <span class="small-pill">${snapshot.latestEvent.time?.elapsed ?? "-"}'</span>
+                    <span class="small-pill">${escapeHtml(snapshot.latestEvent.type || "Event")}</span>
+                    <strong>${escapeHtml(snapshot.latestEvent.team?.name || "Unknown team")}</strong>
+                </div>
+                <p>${escapeHtml(snapshot.latestEvent.player?.name || "-")} ${snapshot.latestEvent.detail ? `· ${escapeHtml(snapshot.latestEvent.detail)}` : ""}</p>
+            </div>
+        ` : ""}
+    `);
 }
 
 function renderStats(stats) {
@@ -424,6 +584,14 @@ function settledValue(result) {
     return result.status === "fulfilled" ? result.value : null;
 }
 
+function parseEventData(event) {
+    try {
+        return JSON.parse(event.data);
+    } catch (error) {
+        return null;
+    }
+}
+
 function loadingMarkup() {
     return `<div class="loading">데이터를 불러오는 중입니다.</div>`;
 }
@@ -449,6 +617,10 @@ function numberText(value) {
 
 function setApiStatus(status) {
     elements.apiStatus.textContent = status;
+}
+
+function setLiveStatus(status) {
+    elements.liveConnectionStatus.textContent = status;
 }
 
 function escapeHtml(value) {
