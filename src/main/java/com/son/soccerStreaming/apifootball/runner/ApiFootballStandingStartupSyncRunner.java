@@ -28,8 +28,8 @@ public class ApiFootballStandingStartupSyncRunner implements CommandLineRunner {
 
     @Override
     public void run(String... args) {
+        log.info("API-Football startup standing sync started.");
         try {
-            log.info("Sync standing startup...");
             apiFootballStandingSyncService.syncStandings(league, season);
         } catch (Exception e) {
             log.error("API-Football startup standing sync failed. league={}, season={}", league, season, e);

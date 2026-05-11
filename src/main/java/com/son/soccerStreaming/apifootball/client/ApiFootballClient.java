@@ -15,6 +15,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 
 import java.util.List;
+import java.util.stream.Collectors;
 
 @Component
 @RequiredArgsConstructor
@@ -34,6 +35,21 @@ public class ApiFootballClient {
     public List<ApiFootballLiveDto.FixtureResponse> getFixture(Long fixtureId) {
         ApiFootballLiveDto.ApiResponse<ApiFootballLiveDto.FixtureResponse> body = apiFootballRestClient.get()
                 .uri(baseUrl + "/fixtures?id={fixtureId}", fixtureId)
+                .headers(this::setApiHeaders)
+                .retrieve()
+                .body(new ParameterizedTypeReference<>() {
+                });
+
+        return responseOf(body);
+    }
+
+    public List<ApiFootballLiveDto.FixtureResponse> getFixturesByIds(List<Long> fixtureIds) {
+        String ids = fixtureIds.stream()
+                .map(String::valueOf)
+                .collect(Collectors.joining("-"));
+
+        ApiFootballLiveDto.ApiResponse<ApiFootballLiveDto.FixtureResponse> body = apiFootballRestClient.get()
+                .uri(baseUrl + "/fixtures?ids={fixtureIds}", ids)
                 .headers(this::setApiHeaders)
                 .retrieve()
                 .body(new ParameterizedTypeReference<>() {

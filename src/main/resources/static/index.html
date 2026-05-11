@@ -67,6 +67,27 @@
             </aside>
         </section>
 
+        <section class="panel live-panel" aria-label="실시간 경기">
+            <div class="panel-heading">
+                <div>
+                    <p class="eyebrow">Live Match</p>
+                    <h2>실시간 경기</h2>
+                </div>
+                <div class="live-controls">
+                    <input id="liveFixtureInput" type="number" placeholder="Fixture ID">
+                    <button id="liveConnectButton" type="button">연결</button>
+                    <button id="liveDisconnectButton" type="button" class="ghost-button" disabled>해제</button>
+                </div>
+            </div>
+            <div class="live-status-row">
+                <span id="liveConnectionStatus" class="small-pill">Disconnected</span>
+                <span id="liveFixtureLabel" class="muted">실시간으로 확인할 fixture ID를 입력하세요.</span>
+            </div>
+            <div id="liveFixtureDetail" class="detail-empty">
+                연결 후 경기 상태, 이벤트, 팀 스탯, 선수 스탯이 실시간으로 표시됩니다.
+            </div>
+        </section>
+
         <section class="content-grid lower-grid">
             <div class="panel standings-panel">
                 <div class="panel-heading">

@@ -7,7 +7,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.CommandLineRunner;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnExpression;
 import org.springframework.context.annotation.Profile;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
@@ -15,10 +15,10 @@ import org.springframework.stereotype.Component;
 @Slf4j
 @Component
 @Profile("prod")
-@Order(4)
+@Order(5)
 @RequiredArgsConstructor
-@ConditionalOnProperty(name = "api-football.sync.fixture-events.test-runner-enabled", havingValue = "true")
-public class ApiFootballFixtureEventTestSyncRunner implements CommandLineRunner {
+@ConditionalOnExpression("${api-football.sync.fixture-events.run-on-startup:false} && !${api-football.sync.fixture-details.enabled:false}")
+public class ApiFootballFixtureEventStartupSyncRunner implements CommandLineRunner {
 
     private final ApiFootballFixtureEventSyncService apiFootballFixtureEventSyncService;
     private final FixtureRecordRepository fixtureRecordRepository;

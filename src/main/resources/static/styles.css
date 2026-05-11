@@ -176,6 +176,52 @@ h3 {
     margin-top: 18px;
 }
 
+.live-panel {
+    margin-top: 18px;
+}
+
+.live-controls {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.live-controls input {
+    width: 150px;
+    height: 40px;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    padding: 0 10px;
+    color: var(--text);
+    background: #fff;
+}
+
+.live-status-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-height: 48px;
+    padding: 12px 18px;
+    border-bottom: 1px solid var(--line);
+}
+
+.live-scoreboard {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+    align-items: center;
+    gap: 12px;
+    min-height: 84px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: #fbfcfe;
+    padding: 14px;
+}
+
+.live-scoreboard .score-box {
+    min-width: 120px;
+    font-size: 28px;
+}
+
 .panel {
     min-width: 0;
     overflow: hidden;
@@ -467,9 +513,14 @@ th {
 
     .topbar,
     .toolbar,
+    .live-controls,
     .panel-heading {
         align-items: stretch;
         flex-direction: column;
+    }
+
+    .live-controls input {
+        width: 100%;
     }
 
     .summary-grid {
@@ -477,6 +528,10 @@ th {
     }
 
     .fixture-card {
+        grid-template-columns: 1fr;
+    }
+
+    .live-scoreboard {
         grid-template-columns: 1fr;
     }
 

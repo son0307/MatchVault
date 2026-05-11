@@ -36,6 +36,7 @@ public class Fixture {
     private Long firstPeriod;
     private Long secondPeriod;
     private String round;
+    private Integer season;
 
     // 경기장 정보
     private Long venueId;
@@ -155,6 +156,10 @@ public class Fixture {
 
     public void updateRound(String round) {
         this.round = round;
+    }
+
+    public void updateSeason(Integer season) {
+        this.season = season;
     }
 
     public void updateHomeLineupColors(String playerPrimary, String playerNumber, String playerBorder,

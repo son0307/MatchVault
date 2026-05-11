@@ -10,6 +10,7 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.List;
 
 @Slf4j
@@ -62,7 +63,7 @@ public class ApiFootballFixtureSyncScheduler {
     }
 
     private boolean hasFixtureInLiveWindow() {
-        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime now = LocalDateTime.now(ZoneOffset.UTC);
         return fixtureRecordRepository.existsByFixtureDateBetweenAndFixtureStatusIn(
                 now.minusHours(liveWindowAfterHours),
                 now.plusMinutes(liveWindowBeforeMinutes),

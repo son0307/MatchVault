@@ -38,13 +38,29 @@ public class ApiFootballFixtureStatSyncService {
 
         List<ApiFootballFixtureStatisticsDto.FixtureStatisticsResponse> teamStats =
                 apiFootballClient.getFixtureStatistics(fixtureId);
+        return syncFixtureStats(fixture, teamStats);
+    }
+
+    @Transactional
+    public int syncFixtureStats(Long fixtureId, List<ApiFootballFixtureStatisticsDto.FixtureStatisticsResponse> teamStats) {
+        Fixture fixture = fixtureRecordRepository.findByFixtureId(fixtureId)
+                .orElseThrow(() -> new CustomException(ErrorCode.FIXTURE_NOT_FOUND));
+        return syncFixtureStats(fixture, teamStats);
+    }
+
+    @Transactional
+    public int syncFixtureStats(Fixture fixture, List<ApiFootballFixtureStatisticsDto.FixtureStatisticsResponse> teamStats) {
+        if (teamStats == null || teamStats.isEmpty()) {
+            return 0;
+        }
+
         int syncedCount = 0;
 
         for (ApiFootballFixtureStatisticsDto.FixtureStatisticsResponse teamStat : teamStats) {
             Optional<Team> team = findTeam(teamStat);
             if (team.isEmpty()) {
                 log.warn("Skip fixture stat because team does not exist. fixtureId={}, teamId={}",
-                        fixtureId, teamStat.getTeam() != null ? teamStat.getTeam().getId() : null);
+                        fixture.getFixtureId(), teamStat.getTeam() != null ? teamStat.getTeam().getId() : null);
                 continue;
             }
 

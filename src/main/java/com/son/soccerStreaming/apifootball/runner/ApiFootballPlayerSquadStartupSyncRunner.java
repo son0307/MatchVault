@@ -15,38 +15,26 @@ import org.springframework.stereotype.Component;
 @Slf4j
 @Component
 @Profile("prod")
-@Order(5)
+@Order(4)
 @RequiredArgsConstructor
-@ConditionalOnProperty(name = "api-football.sync.players.squads.test-runner-enabled", havingValue = "true")
-public class ApiFootballPlayerSquadTestSyncRunner implements CommandLineRunner {
+@ConditionalOnProperty(name = "api-football.sync.players.squads.run-on-startup", havingValue = "true")
+public class ApiFootballPlayerSquadStartupSyncRunner implements CommandLineRunner {
 
     private final ApiFootballPlayerSyncService apiFootballPlayerSyncService;
     private final TeamRepository teamRepository;
 
-    @Value("${api-football.sync.players.squads.test-runner-delay-ms:7000}")
+    @Value("${api-football.sync.players.squads.startup-delay-ms:7000}")
     private Long delayMs;
 
     @Override
     public void run(String... args) {
-        log.info("Sync player squad starting up...");
+        log.info("API-Football startup squad sync started.");
         for (Team team : teamRepository.findAllByOrderByNameAsc()) {
             try {
                 apiFootballPlayerSyncService.syncSquad(team.getTeamId());
-                sleepBetweenRequests();
             } catch (Exception e) {
-                log.error("API-Football squad test sync failed. teamId={}", team.getTeamId(), e);
+                log.error("API-Football squad sync failed. teamId={}", team.getTeamId(), e);
             }
-        }
-    }
-
-    private void sleepBetweenRequests() {
-        if (delayMs == null || delayMs <= 0) {
-            return;
-        }
-        try {
-            Thread.sleep(delayMs);
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
         }
     }
 }

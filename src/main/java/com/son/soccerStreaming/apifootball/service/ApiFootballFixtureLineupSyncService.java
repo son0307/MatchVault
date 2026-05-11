@@ -38,6 +38,22 @@ public class ApiFootballFixtureLineupSyncService {
                 .orElseThrow(() -> new CustomException(ErrorCode.FIXTURE_NOT_FOUND));
 
         List<ApiFootballLineupDto.LineupResponse> lineups = apiFootballClient.getLineups(fixtureId);
+        return syncLineups(fixture, lineups);
+    }
+
+    @Transactional
+    public int syncLineups(Long fixtureId, List<ApiFootballLineupDto.LineupResponse> lineups) {
+        Fixture fixture = fixtureRecordRepository.findByFixtureId(fixtureId)
+                .orElseThrow(() -> new CustomException(ErrorCode.FIXTURE_NOT_FOUND));
+        return syncLineups(fixture, lineups);
+    }
+
+    @Transactional
+    public int syncLineups(Fixture fixture, List<ApiFootballLineupDto.LineupResponse> lineups) {
+        if (lineups == null || lineups.isEmpty()) {
+            return 0;
+        }
+
         int syncedCount = 0;
 
         for (ApiFootballLineupDto.LineupResponse lineup : lineups) {

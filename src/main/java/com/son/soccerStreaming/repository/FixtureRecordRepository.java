@@ -13,6 +13,8 @@ public interface FixtureRecordRepository extends JpaRepository<Fixture, Long>, F
 
     List<Fixture> findAllByOrderByFixtureDateAsc();
 
+    List<Fixture> findAllBySeasonOrderByFixtureDateAsc(Integer season);
+
     boolean existsByFixtureStatus(String fixtureStatus);
 
     boolean existsByFixtureDateBetweenAndFixtureStatusIn(LocalDateTime start, LocalDateTime end, Collection<String> fixtureStatuses);

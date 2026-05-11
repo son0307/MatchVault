@@ -28,6 +28,10 @@ public final class ApiFootballLiveDto {
         private Teams teams;
         private Goals goals;
         private Score score;
+        private List<EventResponse> events;
+        private List<ApiFootballLineupDto.LineupResponse> lineups;
+        private List<ApiFootballFixtureStatisticsDto.FixtureStatisticsResponse> statistics;
+        private List<FixturePlayersResponse> players;
     }
 
     @Getter
