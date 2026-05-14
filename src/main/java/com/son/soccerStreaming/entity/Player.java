@@ -44,11 +44,6 @@ public class Player {
     // 이미지 정보
     private String photoUrl;
 
-    // 현재 소속 팀
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "team_id")
-    private Team team;
-
     // 선수 정보 업데이트(Sync)를 위한 편의 메서드
     public void updateProfile(String name, String firstname, String lastname, Integer age,
                               LocalDate birthDate, String birthPlace, String birthCountry,
@@ -67,10 +62,5 @@ public class Player {
         this.position = position;
         this.number = number;
         this.photoUrl = photoUrl;
-    }
-
-    // 소속팀 이적 시 업데이트 메서드
-    public void updateTeam(Team newTeam) {
-        this.team = newTeam;
     }
 }

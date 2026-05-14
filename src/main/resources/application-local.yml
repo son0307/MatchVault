@@ -32,9 +32,6 @@ api-football:
       registered:
         enabled: false
         run-on-startup: false
-      squads:
-        enabled: false
-        run-on-startup: false
     injuries:
       enabled: false
       run-on-startup: false

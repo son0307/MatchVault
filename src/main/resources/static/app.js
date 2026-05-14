@@ -543,10 +543,11 @@ async function selectTeam(teamId) {
     state.selectedPlayerId = null;
     renderTeams();
     elements.teamDetail.innerHTML = loadingMarkup();
+    const season = encodeURIComponent(elements.seasonInput.value || "2024");
 
     const [details, players] = await Promise.allSettled([
         requestJson(`/api/v1/teams/${teamId}`),
-        requestJson(`/api/v1/teams/${teamId}/players`),
+        requestJson(`/api/v1/teams/${teamId}/players?season=${season}`),
     ]);
 
     const detail = settledValue(details);

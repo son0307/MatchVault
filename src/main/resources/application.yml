@@ -89,12 +89,6 @@ api-football:
         daily-cron: ${API_FOOTBALL_PLAYERS_REGISTERED_DAILY_CRON:0 10 5 * * *}
         delay-ms: ${API_FOOTBALL_PLAYERS_REGISTERED_SYNC_DELAY_MS:7000}
         startup-delay-ms: ${API_FOOTBALL_PLAYERS_REGISTERED_STARTUP_DELAY_MS:7000}
-      squads:
-        enabled: ${API_FOOTBALL_PLAYERS_SQUADS_SYNC_ENABLED:false}
-        cron: ${API_FOOTBALL_PLAYERS_SQUADS_SYNC_CRON:0 50 4 * * SUN}
-        delay-ms: ${API_FOOTBALL_PLAYERS_SQUADS_SYNC_DELAY_MS:7000}
-        run-on-startup: ${API_FOOTBALL_PLAYERS_SQUADS_SYNC_RUN_ON_STARTUP:false}
-        startup-delay-ms: ${API_FOOTBALL_PLAYERS_SQUADS_STARTUP_DELAY_MS:7000}
     injuries:
       enabled: ${API_FOOTBALL_INJURIES_SYNC_ENABLED:false}
       run-on-startup: ${API_FOOTBALL_INJURIES_SYNC_RUN_ON_STARTUP:false}
