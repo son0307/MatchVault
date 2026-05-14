@@ -13,7 +13,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 
-@Tag(name = "Player Information", description = "선수 정보, 통계 조회 API")
+@Tag(name = "선수 정보", description = "선수 정보, 통계 조회 API")
 @RestController
 @RequestMapping("/api/v1/players")
 @RequiredArgsConstructor

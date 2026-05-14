@@ -23,7 +23,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-@Tag(name = "Fixtures", description = "Fixture information API")
+@Tag(name = "경기 일정", description = "경기 일정 관련 API")
 @RestController
 @RequestMapping("/api/v1/fixtures")
 @RequiredArgsConstructor
@@ -36,7 +36,7 @@ public class FixtureController {
     private final FixtureService fixtureService;
     private final FixtureRedisService fixtureRedisService;
 
-    @Operation(summary = "List recent fixtures", description = "Returns fixtures with cursor-based pagination.")
+    @Operation(summary = "최근 경기 일정 목록", description = "경기 일정을 커서 기반 페이징으로 잘라 전달합니다.")
     @GetMapping
     public ResponseEntity<CursorResponse<FixtureResponseDto.Summary>> getFixtures(
             @Parameter(description = "이전 페이지의 마지막 경기 내부 ID", example = "105")

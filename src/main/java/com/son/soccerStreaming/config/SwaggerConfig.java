@@ -12,8 +12,8 @@ public class SwaggerConfig {
     public OpenAPI openAPI() {
         return new OpenAPI()
                 .info(new Info()
-                        .title("???ㅼ떆媛?異뺢뎄 ?ㅽ듃由щ컢 & ?듦퀎 API")
-                        .description("??⑸웾 ?몃옒??泥섎━瑜?怨좊젮???ㅼ떆媛?寃쎄린 ?ㅽ꺈 ?꾩쟻 諛??섏씠吏?議고쉶 API 紐낆꽭?쒖엯?덈떎.")
+                        .title("EPL 경기 정보 웹페이지 API")
+                        .description("EPL 시즌 별 정보 모음 및 라이브 경기 상태 반영 사이트의 API 문서")
                         .version("v1.0.0")
                 );
     }
