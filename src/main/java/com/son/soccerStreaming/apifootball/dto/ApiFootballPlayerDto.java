@@ -16,6 +16,15 @@ public final class ApiFootballPlayerDto {
     @JsonIgnoreProperties(ignoreUnknown = true)
     public static class ApiResponse<T> {
         private List<T> response;
+        private Pagination pagination;
+    }
+
+    @Getter
+    @NoArgsConstructor
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public static class Pagination {
+        private Integer current;
+        private Integer total;
     }
 
     @Getter
@@ -57,6 +66,14 @@ public final class ApiFootballPlayerDto {
     @Getter
     @NoArgsConstructor
     @JsonIgnoreProperties(ignoreUnknown = true)
+    public static class RegisteredPlayerResponse {
+        private ProfilePlayer player;
+        private List<PlayerStatistics> statistics;
+    }
+
+    @Getter
+    @NoArgsConstructor
+    @JsonIgnoreProperties(ignoreUnknown = true)
     public static class ProfilePlayer {
         private Long id;
         private String name;
@@ -79,5 +96,21 @@ public final class ApiFootballPlayerDto {
         private String date;
         private String place;
         private String country;
+    }
+
+    @Getter
+    @NoArgsConstructor
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public static class PlayerStatistics {
+        private TeamInfo team;
+        private Games games;
+    }
+
+    @Getter
+    @NoArgsConstructor
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public static class Games {
+        private Integer number;
+        private String position;
     }
 }

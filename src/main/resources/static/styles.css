@@ -172,7 +172,7 @@ h3 {
 }
 
 .lower-grid {
-    grid-template-columns: minmax(0, 1fr) minmax(360px, 0.8fr);
+    grid-template-columns: minmax(0, 1fr) minmax(320px, 0.7fr) minmax(420px, 0.9fr);
     margin-top: 18px;
 }
 
@@ -382,6 +382,11 @@ h3 {
     padding: 10px;
 }
 
+.absence-item {
+    border-color: #f0c9c9;
+    background: #fff8f8;
+}
+
 .event-meta {
     display: flex;
     flex-wrap: wrap;
@@ -468,6 +473,43 @@ th {
     white-space: nowrap;
 }
 
+.player-button {
+    display: grid;
+    grid-template-columns: 34px minmax(0, 1fr);
+    align-items: center;
+    width: 100%;
+    min-height: 58px;
+    color: var(--text);
+    text-align: left;
+}
+
+.player-button:hover,
+.player-button.active {
+    border-color: var(--accent);
+    background: #f7fbfd;
+}
+
+.player-button strong,
+.player-button p {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.player-button p {
+    grid-column: 2;
+}
+
+.player-thumb {
+    grid-row: span 2;
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    object-fit: cover;
+    background: var(--surface-soft);
+}
+
 .team-detail {
     border-top: 1px solid var(--line);
 }
@@ -488,6 +530,118 @@ th {
     width: 54px;
     height: 54px;
     object-fit: contain;
+}
+
+.player-panel-grid {
+    display: grid;
+    grid-template-columns: minmax(180px, 0.7fr) minmax(0, 1.3fr);
+    gap: 14px;
+    align-items: start;
+}
+
+.player-profile-card,
+.season-stat-card,
+.match-stat-item {
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: #fbfcfe;
+    padding: 14px;
+}
+
+.player-profile-card {
+    display: grid;
+    gap: 10px;
+}
+
+.player-photo {
+    width: 96px;
+    height: 96px;
+    border-radius: 50%;
+    object-fit: cover;
+    background: var(--surface-soft);
+}
+
+.player-stat-stack,
+.season-stat-list,
+.match-stat-list {
+    display: grid;
+    gap: 10px;
+}
+
+.season-stat-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+    color: var(--muted);
+    font-size: 13px;
+}
+
+.season-stat-grid b {
+    color: var(--text);
+}
+
+.season-accordion {
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: #fff;
+    overflow: hidden;
+}
+
+.season-accordion summary {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    min-height: 52px;
+    padding: 12px 14px;
+    cursor: pointer;
+    font-weight: 800;
+}
+
+.season-accordion summary::marker {
+    color: var(--muted);
+}
+
+.season-accordion[open] summary {
+    border-bottom: 1px solid var(--line);
+    background: #f7fbfd;
+}
+
+.season-accordion .season-stat-card,
+.season-accordion .match-stat-list {
+    margin: 10px;
+}
+
+.match-stat-item {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 8px 12px;
+    align-items: center;
+}
+
+.match-stat-score {
+    font-weight: 800;
+    font-size: 20px;
+}
+
+.match-stat-metrics {
+    grid-column: 1 / -1;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    color: var(--muted);
+    font-size: 13px;
+}
+
+.match-stat-metrics span {
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    background: #fff;
+    padding: 4px 9px;
+}
+
+.match-stat-metrics b {
+    color: var(--text);
 }
 
 .muted {
@@ -548,6 +702,11 @@ th {
     }
 
     .stat-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .player-panel-grid,
+    .season-stat-grid {
         grid-template-columns: 1fr;
     }
 }

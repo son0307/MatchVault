@@ -113,6 +113,21 @@ public class ApiFootballClient {
         return playerResponseOf(body);
     }
 
+    public ApiFootballPlayerDto.ApiResponse<ApiFootballPlayerDto.RegisteredPlayerResponse> getRegisteredPlayers(
+            Integer league,
+            Integer season,
+            Integer page
+    ) {
+        ApiFootballPlayerDto.ApiResponse<ApiFootballPlayerDto.RegisteredPlayerResponse> body = apiFootballRestClient.get()
+                .uri(baseUrl + "/players?league={league}&season={season}&page={page}", league, season, page)
+                .headers(this::setApiHeaders)
+                .retrieve()
+                .body(new ParameterizedTypeReference<>() {
+                });
+
+        return body != null ? body : new ApiFootballPlayerDto.ApiResponse<>();
+    }
+
     public List<ApiFootballPlayerDto.SquadResponse> getPlayerSquad(Long teamId) {
         ApiFootballPlayerDto.ApiResponse<ApiFootballPlayerDto.SquadResponse> body = apiFootballRestClient.get()
                 .uri(baseUrl + "/players/squads?team={teamId}", teamId)
