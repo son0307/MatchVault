@@ -4,11 +4,13 @@ import com.son.soccerStreaming.dto.PlayerResponseDto;
 import com.son.soccerStreaming.entity.Fixture;
 import com.son.soccerStreaming.entity.Player;
 import com.son.soccerStreaming.entity.PlayerFixtureStat;
+import com.son.soccerStreaming.entity.PlayerTeamSeasonStat;
 import com.son.soccerStreaming.entity.Team;
 import com.son.soccerStreaming.exception.CustomException;
 import com.son.soccerStreaming.exception.ErrorCode;
 import com.son.soccerStreaming.repository.PlayerFixtureStatRepository;
 import com.son.soccerStreaming.repository.PlayerRepository;
+import com.son.soccerStreaming.repository.PlayerTeamSeasonStatRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
@@ -22,6 +24,7 @@ public class PlayerService {
 
     private final PlayerRepository playerRepository;
     private final PlayerFixtureStatRepository playerFixtureStatRepository;
+    private final PlayerTeamSeasonStatRepository playerTeamSeasonStatRepository;
 
     @Transactional(readOnly = true)
     public PlayerResponseDto.Details getPlayerDetails(Long playerId) {
@@ -32,7 +35,6 @@ public class PlayerService {
     }
 
     private PlayerResponseDto.Details toDetails(Player player) {
-        Team team = player.getTeam();
         return PlayerResponseDto.Details.builder()
                 .playerId(player.getPlayerId())
                 .playerName(player.getName())
@@ -48,9 +50,6 @@ public class PlayerService {
                 .weight(player.getWeight())
                 .position(player.getPosition())
                 .photoUrl(player.getPhotoUrl())
-                .teamId(team != null ? team.getTeamId() : null)
-                .teamName(team != null ? team.getName() : null)
-                .teamLogoUrl(team != null ? team.getLogoUrl() : null)
                 .build();
     }
 
@@ -59,9 +58,9 @@ public class PlayerService {
         Player player = playerRepository.findByPlayerId(playerId)
                 .orElseThrow(() -> new CustomException(ErrorCode.PLAYER_NOT_FOUND));
 
-        // 선수 패널은 한 번의 요청으로 프로필, 시즌 요약, 경기별 핵심 기록을 함께 렌더링한다.
-        List<PlayerResponseDto.SeasonSummary> seasons = playerFixtureStatRepository
-                .findSeasonStatSummariesByPlayerId(playerId)
+        // 시즌 요약은 API-Football의 시즌 누적 스탯을 저장한 테이블에서 바로 가져온다.
+        List<PlayerResponseDto.SeasonSummary> seasons = playerTeamSeasonStatRepository
+                .findAllByPlayerPlayerIdOrderBySeasonDesc(playerId)
                 .stream()
                 .map(this::toSeasonSummary)
                 .toList();
@@ -124,20 +123,20 @@ public class PlayerService {
     }
 
     private PlayerResponseDto.SeasonSummary toSeasonSummary(
-            PlayerFixtureStatRepository.SeasonStatBySeason stats
+            PlayerTeamSeasonStat stats
     ) {
         return PlayerResponseDto.SeasonSummary.builder()
                 .season(stats.getSeason())
-                .totalFixtures(stats.getTotalFixtures())
-                .minutesPlayed(stats.getMinutesPlayed())
-                .averageRating(roundToOneDecimal(stats.getAverageRating()))
-                .goals(stats.getGoals())
-                .assists(stats.getAssists())
-                .shots(stats.getShotsTotal())
-                .shotsOnTarget(stats.getShotsOnTarget())
-                .keyPasses(stats.getPassesKey())
-                .yellowCards(stats.getYellowCards())
-                .redCards(stats.getRedCards())
+                .totalFixtures(valueOf(stats.getAppearances()))
+                .minutesPlayed(valueOf(stats.getMinutes()))
+                .averageRating(stats.getRating() != null ? roundToOneDecimal(stats.getRating()) : 0)
+                .goals(valueOf(stats.getGoals()))
+                .assists(valueOf(stats.getAssists()))
+                .shots(valueOf(stats.getShotsTotal()))
+                .shotsOnTarget(valueOf(stats.getShotsOnTarget()))
+                .keyPasses(valueOf(stats.getPassesKey()))
+                .yellowCards(valueOf(stats.getYellowCards()))
+                .redCards(valueOf(stats.getRedCards()))
                 .build();
     }
 
@@ -186,5 +185,9 @@ public class PlayerService {
 
     private double roundToOneDecimal(double value) {
         return Math.round(value * 10) / 10.0;
+    }
+
+    private int valueOf(Integer value) {
+        return value == null ? 0 : value;
     }
 }

@@ -54,8 +54,10 @@ public class TeamController {
     @GetMapping("/{teamId}/players")
     public List<PlayerResponseDto.Summary> getTeamPlayers(
             @Parameter(description = "조회할 팀의 API ID", example = "47")
-            @PathVariable Long teamId
+            @PathVariable Long teamId,
+            @Parameter(description = "조회할 시즌", example = "2025")
+            @RequestParam(defaultValue = "2025") Integer season
     ) {
-        return teamService.getPlayersByTeam(teamId);
+        return teamService.getPlayersByTeam(teamId, season);
     }
 }

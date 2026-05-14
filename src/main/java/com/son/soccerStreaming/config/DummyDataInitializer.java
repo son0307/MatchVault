@@ -24,6 +24,7 @@ public class DummyDataInitializer implements CommandLineRunner {
     private final FixtureRecordRepository fixtureRecordRepository;
     private final FixtureLineupRepository fixtureLineupRepository;
     private final PlayerFixtureStatRepository playerFixtureStatRepository;
+    private final PlayerTeamSeasonStatRepository playerTeamSeasonStatRepository;
     private final TeamStandingRepository teamStandingRepository;
     private final PlayerAbsenceRepository playerAbsenceRepository;
     private final FixtureEventRepository fixtureEventRepository;
@@ -73,7 +74,6 @@ public class DummyDataInitializer implements CommandLineRunner {
                         .position(pos)
                         .number(i)
                         .photoUrl("https://media.api-sports.io/football/players/" + (playerIdCounter - 1) + ".png")
-                        .team(team)
                         .build();
                 playersForTeam.add(player);
                 allPlayers.add(player);
@@ -81,6 +81,7 @@ public class DummyDataInitializer implements CommandLineRunner {
             teamPlayersMap.put(team, playersForTeam);
         }
         playerRepository.saveAll(allPlayers);
+        playerTeamSeasonStatRepository.saveAll(createPlayerTeamSeasonStats(teamPlayersMap));
 
         // 3. 7개의 경기와 라인업, 스탯 생성
         long fixtureIdCounter = 1208000L; // API 경기 ID 흉내
@@ -192,6 +193,63 @@ public class DummyDataInitializer implements CommandLineRunner {
         }
 
         return standings;
+    }
+
+    private List<PlayerTeamSeasonStat> createPlayerTeamSeasonStats(Map<Team, List<Player>> teamPlayersMap) {
+        List<PlayerTeamSeasonStat> stats = new ArrayList<>();
+        for (Map.Entry<Team, List<Player>> entry : teamPlayersMap.entrySet()) {
+            Team team = entry.getKey();
+            for (Player player : entry.getValue()) {
+                PlayerTeamSeasonStat stat = PlayerTeamSeasonStat.builder()
+                        .player(player)
+                        .team(team)
+                        .leagueId(39L)
+                        .season(2019)
+                        .build();
+
+                stat.updateSeasonStat(
+                        player.getNumber(),
+                        player.getPosition(),
+                        24,
+                        18,
+                        1600,
+                        6.8,
+                        false,
+                        3,
+                        4,
+                        6,
+                        20,
+                        8,
+                        2,
+                        0,
+                        1,
+                        0,
+                        500,
+                        18,
+                        82,
+                        24,
+                        5,
+                        18,
+                        70,
+                        41,
+                        26,
+                        14,
+                        9,
+                        20,
+                        16,
+                        3,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0
+                );
+                stats.add(stat);
+            }
+        }
+        return stats;
     }
 
     private void generateLineupAndStats(Fixture fixture, Team team, List<Player> teamPlayers, Random random) {

@@ -118,6 +118,17 @@ public class ApiFootballClient {
             Integer season,
             Integer page
     ) {
+        if (page == null || page <= 1) {
+            ApiFootballPlayerDto.ApiResponse<ApiFootballPlayerDto.RegisteredPlayerResponse> body = apiFootballRestClient.get()
+                    .uri(baseUrl + "/players?league={league}&season={season}", league, season)
+                    .headers(this::setApiHeaders)
+                    .retrieve()
+                    .body(new ParameterizedTypeReference<>() {
+                    });
+
+            return body != null ? body : new ApiFootballPlayerDto.ApiResponse<>();
+        }
+
         ApiFootballPlayerDto.ApiResponse<ApiFootballPlayerDto.RegisteredPlayerResponse> body = apiFootballRestClient.get()
                 .uri(baseUrl + "/players?league={league}&season={season}&page={page}", league, season, page)
                 .headers(this::setApiHeaders)
@@ -128,15 +139,31 @@ public class ApiFootballClient {
         return body != null ? body : new ApiFootballPlayerDto.ApiResponse<>();
     }
 
-    public List<ApiFootballPlayerDto.SquadResponse> getPlayerSquad(Long teamId) {
-        ApiFootballPlayerDto.ApiResponse<ApiFootballPlayerDto.SquadResponse> body = apiFootballRestClient.get()
-                .uri(baseUrl + "/players/squads?team={teamId}", teamId)
+    public ApiFootballPlayerDto.ApiResponse<ApiFootballPlayerDto.RegisteredPlayerResponse> getRegisteredPlayersByTeam(
+            Long teamId,
+            Integer league,
+            Integer season,
+            Integer page
+    ) {
+        if (page == null || page <= 1) {
+            ApiFootballPlayerDto.ApiResponse<ApiFootballPlayerDto.RegisteredPlayerResponse> body = apiFootballRestClient.get()
+                    .uri(baseUrl + "/players?league={league}&team={teamId}&season={season}", league, teamId, season)
+                    .headers(this::setApiHeaders)
+                    .retrieve()
+                    .body(new ParameterizedTypeReference<>() {
+                    });
+
+            return body != null ? body : new ApiFootballPlayerDto.ApiResponse<>();
+        }
+
+        ApiFootballPlayerDto.ApiResponse<ApiFootballPlayerDto.RegisteredPlayerResponse> body = apiFootballRestClient.get()
+                .uri(baseUrl + "/players?league={league}&team={teamId}&season={season}&page={page}", league, teamId, season, page)
                 .headers(this::setApiHeaders)
                 .retrieve()
                 .body(new ParameterizedTypeReference<>() {
                 });
 
-        return playerResponseOf(body);
+        return body != null ? body : new ApiFootballPlayerDto.ApiResponse<>();
     }
 
     public List<ApiFootballInjuryDto.InjuryResponse> getInjuries(Integer league, Integer season) {

@@ -16,6 +16,21 @@ public interface PlayerFixtureStatRepository extends JpaRepository<PlayerFixture
 
     Optional<PlayerFixtureStat> findByFixtureFixtureIdAndPlayerPlayerId(Long fixtureId, Long playerId);
 
+    @Query("SELECT s.player.playerId as playerId, s.team.teamId as teamId " +
+            "FROM PlayerFixtureStat s " +
+            "WHERE s.player.playerId IN :playerIds " +
+            "AND s.fixture.season = :season " +
+            "AND s.fixture.fixtureDate = (" +
+            "    SELECT MAX(latest.fixture.fixtureDate) " +
+            "    FROM PlayerFixtureStat latest " +
+            "    WHERE latest.player.playerId = s.player.playerId " +
+            "    AND latest.fixture.season = :season" +
+            ")")
+    List<LatestPlayerTeam> findLatestTeamsByPlayerIdsAndSeason(
+            @Param("playerIds") List<Long> playerIds,
+            @Param("season") Integer season
+    );
+
     @Query("SELECT " +
             "COUNT(s) as totalFixtures, " +
             "COALESCE(SUM(s.minutesPlayed), 0) as minutesPlayed, " +
@@ -51,24 +66,6 @@ public interface PlayerFixtureStatRepository extends JpaRepository<PlayerFixture
             "WHERE s.player.playerId = :apiPlayerId")
     SeasonStatSummary findSeasonStatSummaryByPlayerId(@Param("apiPlayerId") Long apiPlayerId);
 
-    @Query("SELECT " +
-            "s.fixture.season as season, " +
-            "COUNT(s) as totalFixtures, " +
-            "COALESCE(SUM(s.minutesPlayed), 0) as minutesPlayed, " +
-            "COALESCE(AVG(s.rating), 0) as averageRating, " +
-            "COALESCE(SUM(s.goals), 0) as goals, " +
-            "COALESCE(SUM(s.assists), 0) as assists, " +
-            "COALESCE(SUM(s.shotsTotal), 0) as shotsTotal, " +
-            "COALESCE(SUM(s.shotsOnTarget), 0) as shotsOnTarget, " +
-            "COALESCE(SUM(s.passesKey), 0) as passesKey, " +
-            "COALESCE(SUM(s.yellowCards), 0) as yellowCards, " +
-            "COALESCE(SUM(s.redCards), 0) as redCards " +
-            "FROM PlayerFixtureStat s " +
-            "WHERE s.player.playerId = :apiPlayerId " +
-            "GROUP BY s.fixture.season " +
-            "ORDER BY s.fixture.season DESC")
-    List<SeasonStatBySeason> findSeasonStatSummariesByPlayerId(@Param("apiPlayerId") Long apiPlayerId);
-
     interface SeasonStatSummary {
         long getTotalFixtures();
         int getMinutesPlayed();
@@ -102,17 +99,8 @@ public interface PlayerFixtureStatRepository extends JpaRepository<PlayerFixture
         int getPenaltySaved();
     }
 
-    interface SeasonStatBySeason {
-        Integer getSeason();
-        long getTotalFixtures();
-        int getMinutesPlayed();
-        double getAverageRating();
-        int getGoals();
-        int getAssists();
-        int getShotsTotal();
-        int getShotsOnTarget();
-        int getPassesKey();
-        int getYellowCards();
-        int getRedCards();
+    interface LatestPlayerTeam {
+        Long getPlayerId();
+        Long getTeamId();
     }
 }
