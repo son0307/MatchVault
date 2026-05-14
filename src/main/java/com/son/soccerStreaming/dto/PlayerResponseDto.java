@@ -5,6 +5,8 @@ import lombok.Builder;
 import lombok.Getter;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.util.List;
 
 public class PlayerResponseDto {
 
@@ -75,5 +77,48 @@ public class PlayerResponseDto {
         private int penaltyScored;
         private int penaltyMissed;
         private int penaltySaved;
+    }
+
+    @Getter
+    @Builder
+    public static class Panel {
+        private Details profile;
+        private List<SeasonSummary> seasons;
+        private List<MatchStat> matches;
+    }
+
+    @Getter
+    @Builder
+    public static class SeasonSummary {
+        private Integer season;
+        private long totalFixtures;
+        private int minutesPlayed;
+        private double averageRating;
+        private int goals;
+        private int assists;
+        private int shots;
+        private int shotsOnTarget;
+        private int keyPasses;
+        private int yellowCards;
+        private int redCards;
+    }
+
+    @Getter
+    @Builder
+    public static class MatchStat {
+        private Long fixtureId;
+        private LocalDateTime fixtureDate;
+        private Integer season;
+        private String round;
+        private Long teamId;
+        private String teamName;
+        private Long opponentTeamId;
+        private String opponentTeamName;
+        private Integer teamScore;
+        private Integer opponentScore;
+        private Integer minutesPlayed;
+        private Double rating;
+        private Integer goals;
+        private Integer assists;
     }
 }

@@ -29,6 +29,39 @@ public class ApiFootballPlayerSyncService {
     @Value("${api-football.sync.players.profile-fallback-enabled:false}")
     private boolean profileFallbackEnabled;
 
+    public int syncRegisteredPlayers(Integer league, Integer season, Long delayMs) {
+        int page = 1;
+        int totalPages = 1;
+        int syncedCount = 0;
+
+        do {
+            ApiFootballPlayerDto.ApiResponse<ApiFootballPlayerDto.RegisteredPlayerResponse> response =
+                    apiFootballClient.getRegisteredPlayers(league, season, page);
+
+            List<ApiFootballPlayerDto.RegisteredPlayerResponse> players = response.getResponse() != null
+                    ? response.getResponse()
+                    : List.of();
+            for (ApiFootballPlayerDto.RegisteredPlayerResponse playerResponse : players) {
+                if (upsertRegisteredPlayer(playerResponse)) {
+                    syncedCount++;
+                }
+            }
+
+            totalPages = response.getPagination() != null && response.getPagination().getTotal() != null
+                    ? response.getPagination().getTotal()
+                    : page;
+
+            log.info("API-Football registered players page synced. league={}, season={}, page={}/{}, count={}",
+                    league, season, page, totalPages, players.size());
+            page++;
+            sleepBetweenPages(delayMs, page, totalPages);
+        } while (page <= totalPages);
+
+        log.info("API-Football registered players sync completed. league={}, season={}, count={}",
+                league, season, syncedCount);
+        return syncedCount;
+    }
+
     @Transactional
     public int syncSquad(Long teamId) {
         Optional<Team> team = teamRepository.findByTeamId(teamId);
@@ -54,6 +87,26 @@ public class ApiFootballPlayerSyncService {
 
         log.info("API-Football squad sync completed. teamId={}, count={}", teamId, syncedCount);
         return syncedCount;
+    }
+
+    @Transactional
+    public boolean upsertRegisteredPlayer(ApiFootballPlayerDto.RegisteredPlayerResponse playerResponse) {
+        if (playerResponse == null || playerResponse.getPlayer() == null
+                || playerResponse.getPlayer().getId() == null) {
+            return false;
+        }
+
+        ApiFootballPlayerDto.PlayerStatistics statistics = primaryStatistics(playerResponse.getStatistics());
+        Team team = teamOf(statistics).orElse(null);
+        ApiFootballPlayerDto.Games games = statistics != null ? statistics.getGames() : null;
+
+        upsertProfilePlayer(
+                playerResponse.getPlayer(),
+                team,
+                games != null ? games.getNumber() : playerResponse.getPlayer().getNumber(),
+                games != null ? games.getPosition() : playerResponse.getPlayer().getPosition()
+        );
+        return true;
     }
 
     @Transactional
@@ -147,6 +200,27 @@ public class ApiFootballPlayerSyncService {
         return playerRepository.save(player);
     }
 
+    private ApiFootballPlayerDto.PlayerStatistics primaryStatistics(
+            List<ApiFootballPlayerDto.PlayerStatistics> statistics
+    ) {
+        if (statistics == null || statistics.isEmpty()) {
+            return null;
+        }
+
+        return statistics.stream()
+                .filter(stat -> stat.getTeam() != null && stat.getTeam().getId() != null)
+                .filter(stat -> teamRepository.findByTeamId(stat.getTeam().getId()).isPresent())
+                .findFirst()
+                .orElse(statistics.get(0));
+    }
+
+    private Optional<Team> teamOf(ApiFootballPlayerDto.PlayerStatistics statistics) {
+        if (statistics == null || statistics.getTeam() == null || statistics.getTeam().getId() == null) {
+            return Optional.empty();
+        }
+        return teamRepository.findByTeamId(statistics.getTeam().getId());
+    }
+
     private Player saveMinimalPlayer(Long playerId, String name, Team team, Integer number,
                                      String position, String photoUrl) {
         Player player = Player.builder()
@@ -177,6 +251,17 @@ public class ApiFootballPlayerSyncService {
         } catch (DateTimeParseException e) {
             log.warn("Failed to parse API-Football player birth date. date={}", date);
             return null;
+        }
+    }
+
+    private void sleepBetweenPages(Long delayMs, int nextPage, int totalPages) {
+        if (nextPage > totalPages || delayMs == null || delayMs <= 0) {
+            return;
+        }
+        try {
+            Thread.sleep(delayMs);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
         }
     }
 }

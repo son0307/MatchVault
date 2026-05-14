@@ -17,8 +17,8 @@ public class FixtureService {
     private final FixtureRecordRepository fixtureRecordRepository;
 
     @Transactional(readOnly = true)
-    public CursorResponse<FixtureResponseDto.Summary> getRecentFixtures(Long cursorId, int size) {
-        List<Fixture> fixtures = fixtureRecordRepository.findRecentFixturesWithCursor(cursorId, size);
+    public CursorResponse<FixtureResponseDto.Summary> getRecentFixtures(Long cursorId, Integer season, int size) {
+        List<Fixture> fixtures = fixtureRecordRepository.findRecentFixturesWithCursor(cursorId, season, size);
 
         boolean hasNext = false;
         if (fixtures.size() > size) {

@@ -41,10 +41,12 @@ public class FixtureController {
     public ResponseEntity<CursorResponse<FixtureResponseDto.Summary>> getFixtures(
             @Parameter(description = "이전 페이지의 마지막 경기 내부 ID", example = "105")
             @RequestParam(required = false) Long cursorId,
+            @Parameter(description = "조회할 시즌", example = "2024")
+            @RequestParam(required = false) Integer season,
             @Parameter(description = "한 번에 가져올 경기 수", example = "10")
             @RequestParam(defaultValue = "10") int size
     ) {
-        return ResponseEntity.ok(fixtureService.getRecentFixtures(cursorId, size));
+        return ResponseEntity.ok(fixtureService.getRecentFixtures(cursorId, season, size));
     }
 
     @Operation(summary = "특정 경기 라인업 조회", description = "선발, 교체, 결장 선수 정보를 팀별로 조회합니다.")

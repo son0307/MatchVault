@@ -81,6 +81,14 @@ api-football:
       startup-delay-ms: ${API_FOOTBALL_FIXTURE_STATISTICS_STARTUP_DELAY_MS:300}
     players:
       profile-fallback-enabled: ${API_FOOTBALL_PLAYERS_PROFILE_FALLBACK_ENABLED:false}
+      registered:
+        enabled: ${API_FOOTBALL_PLAYERS_REGISTERED_SYNC_ENABLED:false}
+        run-on-startup: ${API_FOOTBALL_PLAYERS_REGISTERED_SYNC_RUN_ON_STARTUP:false}
+        league: ${API_FOOTBALL_PLAYERS_REGISTERED_LEAGUE:39}
+        season: ${API_FOOTBALL_PLAYERS_REGISTERED_SEASON:2024}
+        daily-cron: ${API_FOOTBALL_PLAYERS_REGISTERED_DAILY_CRON:0 10 5 * * *}
+        delay-ms: ${API_FOOTBALL_PLAYERS_REGISTERED_SYNC_DELAY_MS:7000}
+        startup-delay-ms: ${API_FOOTBALL_PLAYERS_REGISTERED_STARTUP_DELAY_MS:7000}
       squads:
         enabled: ${API_FOOTBALL_PLAYERS_SQUADS_SYNC_ENABLED:false}
         cron: ${API_FOOTBALL_PLAYERS_SQUADS_SYNC_CRON:0 50 4 * * SUN}

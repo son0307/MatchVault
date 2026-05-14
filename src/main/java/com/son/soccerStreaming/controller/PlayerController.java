@@ -28,6 +28,12 @@ public class PlayerController {
         return ResponseEntity.ok(playerService.getPlayerDetails(playerId));
     }
 
+    @Operation(summary = "선수 패널 조회", description = "선수 프로필, 시즌별 종합 스탯, 경기별 핵심 기록을 한 번에 조회합니다.")
+    @GetMapping("/{playerId}/panel")
+    public ResponseEntity<PlayerResponseDto.Panel> getPlayerPanel(@PathVariable Long playerId) {
+        return ResponseEntity.ok(playerService.getPlayerPanel(playerId));
+    }
+
     // 특정 선수 시즌 누적 스탯 조회
     @Operation(summary = "선수 누적 스탯 조회", description = "특정 선수의 누적 스탯을 조회합니다.")
     @GetMapping("/{playerId}/stats")

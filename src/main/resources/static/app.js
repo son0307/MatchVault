@@ -6,6 +6,7 @@ const state = {
     hasNext: false,
     selectedFixtureId: null,
     selectedTeamId: null,
+    selectedPlayerId: null,
     liveFixtureId: null,
     liveSource: null,
     liveData: {
@@ -30,6 +31,7 @@ const elements = {
     standingsTable: document.querySelector("#standingsTable"),
     teamsList: document.querySelector("#teamsList"),
     teamDetail: document.querySelector("#teamDetail"),
+    playerDetail: document.querySelector("#playerDetail"),
     liveFixtureInput: document.querySelector("#liveFixtureInput"),
     liveConnectButton: document.querySelector("#liveConnectButton"),
     liveDisconnectButton: document.querySelector("#liveDisconnectButton"),
@@ -53,9 +55,12 @@ async function refreshAll() {
     state.hasNext = false;
     state.selectedFixtureId = null;
     state.selectedTeamId = null;
+    state.selectedPlayerId = null;
     elements.fixtureDetail.className = "detail-empty";
     elements.fixtureDetail.textContent = "왼쪽 경기 목록에서 하나를 선택하면 저장된 통계, 이벤트, 라인업을 표시합니다.";
     elements.teamDetail.innerHTML = "";
+    elements.playerDetail.className = "detail-empty";
+    elements.playerDetail.textContent = "팀 목록에서 선수를 선택하면 프로필과 시즌별/경기별 스탯을 표시합니다.";
     renderLoading();
 
     const results = await Promise.allSettled([
@@ -110,10 +115,12 @@ async function loadFixtures(reset) {
     }
 
     elements.loadMoreFixtures.disabled = true;
+    const season = encodeURIComponent(elements.seasonInput.value || "2024");
     const cursor = reset || !state.nextCursor ? "" : `&cursorId=${encodeURIComponent(state.nextCursor)}`;
 
     try {
-        const response = await requestJson(`/api/v1/fixtures?size=10${cursor}`);
+        // 최근 경기 목록은 상단 시즌 입력값을 기준으로 서버에서 필터링한다.
+        const response = await requestJson(`/api/v1/fixtures?size=10&season=${season}${cursor}`);
         const content = Array.isArray(response.content) ? response.content : [];
         state.fixtures = reset ? content : [...state.fixtures, ...content];
         state.nextCursor = response.nextCursor || null;
@@ -130,7 +137,7 @@ async function loadFixtures(reset) {
 
 function renderFixtures() {
     if (!state.fixtures.length) {
-        elements.fixturesList.innerHTML = emptyMarkup("저장된 경기 데이터가 없습니다.");
+        elements.fixturesList.innerHTML = emptyMarkup(`${elements.seasonInput.value || "2024"} 시즌에 저장된 경기 데이터가 없습니다.`);
         return;
     }
 
@@ -423,6 +430,7 @@ function lineupTeamMarkup(team) {
 
     const starters = Array.isArray(team.starters) ? team.starters.slice(0, 11) : [];
     const substitutes = Array.isArray(team.substitutes) ? team.substitutes.slice(0, 6) : [];
+    const absences = Array.isArray(team.absences) ? team.absences : [];
 
     return `
         <div class="stat-card">
@@ -435,6 +443,10 @@ function lineupTeamMarkup(team) {
             <div class="lineup-list">
                 ${substitutes.map(playerMarkup).join("") || `<div class="lineup-item muted">교체 명단 없음</div>`}
             </div>
+            <p class="muted">결장 선수</p>
+            <div class="lineup-list">
+                ${absences.map(absenceMarkup).join("") || `<div class="lineup-item muted">결장 정보 없음</div>`}
+            </div>
         </div>
     `;
 }
@@ -444,6 +456,17 @@ function playerMarkup(player) {
         <div class="lineup-item">
             <strong>${player.backNumber ? `${player.backNumber}. ` : ""}${escapeHtml(player.playerName || "-")}</strong>
             <span class="muted">${escapeHtml(player.position || "")}</span>
+        </div>
+    `;
+}
+
+function absenceMarkup(absence) {
+    const reason = absence.reason || absence.absenceType || "사유 미상";
+
+    return `
+        <div class="lineup-item absence-item">
+            <strong>${escapeHtml(absence.playerName || "-")}</strong>
+            <span class="muted">${escapeHtml(reason)}</span>
         </div>
     `;
 }
@@ -517,6 +540,7 @@ function renderTeams() {
 
 async function selectTeam(teamId) {
     state.selectedTeamId = teamId;
+    state.selectedPlayerId = null;
     renderTeams();
     elements.teamDetail.innerHTML = loadingMarkup();
 
@@ -552,15 +576,173 @@ async function selectTeam(teamId) {
             <div class="player-list">
                 ${Array.isArray(roster) && roster.length
                     ? roster.map((player) => `
-                        <div class="player-item">
+                        <button class="player-item player-button" type="button" data-player-id="${player.playerId}">
+                            ${imageMarkup(player.photoUrl, player.playerName, "player-thumb")}
                             <strong>${player.backNumber ? `${player.backNumber}. ` : ""}${escapeHtml(player.playerName || "-")}</strong>
                             <p class="muted">${escapeHtml(player.position || "-")}</p>
-                        </div>
+                        </button>
                     `).join("")
                     : `<div class="player-item muted">저장된 선수 데이터가 없습니다.</div>`}
             </div>
         </div>
     `;
+
+    document.querySelectorAll(".player-button").forEach((button) => {
+        button.addEventListener("click", () => selectPlayer(Number(button.dataset.playerId)));
+    });
+}
+
+async function selectPlayer(playerId) {
+    state.selectedPlayerId = playerId;
+    document.querySelectorAll(".player-button").forEach((button) => {
+        button.classList.toggle("active", Number(button.dataset.playerId) === playerId);
+    });
+
+    elements.playerDetail.className = "detail-stack";
+    elements.playerDetail.innerHTML = loadingMarkup();
+
+    try {
+        // 선수 패널 전용 API로 프로필과 시즌/경기 스탯을 한 번에 가져온다.
+        const panel = await requestJson(`/api/v1/players/${playerId}/panel`);
+        renderPlayerPanel(panel);
+    } catch (error) {
+        elements.playerDetail.innerHTML = errorMarkup(error);
+    }
+}
+
+function renderPlayerPanel(panel) {
+    const profile = panel?.profile;
+    if (!profile) {
+        elements.playerDetail.innerHTML = emptyMarkup("선수 정보를 찾을 수 없습니다.");
+        return;
+    }
+
+    const seasons = Array.isArray(panel.seasons) ? panel.seasons : [];
+    const matches = Array.isArray(panel.matches) ? panel.matches : [];
+
+    elements.playerDetail.innerHTML = `
+        <div class="player-panel-grid">
+            ${playerProfileMarkup(profile)}
+            <div class="player-stat-stack">
+                <div>
+                    <div class="section-title"><h3>시즌별 기록</h3></div>
+                    <div class="season-stat-list">
+                        ${seasonAccordionsMarkup(seasons, matches)}
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+function playerProfileMarkup(profile) {
+    return `
+        <article class="player-profile-card">
+            ${imageMarkup(profile.photoUrl, profile.playerName, "player-photo")}
+            <h3>${escapeHtml(profile.playerName || "-")}</h3>
+            <p class="muted">${escapeHtml(profile.teamName || "-")} · ${escapeHtml(profile.position || "-")}</p>
+            <div class="stat-row"><span>등번호</span><b>${numberText(profile.backNumber)}</b></div>
+            <div class="stat-row"><span>나이</span><b>${numberText(profile.age)}</b></div>
+            <div class="stat-row"><span>국적</span><b>${escapeHtml(profile.nationality || "-")}</b></div>
+            <div class="stat-row"><span>신장</span><b>${escapeHtml(profile.height || "-")}</b></div>
+            <div class="stat-row"><span>체중</span><b>${escapeHtml(profile.weight || "-")}</b></div>
+        </article>
+    `;
+}
+
+function seasonSummaryMarkup(season) {
+    return `
+        <article class="season-stat-card">
+            <strong>${seasonLabel(season.season)}</strong>
+            <div class="season-stat-grid">
+                <span><b>${numberText(season.totalFixtures)}</b>경기</span>
+                <span><b>${numberText(season.minutesPlayed)}</b>분</span>
+                <span><b>${numberText(season.goals)}</b>골</span>
+                <span><b>${numberText(season.assists)}</b>도움</span>
+                <span><b>${numberText(season.averageRating)}</b>평점</span>
+                <span><b>${numberText(season.keyPasses)}</b>키패스</span>
+            </div>
+        </article>
+    `;
+}
+
+function seasonAccordionsMarkup(seasons, matches) {
+    const matchesBySeason = groupMatchesBySeason(matches);
+    const seasonKeys = [
+        ...new Set([
+            ...seasons.map((season) => String(season.season ?? "unknown")),
+            ...Object.keys(matchesBySeason),
+        ]),
+    ].sort((a, b) => seasonSortValue(b) - seasonSortValue(a));
+
+    if (!seasonKeys.length) {
+        return `<div class="player-item muted">시즌별 기록 없음</div>`;
+    }
+
+    return seasonKeys.map((seasonKey) => {
+        const season = seasons.find((item) => String(item.season ?? "unknown") === String(seasonKey));
+        const seasonMatches = matchesBySeason[seasonKey] || [];
+
+        return `
+            <details class="season-accordion">
+                <summary>
+                    <span>${seasonLabel(season?.season ?? seasonKey)}</span>
+                    <span class="small-pill">${seasonMatches.length}경기</span>
+                </summary>
+                ${season ? seasonSummaryMarkup(season) : ""}
+                <div class="match-stat-list">
+                    ${seasonMatches.map(matchStatMarkup).join("") || `<div class="player-item muted">경기별 스탯 없음</div>`}
+                </div>
+            </details>
+        `;
+    }).join("");
+}
+
+function groupMatchesBySeason(matches) {
+    return matches.reduce((groups, match) => {
+        const key = match.season ?? "unknown";
+        groups[key] = groups[key] || [];
+        groups[key].push(match);
+        return groups;
+    }, {});
+}
+
+function matchStatMarkup(match) {
+    return `
+        <article class="match-stat-item">
+            <div>
+                <strong>${escapeHtml(match.teamName || "-")} vs ${escapeHtml(match.opponentTeamName || "-")}</strong>
+                <p class="muted">${dateText(match.fixtureDate)} · ${escapeHtml(match.round || `Fixture #${match.fixtureId}`)}</p>
+            </div>
+            <div class="match-stat-score">${numberText(match.teamScore)}:${numberText(match.opponentScore)}</div>
+            <div class="match-stat-metrics">
+                <span>골 <b>${numberText(match.goals)}</b></span>
+                <span>도움 <b>${numberText(match.assists)}</b></span>
+                <span>평점 <b>${numberText(match.rating)}</b></span>
+            </div>
+        </article>
+    `;
+}
+
+function seasonLabel(season) {
+    if (season === "unknown" || season === null || season === undefined) {
+        return "시즌 미상";
+    }
+
+    const startYear = Number(season);
+    if (!Number.isFinite(startYear)) {
+        return `${escapeHtml(season)} 시즌`;
+    }
+
+    return `${startYear}/${String((startYear + 1) % 100).padStart(2, "0")} 시즌`;
+}
+
+function seasonSortValue(season) {
+    if (season === "unknown") {
+        return -1;
+    }
+    const value = Number(season);
+    return Number.isFinite(value) ? value : -1;
 }
 
 async function requestJson(url) {
@@ -613,6 +795,10 @@ function imageMarkup(src, alt, className) {
 
 function numberText(value) {
     return value === null || value === undefined || value === "" ? "-" : String(value);
+}
+
+function dateText(value) {
+    return value ? String(value).slice(0, 10) : "-";
 }
 
 function setApiStatus(status) {

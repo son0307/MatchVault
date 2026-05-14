@@ -12,6 +12,8 @@ public interface PlayerFixtureStatRepository extends JpaRepository<PlayerFixture
 
     List<PlayerFixtureStat> findAllByFixtureFixtureId(Long fixtureId);
 
+    List<PlayerFixtureStat> findAllByPlayerPlayerIdOrderByFixtureFixtureDateDesc(Long playerId);
+
     Optional<PlayerFixtureStat> findByFixtureFixtureIdAndPlayerPlayerId(Long fixtureId, Long playerId);
 
     @Query("SELECT " +
@@ -49,6 +51,24 @@ public interface PlayerFixtureStatRepository extends JpaRepository<PlayerFixture
             "WHERE s.player.playerId = :apiPlayerId")
     SeasonStatSummary findSeasonStatSummaryByPlayerId(@Param("apiPlayerId") Long apiPlayerId);
 
+    @Query("SELECT " +
+            "s.fixture.season as season, " +
+            "COUNT(s) as totalFixtures, " +
+            "COALESCE(SUM(s.minutesPlayed), 0) as minutesPlayed, " +
+            "COALESCE(AVG(s.rating), 0) as averageRating, " +
+            "COALESCE(SUM(s.goals), 0) as goals, " +
+            "COALESCE(SUM(s.assists), 0) as assists, " +
+            "COALESCE(SUM(s.shotsTotal), 0) as shotsTotal, " +
+            "COALESCE(SUM(s.shotsOnTarget), 0) as shotsOnTarget, " +
+            "COALESCE(SUM(s.passesKey), 0) as passesKey, " +
+            "COALESCE(SUM(s.yellowCards), 0) as yellowCards, " +
+            "COALESCE(SUM(s.redCards), 0) as redCards " +
+            "FROM PlayerFixtureStat s " +
+            "WHERE s.player.playerId = :apiPlayerId " +
+            "GROUP BY s.fixture.season " +
+            "ORDER BY s.fixture.season DESC")
+    List<SeasonStatBySeason> findSeasonStatSummariesByPlayerId(@Param("apiPlayerId") Long apiPlayerId);
+
     interface SeasonStatSummary {
         long getTotalFixtures();
         int getMinutesPlayed();
@@ -80,5 +100,19 @@ public interface PlayerFixtureStatRepository extends JpaRepository<PlayerFixture
         int getPenaltyScored();
         int getPenaltyMissed();
         int getPenaltySaved();
+    }
+
+    interface SeasonStatBySeason {
+        Integer getSeason();
+        long getTotalFixtures();
+        int getMinutesPlayed();
+        double getAverageRating();
+        int getGoals();
+        int getAssists();
+        int getShotsTotal();
+        int getShotsOnTarget();
+        int getPassesKey();
+        int getYellowCards();
+        int getRedCards();
     }
 }

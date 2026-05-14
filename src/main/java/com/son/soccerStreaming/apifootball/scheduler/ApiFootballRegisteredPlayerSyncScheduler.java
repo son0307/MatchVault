@@ -1,0 +1,36 @@
+package com.son.soccerStreaming.apifootball.scheduler;
+
+import com.son.soccerStreaming.apifootball.service.ApiFootballPlayerSyncService;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.scheduling.annotation.Scheduled;
+import org.springframework.stereotype.Component;
+
+@Slf4j
+@Component
+@RequiredArgsConstructor
+@ConditionalOnProperty(name = "api-football.sync.players.registered.enabled", havingValue = "true")
+public class ApiFootballRegisteredPlayerSyncScheduler {
+
+    private final ApiFootballPlayerSyncService apiFootballPlayerSyncService;
+
+    @Value("${api-football.sync.players.registered.league:39}")
+    private Integer league;
+
+    @Value("${api-football.sync.players.registered.season:2024}")
+    private Integer season;
+
+    @Value("${api-football.sync.players.registered.delay-ms:7000}")
+    private Long delayMs;
+
+    @Scheduled(cron = "${api-football.sync.players.registered.daily-cron:0 10 5 * * *}")
+    public void syncRegisteredPlayersDaily() {
+        try {
+            apiFootballPlayerSyncService.syncRegisteredPlayers(league, season, delayMs);
+        } catch (Exception e) {
+            log.error("API-Football registered player sync failed. league={}, season={}", league, season, e);
+        }
+    }
+}
