@@ -119,6 +119,8 @@ public class ApiFootballFixturePlayerStatSyncService {
         ApiFootballLiveDto.Fouls fouls = stat.getFouls();
         ApiFootballLiveDto.Cards cards = stat.getCards();
         ApiFootballLiveDto.Penalty penalty = stat.getPenalty();
+        Integer passesTotal = passes != null ? passes.getTotal() : null;
+        Integer passesAccurate = passes != null ? parseInteger(passes.getAccuracy()) : null;
 
         entity.updateLiveStat(
                 games != null ? games.getMinutes() : null,
@@ -131,9 +133,10 @@ public class ApiFootballFixturePlayerStatSyncService {
                 goals != null ? goals.getSaves() : null,
                 shots != null ? shots.getTotal() : null,
                 shots != null ? shots.getOn() : null,
-                passes != null ? passes.getTotal() : null,
+                passesTotal,
                 passes != null ? passes.getKey() : null,
-                passes != null ? parseInteger(passes.getAccuracy()) : null,
+                passesAccurate,
+                passAccuracyOf(passesAccurate, passesTotal),
                 tackles != null ? tackles.getTotal() : null,
                 tackles != null ? tackles.getBlocks() : null,
                 tackles != null ? tackles.getInterceptions() : null,
@@ -196,5 +199,12 @@ public class ApiFootballFixturePlayerStatSyncService {
         }
         String digits = value.replaceAll("[^0-9-]", "");
         return digits.isBlank() ? null : Integer.parseInt(digits);
+    }
+
+    private Integer passAccuracyOf(Integer passesAccurate, Integer passesTotal) {
+        if (passesAccurate == null || passesTotal == null || passesTotal <= 0) {
+            return null;
+        }
+        return (int) Math.round((passesAccurate * 100.0) / passesTotal);
     }
 }

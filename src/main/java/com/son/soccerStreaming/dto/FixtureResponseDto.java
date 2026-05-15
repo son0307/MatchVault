@@ -4,12 +4,15 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
 
+import java.time.LocalDateTime;
+
 public class FixtureResponseDto {
     @Getter
     @Builder
     @AllArgsConstructor
     public static class Summary {
         private Long fixtureId;
+        private LocalDateTime fixtureDate;
         private String homeTeamName;
         private String awayTeamName;
         private int homeScore;

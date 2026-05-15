@@ -63,4 +63,10 @@ public class Player {
         this.number = number;
         this.photoUrl = photoUrl;
     }
+
+    public void updateNumber(Integer number) {
+        if (number != null) {
+            this.number = number;
+        }
+    }
 }

@@ -152,4 +152,11 @@ public class PlayerTeamSeasonStat {
         this.penaltyMissed = penaltyMissed;
         this.penaltySaved = penaltySaved;
     }
+
+    // Fill missing season-specific squad number from lineup data.
+    public void updateBackNumberFromLineup(Integer backNumber) {
+        if (backNumber != null) {
+            this.backNumber = backNumber;
+        }
+    }
 }

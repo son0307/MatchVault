@@ -202,11 +202,11 @@ public class BulkDataService {
                 INSERT INTO player_fixture_stat
                 (fixture_id, team_id, player_id, minutes_played, rating, is_captain, is_substitute,
                  goals, assists, conceded, saves, shots_total, shots_on_target, passes_total, passes_key,
-                 pass_accuracy, tackles_total, blocks, interceptions, duels_total, duels_won,
+                 passes_accurate, pass_accuracy, tackles_total, blocks, interceptions, duels_total, duels_won,
                  dribbles_attempts, dribbles_success, dribbles_past, fouls_drawn, fouls_committed,
                  yellow_cards, red_cards, offsides, penalty_won, penalty_committed, penalty_scored,
                  penalty_missed, penalty_saved)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """;
 
         int[][] results = jdbcTemplate.batchUpdate(sql, players, players.size(), (ps, player) -> {
@@ -216,6 +216,8 @@ public class BulkDataService {
             int shotsTotal = goalkeeper ? random.nextInt(2) : random.nextInt(6);
             int shotsOnTarget = random.nextInt(shotsTotal + 1);
             int passesTotal = random.nextInt(55) + 15;
+            int passAccuracy = 65 + random.nextInt(34);
+            int passesAccurate = (int) Math.round(passesTotal * (passAccuracy / 100.0));
             int dribblesAttempts = goalkeeper ? 0 : random.nextInt(6);
             int duelsTotal = random.nextInt(12) + 3;
 
@@ -234,25 +236,26 @@ public class BulkDataService {
             ps.setInt(13, shotsOnTarget);
             ps.setInt(14, passesTotal);
             ps.setInt(15, random.nextInt(4));
-            ps.setInt(16, 65 + random.nextInt(34));
-            ps.setInt(17, random.nextInt(6));
-            ps.setInt(18, random.nextInt(4));
-            ps.setInt(19, random.nextInt(5));
-            ps.setInt(20, duelsTotal);
-            ps.setInt(21, random.nextInt(duelsTotal + 1));
-            ps.setInt(22, dribblesAttempts);
-            ps.setInt(23, random.nextInt(dribblesAttempts + 1));
-            ps.setInt(24, random.nextInt(4));
+            ps.setInt(16, passesAccurate);
+            ps.setInt(17, passAccuracy);
+            ps.setInt(18, random.nextInt(6));
+            ps.setInt(19, random.nextInt(4));
+            ps.setInt(20, random.nextInt(5));
+            ps.setInt(21, duelsTotal);
+            ps.setInt(22, random.nextInt(duelsTotal + 1));
+            ps.setInt(23, dribblesAttempts);
+            ps.setInt(24, random.nextInt(dribblesAttempts + 1));
             ps.setInt(25, random.nextInt(4));
             ps.setInt(26, random.nextInt(4));
-            ps.setInt(27, random.nextInt(100) > 84 ? 1 : 0);
-            ps.setInt(28, random.nextInt(100) > 97 ? 1 : 0);
-            ps.setInt(29, random.nextInt(3));
-            ps.setInt(30, random.nextInt(100) > 96 ? 1 : 0);
+            ps.setInt(27, random.nextInt(4));
+            ps.setInt(28, random.nextInt(100) > 84 ? 1 : 0);
+            ps.setInt(29, random.nextInt(100) > 97 ? 1 : 0);
+            ps.setInt(30, random.nextInt(3));
             ps.setInt(31, random.nextInt(100) > 96 ? 1 : 0);
-            ps.setInt(32, random.nextInt(100) > 94 ? 1 : 0);
-            ps.setInt(33, random.nextInt(100) > 95 ? 1 : 0);
-            ps.setInt(34, goalkeeper && random.nextInt(100) > 94 ? 1 : 0);
+            ps.setInt(32, random.nextInt(100) > 96 ? 1 : 0);
+            ps.setInt(33, random.nextInt(100) > 94 ? 1 : 0);
+            ps.setInt(34, random.nextInt(100) > 95 ? 1 : 0);
+            ps.setInt(35, goalkeeper && random.nextInt(100) > 94 ? 1 : 0);
         });
 
         return sum(results);
@@ -329,4 +332,3 @@ public class BulkDataService {
     ) {
     }
 }
-

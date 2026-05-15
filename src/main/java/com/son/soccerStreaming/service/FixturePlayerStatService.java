@@ -67,6 +67,7 @@ public class FixturePlayerStatService {
                 .shotsOnTarget(valueOfInt(stat.getShotsOnTarget()))
                 .passesTotal(valueOfInt(stat.getPassesTotal()))
                 .passesKey(valueOfInt(stat.getPassesKey()))
+                .passesAccurate(valueOfInt(stat.getPassesAccurate()))
                 .passAccuracy(valueOfInt(stat.getPassAccuracy()))
                 .tacklesTotal(valueOfInt(stat.getTacklesTotal()))
                 .blocks(valueOfInt(stat.getBlocks()))

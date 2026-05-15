@@ -6,6 +6,7 @@ import com.son.soccerStreaming.entity.Fixture;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Repository;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 import static com.son.soccerStreaming.entity.QFixture.fixture;
@@ -17,12 +18,16 @@ public class FixtureRecordRepositoryImpl implements FixtureRecordRepositoryCusto
     private final JPAQueryFactory queryFactory;
 
     @Override
-    public List<Fixture> findRecentFixturesWithCursor(Long cursorId, Integer season, int size) {
+    public List<Fixture> findRecentFixturesWithCursor(Long cursorId, Integer season,
+                                                       LocalDateTime startDateTime, LocalDateTime endDateTime,
+                                                       int size) {
         return queryFactory
                 .selectFrom(fixture)
                 .where(
                         ltCursorId(cursorId),
-                        eqSeason(season)
+                        eqSeason(season),
+                        goeFixtureDate(startDateTime),
+                        ltFixtureDate(endDateTime)
                 )
                 .orderBy(fixture.id.desc())
                 .limit(size + 1)
@@ -35,5 +40,13 @@ public class FixtureRecordRepositoryImpl implements FixtureRecordRepositoryCusto
 
     private BooleanExpression eqSeason(Integer season) {
         return season == null ? null : fixture.season.eq(season);
+    }
+
+    private BooleanExpression goeFixtureDate(LocalDateTime startDateTime) {
+        return startDateTime == null ? null : fixture.fixtureDate.goe(startDateTime);
+    }
+
+    private BooleanExpression ltFixtureDate(LocalDateTime endDateTime) {
+        return endDateTime == null ? null : fixture.fixtureDate.lt(endDateTime);
     }
 }

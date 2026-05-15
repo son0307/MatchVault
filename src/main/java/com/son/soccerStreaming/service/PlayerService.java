@@ -16,7 +16,10 @@ import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
@@ -59,11 +62,8 @@ public class PlayerService {
                 .orElseThrow(() -> new CustomException(ErrorCode.PLAYER_NOT_FOUND));
 
         // 시즌 요약은 API-Football의 시즌 누적 스탯을 저장한 테이블에서 바로 가져온다.
-        List<PlayerResponseDto.SeasonSummary> seasons = playerTeamSeasonStatRepository
-                .findAllByPlayerPlayerIdOrderBySeasonDesc(playerId)
-                .stream()
-                .map(this::toSeasonSummary)
-                .toList();
+        List<PlayerTeamSeasonStat> seasonStats = playerTeamSeasonStatRepository.findAllByPlayerPlayerIdOrderBySeasonDesc(playerId);
+        List<PlayerResponseDto.SeasonSummary> seasons = aggregateSeasonSummaries(seasonStats);
 
         List<PlayerResponseDto.MatchStat> matches = playerFixtureStatRepository
                 .findAllByPlayerPlayerIdOrderByFixtureFixtureDateDesc(playerId)
@@ -122,11 +122,54 @@ public class PlayerService {
                 .build();
     }
 
-    private PlayerResponseDto.SeasonSummary toSeasonSummary(
-            PlayerTeamSeasonStat stats
-    ) {
+    private List<PlayerResponseDto.SeasonSummary> aggregateSeasonSummaries(List<PlayerTeamSeasonStat> stats) {
+        Map<Integer, List<PlayerTeamSeasonStat>> statsBySeason = new LinkedHashMap<>();
+        for (PlayerTeamSeasonStat stat : stats) {
+            statsBySeason.computeIfAbsent(stat.getSeason(), key -> new java.util.ArrayList<>()).add(stat);
+        }
+
+        return statsBySeason.entrySet().stream()
+                .sorted(Map.Entry.<Integer, List<PlayerTeamSeasonStat>>comparingByKey(Comparator.nullsLast(Comparator.reverseOrder())))
+                .map(entry -> toSeasonSummary(entry.getKey(), entry.getValue()))
+                .toList();
+    }
+
+    private PlayerResponseDto.SeasonSummary toSeasonSummary(Integer season, List<PlayerTeamSeasonStat> stats) {
+        long totalFixtures = stats.stream().mapToLong(item -> valueOf(item.getAppearances())).sum();
+        int weightedRatingFixtures = stats.stream()
+                .filter(item -> item.getRating() != null && valueOf(item.getAppearances()) > 0)
+                .mapToInt(item -> valueOf(item.getAppearances()))
+                .sum();
+        double weightedRating = stats.stream()
+                .filter(item -> item.getRating() != null && valueOf(item.getAppearances()) > 0)
+                .mapToDouble(item -> item.getRating() * valueOf(item.getAppearances()))
+                .sum();
+
         return PlayerResponseDto.SeasonSummary.builder()
-                .season(stats.getSeason())
+                .season(season)
+                .totalFixtures(totalFixtures)
+                .minutesPlayed(stats.stream().mapToInt(item -> valueOf(item.getMinutes())).sum())
+                .averageRating(weightedRatingFixtures > 0 ? roundToOneDecimal(weightedRating / weightedRatingFixtures) : 0)
+                .goals(stats.stream().mapToInt(item -> valueOf(item.getGoals())).sum())
+                .assists(stats.stream().mapToInt(item -> valueOf(item.getAssists())).sum())
+                .shots(stats.stream().mapToInt(item -> valueOf(item.getShotsTotal())).sum())
+                .shotsOnTarget(stats.stream().mapToInt(item -> valueOf(item.getShotsOnTarget())).sum())
+                .keyPasses(stats.stream().mapToInt(item -> valueOf(item.getPassesKey())).sum())
+                .yellowCards(stats.stream().mapToInt(item -> valueOf(item.getYellowCards())).sum())
+                .redCards(stats.stream().mapToInt(item -> valueOf(item.getRedCards())).sum())
+                .teams(stats.stream()
+                        .map(this::toTeamSeasonSummary)
+                        .toList())
+                .build();
+    }
+
+    private PlayerResponseDto.TeamSeasonSummary toTeamSeasonSummary(PlayerTeamSeasonStat stats) {
+        Team team = stats.getTeam();
+
+        return PlayerResponseDto.TeamSeasonSummary.builder()
+                .teamId(team.getTeamId())
+                .teamName(team.getName())
+                .teamLogoUrl(team.getLogoUrl())
                 .totalFixtures(valueOf(stats.getAppearances()))
                 .minutesPlayed(valueOf(stats.getMinutes()))
                 .averageRating(stats.getRating() != null ? roundToOneDecimal(stats.getRating()) : 0)

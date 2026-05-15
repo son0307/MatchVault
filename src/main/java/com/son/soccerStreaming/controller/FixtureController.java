@@ -16,12 +16,15 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+
+import java.time.LocalDate;
 
 @Tag(name = "경기 일정", description = "경기 일정 관련 API")
 @RestController
@@ -43,10 +46,12 @@ public class FixtureController {
             @RequestParam(required = false) Long cursorId,
             @Parameter(description = "조회할 시즌", example = "2024")
             @RequestParam(required = false) Integer season,
+            @Parameter(description = "한국 시간 기준 경기 날짜", example = "2026-05-15")
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
             @Parameter(description = "한 번에 가져올 경기 수", example = "10")
             @RequestParam(defaultValue = "10") int size
     ) {
-        return ResponseEntity.ok(fixtureService.getRecentFixtures(cursorId, season, size));
+        return ResponseEntity.ok(fixtureService.getRecentFixtures(cursorId, season, date, size));
     }
 
     @Operation(summary = "특정 경기 라인업 조회", description = "선발, 교체, 결장 선수 정보를 팀별로 조회합니다.")
