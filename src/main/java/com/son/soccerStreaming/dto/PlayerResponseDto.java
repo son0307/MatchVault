@@ -101,6 +101,25 @@ public class PlayerResponseDto {
         private int keyPasses;
         private int yellowCards;
         private int redCards;
+        private List<TeamSeasonSummary> teams;
+    }
+
+    @Getter
+    @Builder
+    public static class TeamSeasonSummary {
+        private Long teamId;
+        private String teamName;
+        private String teamLogoUrl;
+        private long totalFixtures;
+        private int minutesPlayed;
+        private double averageRating;
+        private int goals;
+        private int assists;
+        private int shots;
+        private int shotsOnTarget;
+        private int keyPasses;
+        private int yellowCards;
+        private int redCards;
     }
 
     @Getter

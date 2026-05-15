@@ -2,9 +2,11 @@ package com.son.soccerStreaming.apifootball.service;
 
 import com.son.soccerStreaming.apifootball.client.ApiFootballClient;
 import com.son.soccerStreaming.apifootball.dto.ApiFootballPlayerDto;
+import com.son.soccerStreaming.entity.Fixture;
 import com.son.soccerStreaming.entity.Player;
 import com.son.soccerStreaming.entity.PlayerTeamSeasonStat;
 import com.son.soccerStreaming.entity.Team;
+import com.son.soccerStreaming.repository.FixtureLineupRepository;
 import com.son.soccerStreaming.repository.PlayerRepository;
 import com.son.soccerStreaming.repository.PlayerTeamSeasonStatRepository;
 import com.son.soccerStreaming.repository.TeamRepository;
@@ -25,6 +27,7 @@ import java.util.Optional;
 public class ApiFootballPlayerSyncService {
 
     private final ApiFootballClient apiFootballClient;
+    private final FixtureLineupRepository fixtureLineupRepository;
     private final PlayerRepository playerRepository;
     private final PlayerTeamSeasonStatRepository playerTeamSeasonStatRepository;
     private final TeamRepository teamRepository;
@@ -136,6 +139,40 @@ public class ApiFootballPlayerSyncService {
     }
 
     @Transactional
+    public void updateLineupProfileIfLatest(Player player, Fixture fixture, Integer number, String position) {
+        if (player == null || fixture == null || fixture.getFixtureDate() == null) {
+            return;
+        }
+        if (number == null && (position == null || position.isBlank())) {
+            return;
+        }
+
+        boolean latestLineup = fixtureLineupRepository.findLatestFixtureDateByPlayerId(player.getPlayerId())
+                .map(latestFixtureDate -> !latestFixtureDate.isAfter(fixture.getFixtureDate()))
+                .orElse(true);
+
+        if (latestLineup) {
+            player.updateNumber(number);
+            playerRepository.save(player);
+        }
+    }
+
+    @Transactional
+    public void updateSeasonBackNumberFromLineup(Player player, Team team, Fixture fixture, Integer number) {
+        if (player == null || team == null || fixture == null || fixture.getSeason() == null || number == null) {
+            return;
+        }
+
+        // A lineup number belongs to the player's team-season row, not only to the latest player profile.
+        playerTeamSeasonStatRepository.findAllByPlayerPlayerIdAndTeamTeamIdAndSeason(
+                        player.getPlayerId(),
+                        team.getTeamId(),
+                        fixture.getSeason()
+                )
+                .forEach(stat -> stat.updateBackNumberFromLineup(number));
+    }
+
+    @Transactional
     public Optional<Player> fetchProfile(Long playerId, Integer number, String position) {
         return apiFootballClient.getPlayerProfiles(playerId).stream()
                 .map(ApiFootballPlayerDto.ProfileResponse::getPlayer)
@@ -164,7 +201,7 @@ public class ApiFootballPlayerSyncService {
                 playerInfo.getHeight(),
                 playerInfo.getWeight(),
                 position,
-                number,
+                number != null ? number : player.getNumber(),
                 playerInfo.getPhoto()
         );
         return playerRepository.save(player);

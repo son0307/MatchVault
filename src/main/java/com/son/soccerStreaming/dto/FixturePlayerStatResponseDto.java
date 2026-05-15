@@ -48,6 +48,7 @@ public class FixturePlayerStatResponseDto {
         private Integer shotsOnTarget;
         private Integer passesTotal;
         private Integer passesKey;
+        private Integer passesAccurate;
         private Integer passAccuracy;
         private Integer tacklesTotal;
         private Integer blocks;

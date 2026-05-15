@@ -128,6 +128,18 @@ public class ApiFootballFixtureLineupSyncService {
                     starter
             );
             fixtureLineupRepository.save(lineup);
+            apiFootballPlayerSyncService.updateLineupProfileIfLatest(
+                    player.get(),
+                    fixture,
+                    playerInfo.getNumber(),
+                    playerInfo.getPos()
+            );
+            apiFootballPlayerSyncService.updateSeasonBackNumberFromLineup(
+                    player.get(),
+                    team,
+                    fixture,
+                    playerInfo.getNumber()
+            );
             syncedCount++;
         }
 

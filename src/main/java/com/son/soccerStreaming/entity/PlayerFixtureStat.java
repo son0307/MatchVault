@@ -53,7 +53,8 @@ public class PlayerFixtureStat {
     // 패스 (Passes)
     private Integer passesTotal;   // 총 패스
     private Integer passesKey;     // 키 패스
-    private Integer passAccuracy;  // 패스 정확도
+    private Integer passesAccurate;// 성공 패스
+    private Integer passAccuracy;  // 패스 성공률
 
     // 수비 (Tackles & Blocks)
     private Integer tacklesTotal;  // 총 태클
@@ -83,7 +84,7 @@ public class PlayerFixtureStat {
     public void updateLiveStat(Integer minutesPlayed, Double rating, Boolean isCaptain, Boolean isSubstitute,
                                Integer goals, Integer assists, Integer conceded, Integer saves,
                                Integer shotsTotal, Integer shotsOnTarget, Integer passesTotal,
-                               Integer passesKey, Integer passAccuracy, Integer tacklesTotal,
+                               Integer passesKey, Integer passesAccurate, Integer passAccuracy, Integer tacklesTotal,
                                Integer blocks, Integer interceptions, Integer duelsTotal,
                                Integer duelsWon, Integer dribblesAttempts, Integer dribblesSuccess,
                                Integer dribblesPast, Integer foulsDrawn, Integer foulsCommitted,
@@ -102,6 +103,7 @@ public class PlayerFixtureStat {
         this.shotsOnTarget = shotsOnTarget;
         this.passesTotal = passesTotal;
         this.passesKey = passesKey;
+        this.passesAccurate = passesAccurate;
         this.passAccuracy = passAccuracy;
         this.tacklesTotal = tacklesTotal;
         this.blocks = blocks;

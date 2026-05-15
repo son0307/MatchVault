@@ -277,6 +277,8 @@ public class DummyDataInitializer implements CommandLineRunner {
 
             // 2. 📊 방대한 경기 스탯 저장
             int passes = random.nextInt(40) + 20;
+            int passAccuracy = random.nextInt(30) + 70;
+            int passesAccurate = (int) Math.round(passes * (passAccuracy / 100.0));
             PlayerFixtureStat stat = PlayerFixtureStat.builder()
                     .fixture(fixture)
                     .team(team)
@@ -291,7 +293,8 @@ public class DummyDataInitializer implements CommandLineRunner {
                     .shotsOnTarget(random.nextInt(3))
                     .passesTotal(passes)
                     .passesKey(random.nextInt(3))
-                    .passAccuracy(random.nextInt(30) + 70) // 70~100%
+                    .passesAccurate(passesAccurate)
+                    .passAccuracy(passAccuracy) // 70~100%
                     .tacklesTotal(random.nextInt(4))
                     .interceptions(random.nextInt(3))
                     .duelsTotal(random.nextInt(10) + 5)

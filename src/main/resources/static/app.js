@@ -4,7 +4,9 @@ const state = {
     standings: [],
     nextCursor: null,
     hasNext: false,
+    selectedFixtureDate: todayKoreaDateKey(),
     selectedFixtureId: null,
+    selectedFixturePlayerStats: null,
     selectedTeamId: null,
     selectedPlayerId: null,
     liveFixtureId: null,
@@ -21,6 +23,10 @@ const elements = {
     seasonInput: document.querySelector("#seasonInput"),
     refreshButton: document.querySelector("#refreshButton"),
     loadMoreFixtures: document.querySelector("#loadMoreFixtures"),
+    previousFixtureDate: document.querySelector("#previousFixtureDate"),
+    fixtureDateButton: document.querySelector("#fixtureDateButton"),
+    fixtureDateInput: document.querySelector("#fixtureDateInput"),
+    nextFixtureDate: document.querySelector("#nextFixtureDate"),
     teamCount: document.querySelector("#teamCount"),
     fixtureCount: document.querySelector("#fixtureCount"),
     standingCount: document.querySelector("#standingCount"),
@@ -41,12 +47,79 @@ const elements = {
 };
 
 document.addEventListener("DOMContentLoaded", () => {
+    setupFixtureDateControls();
     elements.refreshButton.addEventListener("click", refreshAll);
     elements.loadMoreFixtures.addEventListener("click", () => loadFixtures(false));
+    elements.previousFixtureDate.addEventListener("click", () => moveSelectedFixtureDate(-1));
+    elements.nextFixtureDate.addEventListener("click", () => moveSelectedFixtureDate(1));
+    elements.fixtureDateButton.addEventListener("click", openFixtureDatePicker);
+    elements.fixtureDateInput.addEventListener("change", selectFixtureDateFromInput);
     elements.liveConnectButton.addEventListener("click", connectLiveFixture);
     elements.liveDisconnectButton.addEventListener("click", disconnectLiveFixture);
+    renderFixtureDateControl();
     refreshAll();
 });
+
+function setupFixtureDateControls() {
+    if (!elements.previousFixtureDate || !elements.fixtureDateButton || !elements.fixtureDateInput || !elements.nextFixtureDate) {
+        const heading = document.querySelector(".fixtures-panel .panel-heading");
+        const loadMoreButton = elements.loadMoreFixtures;
+
+        if (heading && loadMoreButton) {
+            const controls = document.createElement("div");
+            controls.className = "fixture-date-controls";
+            controls.setAttribute("aria-label", "경기 날짜 선택");
+            controls.innerHTML = `
+                <button id="previousFixtureDate" type="button" class="date-nav-button" aria-label="이전 날짜">‹</button>
+                <button id="fixtureDateButton" type="button" class="fixture-date-button">오늘</button>
+                <input id="fixtureDateInput" class="fixture-date-input" type="date" aria-label="경기 날짜">
+                <button id="nextFixtureDate" type="button" class="date-nav-button" aria-label="다음 날짜">›</button>
+            `;
+            heading.insertBefore(controls, loadMoreButton);
+            loadMoreButton.textContent = "더 보기";
+        }
+
+        elements.previousFixtureDate = document.querySelector("#previousFixtureDate");
+        elements.fixtureDateButton = document.querySelector("#fixtureDateButton");
+        elements.fixtureDateInput = document.querySelector("#fixtureDateInput");
+        elements.nextFixtureDate = document.querySelector("#nextFixtureDate");
+    }
+}
+
+function renderFixtureDateControl() {
+    elements.fixtureDateInput.value = state.selectedFixtureDate;
+    elements.fixtureDateButton.textContent = selectedFixtureDateLabel();
+}
+
+function moveSelectedFixtureDate(dayDelta) {
+    state.selectedFixtureDate = addDaysToDateKey(state.selectedFixtureDate, dayDelta);
+    state.selectedFixtureId = null;
+    state.selectedFixturePlayerStats = null;
+    renderFixtureDateControl();
+    resetFixtureDetail();
+    loadFixtures(true);
+}
+
+function openFixtureDatePicker() {
+    if (typeof elements.fixtureDateInput.showPicker === "function") {
+        elements.fixtureDateInput.showPicker();
+        return;
+    }
+
+    elements.fixtureDateInput.click();
+}
+
+function selectFixtureDateFromInput() {
+    if (!elements.fixtureDateInput.value || elements.fixtureDateInput.value === state.selectedFixtureDate) {
+        return;
+    }
+
+    state.selectedFixtureDate = elements.fixtureDateInput.value;
+    state.selectedFixtureId = null;
+    renderFixtureDateControl();
+    resetFixtureDetail();
+    loadFixtures(true);
+}
 
 async function refreshAll() {
     setApiStatus("Loading");
@@ -56,8 +129,7 @@ async function refreshAll() {
     state.selectedFixtureId = null;
     state.selectedTeamId = null;
     state.selectedPlayerId = null;
-    elements.fixtureDetail.className = "detail-empty";
-    elements.fixtureDetail.textContent = "왼쪽 경기 목록에서 하나를 선택하면 저장된 통계, 이벤트, 라인업을 표시합니다.";
+    resetFixtureDetail();
     elements.teamDetail.innerHTML = "";
     elements.playerDetail.className = "detail-empty";
     elements.playerDetail.textContent = "팀 목록에서 선수를 선택하면 프로필과 시즌별/경기별 스탯을 표시합니다.";
@@ -71,6 +143,13 @@ async function refreshAll() {
 
     const failed = results.filter((result) => result.status === "rejected");
     setApiStatus(failed.length ? "Partial" : "Ready");
+}
+
+function resetFixtureDetail() {
+    elements.detailTitle.textContent = "경기 상세";
+    elements.fixtureDetail.className = "detail-empty";
+    elements.fixtureDetail.textContent = "왼쪽 경기 목록에서 하나를 선택하면 저장된 통계, 이벤트, 라인업을 표시합니다.";
+    state.selectedFixturePlayerStats = null;
 }
 
 function renderLoading() {
@@ -116,11 +195,12 @@ async function loadFixtures(reset) {
 
     elements.loadMoreFixtures.disabled = true;
     const season = encodeURIComponent(elements.seasonInput.value || "2024");
+    const date = encodeURIComponent(state.selectedFixtureDate);
     const cursor = reset || !state.nextCursor ? "" : `&cursorId=${encodeURIComponent(state.nextCursor)}`;
 
     try {
-        // 최근 경기 목록은 상단 시즌 입력값을 기준으로 서버에서 필터링한다.
-        const response = await requestJson(`/api/v1/fixtures?size=10&season=${season}${cursor}`);
+        // 선택한 날짜는 한국 시간 기준으로 서버에 전달하고, 서버가 UTC 저장 범위로 변환해 조회한다.
+        const response = await requestJson(`/api/v1/fixtures?size=100&season=${season}&date=${date}${cursor}`);
         const content = Array.isArray(response.content) ? response.content : [];
         state.fixtures = reset ? content : [...state.fixtures, ...content];
         state.nextCursor = response.nextCursor || null;
@@ -137,37 +217,63 @@ async function loadFixtures(reset) {
 
 function renderFixtures() {
     if (!state.fixtures.length) {
-        elements.fixturesList.innerHTML = emptyMarkup(`${elements.seasonInput.value || "2024"} 시즌에 저장된 경기 데이터가 없습니다.`);
+        elements.fixturesList.innerHTML = emptyMarkup(`${selectedFixtureDateLabel()}에 예정된 경기 데이터가 없습니다.`);
         return;
     }
 
-    elements.fixturesList.innerHTML = state.fixtures.map((fixture) => {
-        const isActive = fixture.fixtureId === state.selectedFixtureId ? " active" : "";
-        const homeWinner = fixture.homeWinner ? " winner" : "";
-        const awayWinner = fixture.awayWinner ? " winner" : "";
+    const selectedDateFixtures = fixturesForSelectedDate(state.fixtures);
+    if (!selectedDateFixtures.length) {
+        elements.fixturesList.innerHTML = emptyMarkup(`${selectedFixtureDateLabel()}에 예정된 경기 데이터가 없습니다.`);
+        return;
+    }
 
-        return `
-            <button class="fixture-card${isActive}" type="button" data-fixture-id="${fixture.fixtureId}">
-                <span class="team-side">
-                    <span class="team-name${homeWinner}">${escapeHtml(fixture.homeTeamName)}</span>
-                    <span class="status-pill">Home</span>
-                </span>
-                <span class="score-box">
-                    <span>${numberText(fixture.homeScore)}</span>
-                    <span>:</span>
-                    <span>${numberText(fixture.awayScore)}</span>
-                </span>
-                <span class="team-side away">
-                    <span class="team-name${awayWinner}">${escapeHtml(fixture.awayTeamName)}</span>
-                    <span class="status-pill">${escapeHtml(fixture.fixtureStatus || "Status")}</span>
-                </span>
-            </button>
-        `;
-    }).join("");
+    elements.fixturesList.innerHTML = `
+        <section class="fixture-date-group" aria-label="${escapeAttribute(selectedFixtureDateLabel())}">
+            <div class="fixture-date-heading">
+                <strong>${escapeHtml(selectedFixtureDateLabel())}</strong>
+                <span>${selectedDateFixtures.length}경기</span>
+            </div>
+            ${selectedDateFixtures.map(fixtureCardMarkup).join("")}
+        </section>
+    `;
 
     document.querySelectorAll(".fixture-card").forEach((button) => {
         button.addEventListener("click", () => selectFixture(Number(button.dataset.fixtureId)));
     });
+}
+
+function fixtureCardMarkup(fixture) {
+    const isActive = fixture.fixtureId === state.selectedFixtureId ? " active" : "";
+    const homeWinner = fixture.homeWinner ? " winner" : "";
+    const awayWinner = fixture.awayWinner ? " winner" : "";
+
+    return `
+        <button class="fixture-card${isActive}" type="button" data-fixture-id="${fixture.fixtureId}">
+            <span class="team-side">
+                <span class="team-name${homeWinner}">${escapeHtml(fixture.homeTeamName)}</span>
+                <span class="status-pill">Home</span>
+            </span>
+            <span class="fixture-time">
+                <strong>${escapeHtml(timeText(fixture.fixtureDate))}</strong>
+                <span>${escapeHtml(fixture.fixtureStatus || "Status")}</span>
+            </span>
+            <span class="score-box">
+                <span>${numberText(fixture.homeScore)}</span>
+                <span>:</span>
+                <span>${numberText(fixture.awayScore)}</span>
+            </span>
+            <span class="team-side away">
+                <span class="team-name${awayWinner}">${escapeHtml(fixture.awayTeamName)}</span>
+                <span class="status-pill">${escapeHtml(fixture.fixtureStatus || "Status")}</span>
+            </span>
+        </button>
+    `;
+}
+
+function fixturesForSelectedDate(fixtures) {
+    return fixtures
+        .filter((fixture) => dateKey(fixture.fixtureDate) === state.selectedFixtureDate)
+        .sort((a, b) => fixtureTimeValue(a) - fixtureTimeValue(b));
 }
 
 async function selectFixture(fixtureId) {
@@ -189,12 +295,14 @@ async function selectFixture(fixtureId) {
         requestJson(`/api/v1/fixtures/${fixtureId}/player-stats`),
     ]);
 
+    state.selectedFixturePlayerStats = settledValue(playerStats);
     elements.fixtureDetail.innerHTML = [
         renderStats(settledValue(stats)),
         renderEvents(settledValue(events)),
         renderLineups(settledValue(lineups)),
-        renderPlayerStats(settledValue(playerStats)),
+        renderPlayerStats(state.selectedFixturePlayerStats),
     ].join("");
+    bindLineupPlayerButtons();
 }
 
 async function connectLiveFixture() {
@@ -453,11 +561,136 @@ function lineupTeamMarkup(team) {
 
 function playerMarkup(player) {
     return `
-        <div class="lineup-item">
+        <button class="lineup-item lineup-player-button" type="button" data-player-id="${player.playerId}">
             <strong>${player.backNumber ? `${player.backNumber}. ` : ""}${escapeHtml(player.playerName || "-")}</strong>
             <span class="muted">${escapeHtml(player.position || "")}</span>
+        </button>
+    `;
+}
+
+function bindLineupPlayerButtons() {
+    document.querySelectorAll(".lineup-player-button").forEach((button) => {
+        button.addEventListener("click", () => openFixturePlayerStatModal(Number(button.dataset.playerId)));
+    });
+}
+
+function openFixturePlayerStatModal(playerId) {
+    const playerStat = findFixturePlayerStat(playerId);
+    if (!playerStat) {
+        showFixturePlayerStatModal(`
+            <div class="modal-header">
+                <div>
+                    <p class="eyebrow">Player Stats</p>
+                    <h3>선수 경기 스탯</h3>
+                </div>
+                <button class="modal-close-button" type="button" aria-label="닫기">×</button>
+            </div>
+            ${emptyMarkup("이 선수의 경기 스탯이 아직 저장되지 않았습니다.")}
+        `);
+        return;
+    }
+
+    showFixturePlayerStatModal(playerStatModalMarkup(playerStat));
+}
+
+function findFixturePlayerStat(playerId) {
+    const groups = [state.selectedFixturePlayerStats?.homeTeam, state.selectedFixturePlayerStats?.awayTeam].filter(Boolean);
+    for (const group of groups) {
+        const player = Array.isArray(group.players)
+            ? group.players.find((item) => Number(item.playerId) === Number(playerId))
+            : null;
+        if (player) {
+            return {...player, teamName: group.teamName};
+        }
+    }
+    return null;
+}
+
+function showFixturePlayerStatModal(markup) {
+    closeFixturePlayerStatModal();
+    document.body.insertAdjacentHTML("beforeend", `
+        <div class="modal-backdrop" role="presentation">
+            <section class="player-stat-modal" role="dialog" aria-modal="true" aria-label="선수 경기 스탯">
+                ${markup}
+            </section>
+        </div>
+    `);
+
+    const backdrop = document.querySelector(".modal-backdrop");
+    const closeButton = document.querySelector(".modal-close-button");
+    backdrop.addEventListener("click", (event) => {
+        if (event.target === backdrop) {
+            closeFixturePlayerStatModal();
+        }
+    });
+    closeButton?.addEventListener("click", closeFixturePlayerStatModal);
+    document.addEventListener("keydown", closeFixturePlayerStatOnEscape);
+}
+
+function closeFixturePlayerStatModal() {
+    document.querySelector(".modal-backdrop")?.remove();
+    document.removeEventListener("keydown", closeFixturePlayerStatOnEscape);
+}
+
+function closeFixturePlayerStatOnEscape(event) {
+    if (event.key === "Escape") {
+        closeFixturePlayerStatModal();
+    }
+}
+
+function playerStatModalMarkup(player) {
+    const summaryRows = [
+        ["출전 시간", `${numberText(player.minutesPlayed)}분`],
+        ["평점", numberText(player.rating)],
+        ["골", numberText(player.goals)],
+        ["도움", numberText(player.assists)],
+        ["슈팅", numberText(player.shotsTotal)],
+        ["유효 슈팅", numberText(player.shotsOnTarget)],
+        ["패스", successRatioText(player.passesAccurate, player.passesTotal, player.passAccuracy)],
+        ["키패스", numberText(player.passesKey)],
+        ["태클", numberText(player.tacklesTotal)],
+        ["인터셉트", numberText(player.interceptions)],
+        ["블록", numberText(player.blocks)],
+        ["드리블 성공", successRatioText(player.dribblesSuccess, player.dribblesAttempts)],
+        ["경합 성공", successRatioText(player.duelsWon, player.duelsTotal)],
+        ["파울 유도", numberText(player.foulsDrawn)],
+        ["파울", numberText(player.foulsCommitted)],
+        ["카드", `${numberText(player.yellowCards)}Y / ${numberText(player.redCards)}R`],
+    ];
+
+    return `
+        <div class="modal-header">
+            <div>
+                <p class="eyebrow">Player Stats</p>
+                <h3>${player.jerseyNumber ? `${player.jerseyNumber}. ` : ""}${escapeHtml(player.playerName || "-")}</h3>
+                <p class="muted">${escapeHtml(player.teamName || "-")} · ${escapeHtml(player.position || "-")}${player.captain ? " · Captain" : ""}${player.substitute ? " · Substitute" : ""}</p>
+            </div>
+            <button class="modal-close-button" type="button" aria-label="닫기">×</button>
+        </div>
+        <div class="modal-stat-grid">
+            ${summaryRows.map(([label, value]) => `
+                <div class="modal-stat-row">
+                    <span>${label}</span>
+                    <b>${value}</b>
+                </div>
+            `).join("")}
         </div>
     `;
+}
+
+function successRatioText(success, total, knownRate) {
+    const successText = numberText(success);
+    const totalText = numberText(total);
+    const rate = knownRate ?? successRate(success, total);
+
+    return `${successText} / ${totalText}${rate === null ? "" : ` (${rate}%)`}`;
+}
+
+function successRate(success, total) {
+    if (success === null || success === undefined || total === null || total === undefined || Number(total) <= 0) {
+        return null;
+    }
+    return Math.round((Number(success) * 100) / Number(total));
 }
 
 function absenceMarkup(absence) {
@@ -652,6 +885,8 @@ function playerProfileMarkup(profile) {
 }
 
 function seasonSummaryMarkup(season) {
+    const teams = Array.isArray(season.teams) ? season.teams : [];
+
     return `
         <article class="season-stat-card">
             <strong>${seasonLabel(season.season)}</strong>
@@ -663,7 +898,31 @@ function seasonSummaryMarkup(season) {
                 <span><b>${numberText(season.averageRating)}</b>평점</span>
                 <span><b>${numberText(season.keyPasses)}</b>키패스</span>
             </div>
+            ${teams.length > 1 ? teamSeasonBreakdownMarkup(teams) : ""}
         </article>
+    `;
+}
+
+function teamSeasonBreakdownMarkup(teams) {
+    return `
+        <div class="team-season-list">
+            ${teams.map((team) => `
+                <article class="team-season-item">
+                    <div class="team-season-head">
+                        ${imageMarkup(team.teamLogoUrl, team.teamName, "club-logo")}
+                        <strong>${escapeHtml(team.teamName || "-")}</strong>
+                    </div>
+                    <div class="season-stat-grid">
+                        <span><b>${numberText(team.totalFixtures)}</b>경기</span>
+                        <span><b>${numberText(team.minutesPlayed)}</b>분</span>
+                        <span><b>${numberText(team.goals)}</b>골</span>
+                        <span><b>${numberText(team.assists)}</b>도움</span>
+                        <span><b>${numberText(team.averageRating)}</b>평점</span>
+                        <span><b>${numberText(team.keyPasses)}</b>키패스</span>
+                    </div>
+                </article>
+            `).join("")}
+        </div>
     `;
 }
 
@@ -688,20 +947,58 @@ function seasonAccordionsMarkup(seasons, matches) {
             <details class="season-accordion">
                 <summary>
                     <span>${seasonLabel(season?.season ?? seasonKey)}</span>
-                    <span class="small-pill">${seasonMatches.length}경기</span>
                 </summary>
                 ${season ? seasonSummaryMarkup(season) : ""}
-                <div class="match-stat-list">
-                    ${seasonMatches.map(matchStatMarkup).join("") || `<div class="player-item muted">경기별 스탯 없음</div>`}
-                </div>
+                ${seasonMatchesMarkup(season, seasonMatches)}
             </details>
         `;
     }).join("");
 }
 
+function seasonMatchesMarkup(season, matches) {
+    if (!matches.length) {
+        return `<div class="match-stat-list"><div class="player-item muted">경기별 스탯 없음</div></div>`;
+    }
+
+    const teams = Array.isArray(season?.teams) ? season.teams : [];
+    if (teams.length <= 1) {
+        return `<div class="match-stat-list">${matches.map(matchStatMarkup).join("")}</div>`;
+    }
+
+    const matchesByTeam = groupMatchesByTeam(matches);
+
+    return `
+        <div class="team-match-list">
+            ${teams.map((team) => {
+                const teamMatches = matchesByTeam[String(team.teamId)] || [];
+                return `
+                    <section class="team-match-group">
+                        <div class="team-match-heading">
+                            ${imageMarkup(team.teamLogoUrl, team.teamName, "club-logo")}
+                            <strong>${escapeHtml(team.teamName || "-")}</strong>
+                        </div>
+                        <div class="match-stat-list">
+                            ${teamMatches.map(matchStatMarkup).join("") || `<div class="player-item muted">경기별 스탯 없음</div>`}
+                        </div>
+                    </section>
+                `;
+            }).join("")}
+        </div>
+    `;
+}
+
 function groupMatchesBySeason(matches) {
     return matches.reduce((groups, match) => {
         const key = match.season ?? "unknown";
+        groups[key] = groups[key] || [];
+        groups[key].push(match);
+        return groups;
+    }, {});
+}
+
+function groupMatchesByTeam(matches) {
+    return matches.reduce((groups, match) => {
+        const key = String(match.teamId ?? "unknown");
         groups[key] = groups[key] || [];
         groups[key].push(match);
         return groups;
@@ -800,6 +1097,107 @@ function numberText(value) {
 
 function dateText(value) {
     return value ? String(value).slice(0, 10) : "-";
+}
+
+function dateKey(value) {
+    const date = parseFixtureDate(value);
+    if (!date) {
+        return "unknown";
+    }
+
+    return new Intl.DateTimeFormat("en-CA", {
+        timeZone: "Asia/Seoul",
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+    }).format(date);
+}
+
+function dateGroupTitle(value) {
+    if (value === "unknown") {
+        return "날짜 미정";
+    }
+
+    const date = new Date(`${value}T00:00:00+09:00`);
+    if (Number.isNaN(date.getTime())) {
+        return value;
+    }
+
+    const today = new Date(`${todayKoreaDateKey()}T00:00:00+09:00`);
+
+    const diffDays = Math.round((date.getTime() - today.getTime()) / 86400000);
+    const weekday = new Intl.DateTimeFormat("ko-KR", {timeZone: "Asia/Seoul", weekday: "short"}).format(date);
+    const formatted = new Intl.DateTimeFormat("ko-KR", {
+        timeZone: "Asia/Seoul",
+        month: "long",
+        day: "numeric",
+    }).format(date);
+
+    if (diffDays === 0) {
+        return `오늘, ${formatted} (${weekday})`;
+    }
+    if (diffDays === 1) {
+        return `내일, ${formatted} (${weekday})`;
+    }
+    if (diffDays === -1) {
+        return `어제, ${formatted} (${weekday})`;
+    }
+
+    return `${formatted} (${weekday})`;
+}
+
+function selectedFixtureDateLabel() {
+    return dateGroupTitle(state.selectedFixtureDate);
+}
+
+function timeText(value) {
+    const date = parseFixtureDate(value);
+    if (!date) {
+        return String(value).slice(11, 16) || "-";
+    }
+
+    return new Intl.DateTimeFormat("ko-KR", {
+        timeZone: "Asia/Seoul",
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: false,
+    }).format(date);
+}
+
+function fixtureTimeValue(fixture) {
+    return parseFixtureDate(fixture.fixtureDate)?.getTime() ?? 0;
+}
+
+function parseFixtureDate(value) {
+    if (!value) {
+        return null;
+    }
+
+    const text = String(value);
+    const isoText = /Z$|[+-]\d\d:\d\d$/.test(text) ? text : `${text}Z`;
+    const date = new Date(isoText);
+    return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function todayKoreaDateKey() {
+    return new Intl.DateTimeFormat("en-CA", {
+        timeZone: "Asia/Seoul",
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+    }).format(new Date());
+}
+
+function addDaysToDateKey(dateKeyValue, dayDelta) {
+    const date = new Date(`${dateKeyValue}T00:00:00+09:00`);
+    date.setUTCDate(date.getUTCDate() + dayDelta);
+
+    return new Intl.DateTimeFormat("en-CA", {
+        timeZone: "Asia/Seoul",
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+    }).format(date);
 }
 
 function setApiStatus(status) {
