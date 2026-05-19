@@ -12,7 +12,6 @@ import com.son.soccerStreaming.repository.PlayerFixtureStatRepository;
 import com.son.soccerStreaming.repository.PlayerRepository;
 import com.son.soccerStreaming.repository.PlayerTeamSeasonStatRepository;
 import lombok.RequiredArgsConstructor;
-import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -75,50 +74,6 @@ public class PlayerService {
                 .profile(toDetails(player))
                 .seasons(seasons)
                 .matches(matches)
-                .build();
-    }
-
-    @Cacheable(value = "playerStats", key = "#playerId")
-    @Transactional(readOnly = true)
-    public PlayerResponseDto.SeasonStats getPlayerSeasonStats(Long playerId) {
-        Player player = playerRepository.findByPlayerId(playerId)
-                .orElseThrow(() -> new CustomException(ErrorCode.PLAYER_NOT_FOUND));
-
-        PlayerFixtureStatRepository.SeasonStatSummary stats =
-                playerFixtureStatRepository.findSeasonStatSummaryByPlayerId(playerId);
-
-        return PlayerResponseDto.SeasonStats.builder()
-                .playerId(player.getPlayerId())
-                .totalFixtures(stats.getTotalFixtures())
-                .minutesPlayed(stats.getMinutesPlayed())
-                .averageRating(roundToOneDecimal(stats.getAverageRating()))
-                .goals(stats.getGoals())
-                .assists(stats.getAssists())
-                .conceded(stats.getConceded())
-                .saves(stats.getSaves())
-                .shots(stats.getShotsTotal())
-                .shotsOnTarget(stats.getShotsOnTarget())
-                .totalPasses(stats.getPassesTotal())
-                .keyPasses(stats.getPassesKey())
-                .passAccuracy(roundToOneDecimal(stats.getAvgPassAccuracy()))
-                .foulsDrawn(stats.getFoulsDrawn())
-                .foulsCommitted(stats.getFoulsCommitted())
-                .tackles(stats.getTacklesTotal())
-                .blocks(stats.getBlocks())
-                .interceptions(stats.getInterceptions())
-                .duelsTotal(stats.getDuelsTotal())
-                .duelsWon(stats.getDuelsWon())
-                .dribblesAttempts(stats.getDribblesAttempts())
-                .dribblesSuccess(stats.getDribblesSuccess())
-                .dribblesPast(stats.getDribblesPast())
-                .yellowCards(stats.getYellowCards())
-                .redCards(stats.getRedCards())
-                .offsides(stats.getOffsides())
-                .penaltyWon(stats.getPenaltyWon())
-                .penaltyCommitted(stats.getPenaltyCommitted())
-                .penaltyScored(stats.getPenaltyScored())
-                .penaltyMissed(stats.getPenaltyMissed())
-                .penaltySaved(stats.getPenaltySaved())
                 .build();
     }
 

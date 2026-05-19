@@ -23,7 +23,7 @@ public class ApiFootballRegisteredPlayerStartupSyncRunner implements CommandLine
     @Value("${api-football.sync.players.registered.league:39}")
     private Integer league;
 
-    @Value("${api-football.sync.players.registered.season:2024}")
+    @Value("${api-football.sync.players.registered.season:2025}")
     private Integer season;
 
     @Value("${api-football.sync.players.registered.startup-delay-ms:7000}")

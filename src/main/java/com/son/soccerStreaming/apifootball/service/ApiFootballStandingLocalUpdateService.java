@@ -37,7 +37,7 @@ public class ApiFootballStandingLocalUpdateService {
     @Value("${api-football.sync.standings.local-live-update-enabled:false}")
     private boolean localLiveUpdateEnabled;
 
-    @Value("${api-football.sync.standings.season:2024}")
+    @Value("${api-football.sync.standings.season:2025}")
     private Integer season;
 
     @Value("${api-football.sync.standings.local-live-impact-ttl-hours:6}")

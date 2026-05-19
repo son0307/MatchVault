@@ -9,6 +9,8 @@ const state = {
     selectedFixturePlayerStats: null,
     selectedTeamId: null,
     selectedPlayerId: null,
+    authUser: null,
+    favoriteDashboard: null,
     liveFixtureId: null,
     liveSource: null,
     liveData: {
@@ -31,6 +33,19 @@ const elements = {
     fixtureCount: document.querySelector("#fixtureCount"),
     standingCount: document.querySelector("#standingCount"),
     apiStatus: document.querySelector("#apiStatus"),
+    authForm: document.querySelector("#authForm"),
+    authFields: document.querySelector("#authFields"),
+    authEmailInput: document.querySelector("#authEmailInput"),
+    authPasswordInput: document.querySelector("#authPasswordInput"),
+    authNicknameInput: document.querySelector("#authNicknameInput"),
+    authProfile: document.querySelector("#authProfile"),
+    authUserLabel: document.querySelector("#authUserLabel"),
+    authMessage: document.querySelector("#authMessage"),
+    loginButton: document.querySelector("#loginButton"),
+    signupButton: document.querySelector("#signupButton"),
+    logoutButton: document.querySelector("#logoutButton"),
+    favoriteDashboard: document.querySelector("#favoriteDashboard"),
+    favoriteDashboardContent: document.querySelector("#favoriteDashboardContent"),
     fixturesList: document.querySelector("#fixturesList"),
     fixtureDetail: document.querySelector("#fixtureDetail"),
     detailTitle: document.querySelector("#detailTitle"),
@@ -48,6 +63,7 @@ const elements = {
 
 document.addEventListener("DOMContentLoaded", () => {
     setupFixtureDateControls();
+    setupAuthControls();
     elements.refreshButton.addEventListener("click", refreshAll);
     elements.loadMoreFixtures.addEventListener("click", () => loadFixtures(false));
     elements.previousFixtureDate.addEventListener("click", () => moveSelectedFixtureDate(-1));
@@ -57,8 +73,286 @@ document.addEventListener("DOMContentLoaded", () => {
     elements.liveConnectButton.addEventListener("click", connectLiveFixture);
     elements.liveDisconnectButton.addEventListener("click", disconnectLiveFixture);
     renderFixtureDateControl();
+    loadCurrentUser();
     refreshAll();
 });
+
+function setupAuthControls() {
+    elements.loginButton.addEventListener("click", login);
+    elements.signupButton.addEventListener("click", signup);
+    elements.logoutButton.addEventListener("click", logout);
+    elements.authForm.addEventListener("submit", (event) => {
+        event.preventDefault();
+        login();
+    });
+}
+
+async function loadCurrentUser() {
+    try {
+        state.authUser = await requestJson("/api/v1/auth/me");
+        setAuthMessage("");
+        await loadFavoriteDashboard();
+    } catch (error) {
+        state.authUser = null;
+        state.favoriteDashboard = null;
+        if (!isUnauthorizedError(error)) {
+            setAuthMessage(error.message);
+        }
+    } finally {
+        renderAuthState();
+    }
+}
+
+async function signup() {
+    setAuthMessage("Signing up...");
+    setAuthButtonsDisabled(true);
+
+    try {
+        state.authUser = await postJson("/api/v1/auth/signup", {
+            email: elements.authEmailInput.value,
+            password: elements.authPasswordInput.value,
+            nickname: elements.authNicknameInput.value,
+        });
+        clearAuthInputs();
+        setAuthMessage("Signed in.");
+        renderAuthState();
+        await loadFavoriteDashboard();
+    } catch (error) {
+        setAuthMessage(error.message);
+    } finally {
+        setAuthButtonsDisabled(false);
+    }
+}
+
+async function login() {
+    setAuthMessage("Signing in...");
+    setAuthButtonsDisabled(true);
+
+    try {
+        state.authUser = await postJson("/api/v1/auth/login", {
+            email: elements.authEmailInput.value,
+            password: elements.authPasswordInput.value,
+        });
+        clearAuthInputs();
+        setAuthMessage("Signed in.");
+        renderAuthState();
+        await loadFavoriteDashboard();
+    } catch (error) {
+        setAuthMessage(error.message);
+    } finally {
+        setAuthButtonsDisabled(false);
+    }
+}
+
+async function logout() {
+    setAuthMessage("Signing out...");
+    elements.logoutButton.disabled = true;
+
+    try {
+        await fetch("/api/v1/auth/logout", {
+            method: "POST",
+            credentials: "same-origin",
+            headers: {"Accept": "application/json"},
+        });
+        state.authUser = null;
+        state.favoriteDashboard = null;
+        setAuthMessage("");
+        renderAuthState();
+        renderFavoriteDashboard();
+    } catch (error) {
+        setAuthMessage("Logout failed.");
+    } finally {
+        elements.logoutButton.disabled = false;
+    }
+}
+
+function renderAuthState() {
+    const isLoggedIn = Boolean(state.authUser);
+    elements.authFields.hidden = isLoggedIn;
+    elements.authProfile.hidden = !isLoggedIn;
+    elements.authUserLabel.textContent = isLoggedIn
+        ? (state.authUser.nickname || state.authUser.email)
+        : "Guest";
+    elements.favoriteDashboard.hidden = !isLoggedIn;
+    if (!isLoggedIn) {
+        elements.favoriteDashboardContent.innerHTML = "";
+    }
+}
+
+function setAuthButtonsDisabled(disabled) {
+    elements.loginButton.disabled = disabled;
+    elements.signupButton.disabled = disabled;
+}
+
+function clearAuthInputs() {
+    elements.authPasswordInput.value = "";
+    elements.authNicknameInput.value = "";
+}
+
+function setAuthMessage(message) {
+    elements.authMessage.textContent = message || "";
+}
+
+async function loadFavoriteDashboard() {
+    if (!state.authUser) {
+        state.favoriteDashboard = null;
+        renderFavoriteDashboard();
+        return;
+    }
+
+    const season = encodeURIComponent(elements.seasonInput.value || "2025");
+    try {
+        state.favoriteDashboard = await requestJson(`/api/v1/favorites/dashboard?season=${season}`);
+        renderFavoriteDashboard();
+    } catch (error) {
+        elements.favoriteDashboardContent.innerHTML = errorMarkup(error);
+    }
+}
+
+function renderFavoriteDashboard() {
+    if (!state.authUser || !state.favoriteDashboard) {
+        return;
+    }
+
+    const teams = Array.isArray(state.favoriteDashboard.teams) ? state.favoriteDashboard.teams : [];
+    const players = Array.isArray(state.favoriteDashboard.players) ? state.favoriteDashboard.players : [];
+
+    if (!teams.length && !players.length) {
+        elements.favoriteDashboardContent.innerHTML = emptyMarkup("Favorite teams and players will appear here.");
+        return;
+    }
+
+    elements.favoriteDashboardContent.innerHTML = `
+        <section>
+            <div class="section-title">
+                <h3>Teams</h3>
+                <span class="small-pill">${teams.length}</span>
+            </div>
+            <div class="favorite-card-grid">
+                ${teams.map(favoriteTeamCardMarkup).join("") || `<div class="empty">No favorite teams yet.</div>`}
+            </div>
+        </section>
+        <section>
+            <div class="section-title">
+                <h3>Players</h3>
+                <span class="small-pill">${players.length}</span>
+            </div>
+            <div class="favorite-card-grid">
+                ${players.map(favoritePlayerCardMarkup).join("") || `<div class="empty">No favorite players yet.</div>`}
+            </div>
+        </section>
+    `;
+
+    document.querySelectorAll("[data-remove-favorite-team]").forEach((button) => {
+        button.addEventListener("click", () => toggleFavoriteTeam(Number(button.dataset.removeFavoriteTeam)));
+    });
+    document.querySelectorAll("[data-remove-favorite-player]").forEach((button) => {
+        button.addEventListener("click", () => toggleFavoritePlayer(Number(button.dataset.removeFavoritePlayer)));
+    });
+}
+
+function favoriteTeamCardMarkup(team) {
+    const fixtures = Array.isArray(team.recentFixtures) ? team.recentFixtures : [];
+
+    return `
+        <article class="favorite-card">
+            <div class="favorite-card-head">
+                ${imageMarkup(team.logoUrl, team.teamName, "club-logo")}
+                <div>
+                    <h3>${escapeHtml(team.teamName || "-")}</h3>
+                    <p class="muted">Rank ${numberText(team.rank)} · ${numberText(team.points)} pts · Form ${escapeHtml(team.form || "-")}</p>
+                </div>
+                <button type="button" class="icon-text-button ghost-button" data-remove-favorite-team="${team.teamId}">Remove</button>
+            </div>
+            <div class="favorite-mini-list">
+                ${fixtures.map((fixture) => `
+                    <div class="favorite-mini-row">
+                        <span class="small-pill">${escapeHtml(fixture.result || "-")}</span>
+                        <span>${escapeHtml(fixture.homeTeamName || "-")} ${numberText(fixture.homeScore)}:${numberText(fixture.awayScore)} ${escapeHtml(fixture.awayTeamName || "-")}</span>
+                    </div>
+                `).join("") || `<div class="muted">No recent fixtures.</div>`}
+            </div>
+        </article>
+    `;
+}
+
+function favoritePlayerCardMarkup(player) {
+    const match = player.recentMatch;
+    const season = player.seasonStat;
+
+    return `
+        <article class="favorite-card">
+            <div class="favorite-card-head">
+                ${imageMarkup(player.photoUrl, player.playerName, "player-thumb")}
+                <div>
+                    <h3>${escapeHtml(player.playerName || "-")}</h3>
+                    <p class="muted">${escapeHtml(player.position || "-")}</p>
+                </div>
+                <button type="button" class="icon-text-button ghost-button" data-remove-favorite-player="${player.playerId}">Remove</button>
+            </div>
+            <div class="favorite-stat-grid">
+                <span>Recent rating <b>${numberText(match?.rating)}</b></span>
+                <span>Minutes <b>${numberText(match?.minutesPlayed)}</b></span>
+                <span>Season apps <b>${numberText(season?.appearances)}</b></span>
+                <span>Goals/Assists <b>${numberText(season?.goals)} / ${numberText(season?.assists)}</b></span>
+            </div>
+            <p class="muted">${match ? `${escapeHtml(match.teamName || "-")} ${numberText(match.teamScore)}:${numberText(match.opponentScore)} ${escapeHtml(match.opponentTeamName || "-")}` : "No recent match stats."}</p>
+        </article>
+    `;
+}
+
+async function toggleFavoriteTeam(teamId) {
+    if (!state.authUser) {
+        setAuthMessage("Log in to use favorites.");
+        return;
+    }
+
+    const season = encodeURIComponent(elements.seasonInput.value || "2025");
+    const isFavorite = isFavoriteTeam(teamId);
+    state.favoriteDashboard = await requestJson(`/api/v1/favorites/teams/${teamId}?season=${season}`, {
+        method: isFavorite ? "DELETE" : "POST",
+    });
+    renderFavoriteDashboard();
+    renderTeams();
+    if (state.selectedTeamId === teamId) {
+        selectTeam(teamId);
+    }
+}
+
+async function toggleFavoritePlayer(playerId) {
+    if (!state.authUser) {
+        setAuthMessage("Log in to use favorites.");
+        return;
+    }
+
+    const season = encodeURIComponent(elements.seasonInput.value || "2025");
+    const isFavorite = isFavoritePlayer(playerId);
+    state.favoriteDashboard = await requestJson(`/api/v1/favorites/players/${playerId}?season=${season}`, {
+        method: isFavorite ? "DELETE" : "POST",
+    });
+    renderFavoriteDashboard();
+    document.querySelector("[data-favorite-player]")?.replaceWith(favoritePlayerButton(playerId));
+    document.querySelector("[data-favorite-player]")?.addEventListener("click", (event) => {
+        toggleFavoritePlayer(Number(event.currentTarget.dataset.favoritePlayer));
+    });
+}
+
+function isFavoriteTeam(teamId) {
+    return Boolean(state.favoriteDashboard?.teams?.some((team) => team.teamId === teamId));
+}
+
+function isFavoritePlayer(playerId) {
+    return Boolean(state.favoriteDashboard?.players?.some((player) => player.playerId === playerId));
+}
+
+function favoritePlayerButton(playerId) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "favorite-toggle-button ghost-button";
+    button.dataset.favoritePlayer = String(playerId);
+    button.textContent = isFavoritePlayer(playerId) ? "Remove favorite" : "Add favorite";
+    return button;
+}
 
 function setupFixtureDateControls() {
     if (!elements.previousFixtureDate || !elements.fixtureDateButton || !elements.fixtureDateInput || !elements.nextFixtureDate) {
@@ -143,6 +437,9 @@ async function refreshAll() {
 
     const failed = results.filter((result) => result.status === "rejected");
     setApiStatus(failed.length ? "Partial" : "Ready");
+    if (state.authUser) {
+        await loadFavoriteDashboard();
+    }
 }
 
 function resetFixtureDetail() {
@@ -175,7 +472,7 @@ async function loadTeams() {
 }
 
 async function loadStandings() {
-    const season = encodeURIComponent(elements.seasonInput.value || "2024");
+    const season = encodeURIComponent(elements.seasonInput.value || "2025");
     try {
         const standings = await requestJson(`/api/v1/teams/standings?season=${season}`);
         state.standings = Array.isArray(standings) ? standings : [];
@@ -194,7 +491,7 @@ async function loadFixtures(reset) {
     }
 
     elements.loadMoreFixtures.disabled = true;
-    const season = encodeURIComponent(elements.seasonInput.value || "2024");
+    const season = encodeURIComponent(elements.seasonInput.value || "2025");
     const date = encodeURIComponent(state.selectedFixtureDate);
     const cursor = reset || !state.nextCursor ? "" : `&cursorId=${encodeURIComponent(state.nextCursor)}`;
 
@@ -776,7 +1073,7 @@ async function selectTeam(teamId) {
     state.selectedPlayerId = null;
     renderTeams();
     elements.teamDetail.innerHTML = loadingMarkup();
-    const season = encodeURIComponent(elements.seasonInput.value || "2024");
+    const season = encodeURIComponent(elements.seasonInput.value || "2025");
 
     const [details, players] = await Promise.allSettled([
         requestJson(`/api/v1/teams/${teamId}`),
@@ -797,6 +1094,9 @@ async function selectTeam(teamId) {
                 ${imageMarkup(detail.logoUrl, detail.teamName, "club-logo")}
                 <div>
                     <h3>${escapeHtml(detail.teamName || "-")}</h3>
+                    ${state.authUser ? `<button type="button" class="favorite-toggle-button ghost-button" data-favorite-team="${detail.teamId}">
+                        ${isFavoriteTeam(detail.teamId) ? "Remove favorite" : "Add favorite"}
+                    </button>` : ""}
                     <p class="muted">${escapeHtml(detail.country || "-")} · Founded ${numberText(detail.founded)}</p>
                 </div>
             </div>
@@ -823,6 +1123,9 @@ async function selectTeam(teamId) {
 
     document.querySelectorAll(".player-button").forEach((button) => {
         button.addEventListener("click", () => selectPlayer(Number(button.dataset.playerId)));
+    });
+    document.querySelector("[data-favorite-team]")?.addEventListener("click", (event) => {
+        toggleFavoriteTeam(Number(event.currentTarget.dataset.favoriteTeam));
     });
 }
 
@@ -867,6 +1170,9 @@ function renderPlayerPanel(panel) {
             </div>
         </div>
     `;
+    document.querySelector("[data-favorite-player]")?.addEventListener("click", (event) => {
+        toggleFavoritePlayer(Number(event.currentTarget.dataset.favoritePlayer));
+    });
 }
 
 function playerProfileMarkup(profile) {
@@ -874,6 +1180,9 @@ function playerProfileMarkup(profile) {
         <article class="player-profile-card">
             ${imageMarkup(profile.photoUrl, profile.playerName, "player-photo")}
             <h3>${escapeHtml(profile.playerName || "-")}</h3>
+            ${state.authUser ? `<button type="button" class="favorite-toggle-button ghost-button" data-favorite-player="${profile.playerId}">
+                ${isFavoritePlayer(profile.playerId) ? "Remove favorite" : "Add favorite"}
+            </button>` : ""}
             <p class="muted">${escapeHtml(profile.teamName || "-")} · ${escapeHtml(profile.position || "-")}</p>
             <div class="stat-row"><span>등번호</span><b>${numberText(profile.backNumber)}</b></div>
             <div class="stat-row"><span>나이</span><b>${numberText(profile.age)}</b></div>
@@ -1043,12 +1352,52 @@ function seasonSortValue(season) {
     return Number.isFinite(value) ? value : -1;
 }
 
-async function requestJson(url) {
-    const response = await fetch(url, {headers: {"Accept": "application/json"}});
+async function requestJson(url, options = {}) {
+    const response = await fetch(url, {
+        ...options,
+        credentials: "same-origin",
+        headers: {
+            "Accept": "application/json",
+            ...(options.headers || {}),
+        },
+    });
     if (!response.ok) {
-        throw new Error(`${url} 요청 실패 (${response.status})`);
+        throw await responseError(response, `${url} 요청 실패 (${response.status})`);
     }
     return response.json();
+}
+
+async function postJson(url, body) {
+    const response = await fetch(url, {
+        method: "POST",
+        credentials: "same-origin",
+        headers: {
+            "Accept": "application/json",
+            "Content-Type": "application/json",
+        },
+        body: JSON.stringify(body),
+    });
+    if (!response.ok) {
+        throw await responseError(response, `${url} request failed (${response.status})`);
+    }
+    return response.status === 204 ? null : response.json();
+}
+
+async function responseError(response, fallbackMessage) {
+    let message = fallbackMessage;
+    try {
+        const errorBody = await response.json();
+        message = errorBody.message || message;
+    } catch (error) {
+        message = response.status === 401 ? "로그인이 필요합니다." : message;
+    }
+    const requestError = new Error(message);
+    requestError.status = response.status;
+    return requestError;
+}
+
+function isUnauthorizedError(error) {
+    return error && (error.status === 401 || String(error.message || "").includes("(401)"));
 }
 
 function sectionMarkup(title, body) {

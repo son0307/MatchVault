@@ -19,7 +19,7 @@ public class ApiFootballInjurySyncScheduler {
     @Value("${api-football.sync.injuries.league:39}")
     private Integer league;
 
-    @Value("${api-football.sync.injuries.season:2024}")
+    @Value("${api-football.sync.injuries.season:2025}")
     private Integer season;
 
     @Scheduled(cron = "${api-football.sync.injuries.daily-cron:0 0 5 * * *}")

@@ -23,7 +23,7 @@ public class ApiFootballInjuryStartupSyncRunner implements CommandLineRunner {
     @Value("${api-football.sync.injuries.league:39}")
     private Integer league;
 
-    @Value("${api-football.sync.injuries.season:2024}")
+    @Value("${api-football.sync.injuries.season:2025}")
     private Integer season;
 
     @Override

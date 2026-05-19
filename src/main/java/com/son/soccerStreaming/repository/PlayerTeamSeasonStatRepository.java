@@ -25,6 +25,8 @@ public interface PlayerTeamSeasonStatRepository extends JpaRepository<PlayerTeam
 
     List<PlayerTeamSeasonStat> findAllByPlayerPlayerIdOrderBySeasonDesc(Long playerId);
 
+    Optional<PlayerTeamSeasonStat> findTopByPlayerPlayerIdOrderBySeasonDesc(Long playerId);
+
     // Only expose players who appeared or were named on the bench at least once.
     @Query("SELECT s FROM PlayerTeamSeasonStat s " +
             "JOIN FETCH s.player p " +
