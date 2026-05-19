@@ -14,9 +14,23 @@
             <h1>Soccer Streaming</h1>
         </div>
         <div class="toolbar">
+            <form id="authForm" class="auth-form">
+                <div id="authFields" class="auth-fields">
+                    <input id="authEmailInput" type="email" autocomplete="email" placeholder="Email">
+                    <input id="authPasswordInput" type="password" autocomplete="current-password" placeholder="Password">
+                    <input id="authNicknameInput" type="text" autocomplete="nickname" placeholder="Nickname">
+                    <button id="loginButton" type="button">Login</button>
+                    <button id="signupButton" type="button" class="ghost-button">Sign up</button>
+                </div>
+                <div id="authProfile" class="auth-profile" hidden>
+                    <span id="authUserLabel" class="small-pill">Guest</span>
+                    <button id="logoutButton" type="button" class="ghost-button">Logout</button>
+                </div>
+                <p id="authMessage" class="auth-message" aria-live="polite"></p>
+            </form>
             <label class="season-control">
                 <span>Season</span>
-                <input id="seasonInput" type="number" min="1990" max="2100" value="2024">
+                <input id="seasonInput" type="number" min="1990" max="2100" value="2025">
             </label>
             <button id="refreshButton" type="button">새로고침</button>
         </div>
@@ -40,6 +54,16 @@
                 <span class="metric-label">API Status</span>
                 <strong id="apiStatus">Loading</strong>
             </article>
+        </section>
+
+        <section id="favoriteDashboard" class="panel favorite-dashboard" hidden>
+            <div class="panel-heading">
+                <div>
+                    <p class="eyebrow">My Dashboard</p>
+                    <h2>Favorites</h2>
+                </div>
+            </div>
+            <div id="favoriteDashboardContent" class="favorite-dashboard-content"></div>
         </section>
 
         <section class="content-grid">

@@ -21,7 +21,7 @@ public class ApiFootballStandingSyncScheduler {
     @Value("${api-football.sync.standings.league:39}")
     private Integer league;
 
-    @Value("${api-football.sync.standings.season:2024}")
+    @Value("${api-football.sync.standings.season:2025}")
     private Integer season;
 
     @Scheduled(cron = "${api-football.sync.standings.daily-cron:0 10 4 * * *}")

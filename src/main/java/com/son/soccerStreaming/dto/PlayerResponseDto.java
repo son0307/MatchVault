@@ -1,6 +1,5 @@
 package com.son.soccerStreaming.dto;
 
-import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
 
@@ -40,43 +39,6 @@ public class PlayerResponseDto {
         private Long teamId;
         private String teamName;
         private String teamLogoUrl;
-    }
-
-    @Getter
-    @Builder
-    @AllArgsConstructor
-    public static class SeasonStats {
-        private Long playerId;
-        private long totalFixtures;
-        private int minutesPlayed;
-        private double averageRating;
-        private int goals;
-        private int assists;
-        private int conceded;
-        private int saves;
-        private int shots;
-        private int shotsOnTarget;
-        private int totalPasses;
-        private int keyPasses;
-        private double passAccuracy;
-        private int foulsDrawn;
-        private int foulsCommitted;
-        private int tackles;
-        private int blocks;
-        private int interceptions;
-        private int duelsTotal;
-        private int duelsWon;
-        private int dribblesAttempts;
-        private int dribblesSuccess;
-        private int dribblesPast;
-        private int yellowCards;
-        private int redCards;
-        private int offsides;
-        private int penaltyWon;
-        private int penaltyCommitted;
-        private int penaltyScored;
-        private int penaltyMissed;
-        private int penaltySaved;
     }
 
     @Getter

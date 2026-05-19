@@ -19,7 +19,7 @@ public class ApiFootballTeamSyncScheduler {
     @Value("${api-football.sync.teams.league:39}")
     private Integer league;
 
-    @Value("${api-football.sync.teams.season:2024}")
+    @Value("${api-football.sync.teams.season:2025}")
     private Integer season;
 
     @Scheduled(cron = "${api-football.sync.teams.cron:0 0 4 * * *}")

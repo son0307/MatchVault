@@ -20,7 +20,7 @@ public class ApiFootballFixtureDetailStartupSyncRunner implements CommandLineRun
 
     private final ApiFootballFixtureDetailSyncService apiFootballFixtureDetailSyncService;
 
-    @Value("${api-football.sync.fixtures.season:2024}")
+    @Value("${api-football.sync.fixtures.season:2025}")
     private Integer season;
 
     @Override

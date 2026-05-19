@@ -44,7 +44,7 @@ public class FixtureController {
     public ResponseEntity<CursorResponse<FixtureResponseDto.Summary>> getFixtures(
             @Parameter(description = "이전 페이지의 마지막 경기 내부 ID", example = "105")
             @RequestParam(required = false) Long cursorId,
-            @Parameter(description = "조회할 시즌", example = "2024")
+            @Parameter(description = "조회할 시즌", example = "2025")
             @RequestParam(required = false) Integer season,
             @Parameter(description = "한국 시간 기준 경기 날짜", example = "2026-05-15")
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,

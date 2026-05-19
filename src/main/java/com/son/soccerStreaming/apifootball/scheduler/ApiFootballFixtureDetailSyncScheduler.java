@@ -20,7 +20,7 @@ public class ApiFootballFixtureDetailSyncScheduler {
     private final LiveFixtureBroadcastService liveFixtureBroadcastService;
     private final FixtureRecordRepository fixtureRecordRepository;
 
-    @Value("${api-football.sync.fixtures.season:2024}")
+    @Value("${api-football.sync.fixtures.season:2025}")
     private Integer season;
 
     @Scheduled(cron = "${api-football.sync.fixture-details.live-cron:0 * * * * *}")
