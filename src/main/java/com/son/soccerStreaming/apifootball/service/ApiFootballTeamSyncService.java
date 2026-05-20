@@ -2,15 +2,18 @@ package com.son.soccerStreaming.apifootball.service;
 
 import com.son.soccerStreaming.apifootball.client.ApiFootballClient;
 import com.son.soccerStreaming.apifootball.dto.ApiFootballTeamDto;
+import com.son.soccerStreaming.entity.AdminOverrideTargetType;
 import com.son.soccerStreaming.entity.Team;
 import com.son.soccerStreaming.entity.Venue;
 import com.son.soccerStreaming.repository.TeamRepository;
+import com.son.soccerStreaming.service.AdminOverrideService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Set;
 
 @Slf4j
 @Service
@@ -19,6 +22,11 @@ public class ApiFootballTeamSyncService {
 
     private final ApiFootballClient apiFootballClient;
     private final TeamRepository teamRepository;
+    private final AdminOverrideService adminOverrideService;
+    private static final List<String> OVERRIDE_FIELDS = List.of(
+            "name", "code", "country", "founded", "logoUrl",
+            "venueId", "venueName", "venueAddress", "venueCity", "capacity", "surface", "venueImageUrl"
+    );
 
     @Transactional
     public int syncTeams(Integer league, Integer season) {
@@ -41,14 +49,20 @@ public class ApiFootballTeamSyncService {
                             .logoUrl(teamInfo.getLogo())
                             .build());
 
-            team.updateTeam(
-                    teamInfo.getName(),
-                    teamInfo.getCode(),
-                    teamInfo.getCountry(),
-                    teamInfo.getFounded(),
-                    teamInfo.getLogo()
+            Set<String> overrides = adminOverrideService.overriddenFields(
+                    AdminOverrideTargetType.TEAM,
+                    teamInfo.getId(),
+                    OVERRIDE_FIELDS
             );
-            upsertVenue(team, response.getVenue());
+
+            team.updateTeam(
+                    adminOverrideService.apiValueUnlessOverridden(overrides, "name", team.getName(), teamInfo.getName()),
+                    adminOverrideService.apiValueUnlessOverridden(overrides, "code", team.getCode(), teamInfo.getCode()),
+                    adminOverrideService.apiValueUnlessOverridden(overrides, "country", team.getCountry(), teamInfo.getCountry()),
+                    adminOverrideService.apiValueUnlessOverridden(overrides, "founded", team.getFounded(), teamInfo.getFounded()),
+                    adminOverrideService.apiValueUnlessOverridden(overrides, "logoUrl", team.getLogoUrl(), teamInfo.getLogo())
+            );
+            upsertVenue(team, response.getVenue(), overrides);
 
             teamRepository.save(team);
             syncedCount++;
@@ -58,25 +72,31 @@ public class ApiFootballTeamSyncService {
         return syncedCount;
     }
 
-    private void upsertVenue(Team team, ApiFootballTeamDto.VenueInfo venueInfo) {
+    private void upsertVenue(Team team, ApiFootballTeamDto.VenueInfo venueInfo, Set<String> overrides) {
         if (venueInfo == null || venueInfo.getId() == null) {
             return;
         }
 
         Venue venue = team.getVenue();
-        if (venue == null || !venueInfo.getId().equals(venue.getVenueId())) {
+        Long nextVenueId = adminOverrideService.apiValueUnlessOverridden(
+                overrides,
+                "venueId",
+                venue != null ? venue.getVenueId() : venueInfo.getId(),
+                venueInfo.getId()
+        );
+        if (venue == null || !nextVenueId.equals(venue.getVenueId())) {
             venue = Venue.builder()
-                    .venueId(venueInfo.getId())
+                    .venueId(nextVenueId)
                     .build();
         }
 
         venue.updateVenue(
-                venueInfo.getName(),
-                venueInfo.getAddress(),
-                venueInfo.getCity(),
-                venueInfo.getCapacity(),
-                venueInfo.getSurface(),
-                venueInfo.getImage()
+                adminOverrideService.apiValueUnlessOverridden(overrides, "venueName", venue.getVenueName(), venueInfo.getName()),
+                adminOverrideService.apiValueUnlessOverridden(overrides, "venueAddress", venue.getVenueAddress(), venueInfo.getAddress()),
+                adminOverrideService.apiValueUnlessOverridden(overrides, "venueCity", venue.getVenueCity(), venueInfo.getCity()),
+                adminOverrideService.apiValueUnlessOverridden(overrides, "capacity", venue.getCapacity(), venueInfo.getCapacity()),
+                adminOverrideService.apiValueUnlessOverridden(overrides, "surface", venue.getSurface(), venueInfo.getSurface()),
+                adminOverrideService.apiValueUnlessOverridden(overrides, "venueImageUrl", venue.getVenueImageUrl(), venueInfo.getImage())
         );
         team.updateVenue(venue);
     }

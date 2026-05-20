@@ -2,6 +2,7 @@ package com.son.soccerStreaming.apifootball.service;
 
 import com.son.soccerStreaming.apifootball.client.ApiFootballClient;
 import com.son.soccerStreaming.apifootball.dto.ApiFootballPlayerDto;
+import com.son.soccerStreaming.entity.AdminOverrideTargetType;
 import com.son.soccerStreaming.entity.Fixture;
 import com.son.soccerStreaming.entity.Player;
 import com.son.soccerStreaming.entity.PlayerTeamSeasonStat;
@@ -10,16 +11,20 @@ import com.son.soccerStreaming.repository.FixtureLineupRepository;
 import com.son.soccerStreaming.repository.PlayerRepository;
 import com.son.soccerStreaming.repository.PlayerTeamSeasonStatRepository;
 import com.son.soccerStreaming.repository.TeamRepository;
+import com.son.soccerStreaming.service.AdminOverrideService;
+import jakarta.persistence.EntityManager;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.LocalDate;
 import java.time.format.DateTimeParseException;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 @Slf4j
 @Service
@@ -31,6 +36,13 @@ public class ApiFootballPlayerSyncService {
     private final PlayerRepository playerRepository;
     private final PlayerTeamSeasonStatRepository playerTeamSeasonStatRepository;
     private final TeamRepository teamRepository;
+    private final AdminOverrideService adminOverrideService;
+    private final TransactionTemplate transactionTemplate;
+    private final EntityManager entityManager;
+    private static final List<String> PROFILE_OVERRIDE_FIELDS = List.of(
+            "name", "firstname", "lastname", "age", "birthDate", "birthPlace", "birthCountry",
+            "nationality", "height", "weight", "position", "number", "photoUrl"
+    );
 
     @Value("${api-football.sync.players.profile-fallback-enabled:false}")
     private boolean profileFallbackEnabled;
@@ -63,11 +75,7 @@ public class ApiFootballPlayerSyncService {
             List<ApiFootballPlayerDto.RegisteredPlayerResponse> players = response.getResponse() != null
                     ? response.getResponse()
                     : List.of();
-            for (ApiFootballPlayerDto.RegisteredPlayerResponse playerResponse : players) {
-                if (upsertRegisteredPlayer(playerResponse, team, league, season)) {
-                    syncedCount++;
-                }
-            }
+            syncedCount += syncRegisteredPlayerPage(players, team.getTeamId(), league, season);
 
             totalPages = response.getPaging() != null && response.getPaging().getTotal() != null
                     ? response.getPaging().getTotal()
@@ -76,12 +84,36 @@ public class ApiFootballPlayerSyncService {
             log.info("API-Football registered players page synced. teamId={}, season={}, page={}/{}, count={}",
                     team.getTeamId(), season, page, totalPages, players.size());
             page++;
-            sleepBetweenPages(delayMs, page, totalPages);
         } while (page <= totalPages);
 
         log.info("API-Football registered players team sync completed. teamId={}, season={}, count={}",
                 team.getTeamId(), season, syncedCount);
         return syncedCount;
+    }
+
+    private int syncRegisteredPlayerPage(List<ApiFootballPlayerDto.RegisteredPlayerResponse> players,
+                                         Long requestedTeamId,
+                                         Integer league,
+                                         Integer season) {
+        Integer count = transactionTemplate.execute(status -> {
+            Team managedTeam = teamRepository.findByTeamId(requestedTeamId).orElse(null);
+            if (managedTeam == null) {
+                log.warn("Skip registered players page because team does not exist. teamId={}", requestedTeamId);
+                return 0;
+            }
+
+            int syncedCount = 0;
+            for (ApiFootballPlayerDto.RegisteredPlayerResponse playerResponse : players) {
+                if (upsertRegisteredPlayer(playerResponse, managedTeam, league, season)) {
+                    syncedCount++;
+                }
+            }
+            // Bulk admin sync can run for a long time, so release managed entities after each API page.
+            entityManager.flush();
+            entityManager.clear();
+            return syncedCount;
+        });
+        return count != null ? count : 0;
     }
 
     @Transactional
@@ -189,20 +221,25 @@ public class ApiFootballPlayerSyncService {
                         .build());
 
         ApiFootballPlayerDto.Birth birth = playerInfo.getBirth();
+        Set<String> overrides = adminOverrideService.overriddenFields(
+                AdminOverrideTargetType.PLAYER,
+                playerInfo.getId(),
+                PROFILE_OVERRIDE_FIELDS
+        );
         player.updateProfile(
-                nameOrFallback(playerInfo.getName(), player.getName()),
-                playerInfo.getFirstname(),
-                playerInfo.getLastname(),
-                playerInfo.getAge(),
-                birth != null ? parseBirthDate(birth.getDate()) : null,
-                birth != null ? birth.getPlace() : null,
-                birth != null ? birth.getCountry() : null,
-                playerInfo.getNationality(),
-                playerInfo.getHeight(),
-                playerInfo.getWeight(),
-                position,
-                number != null ? number : player.getNumber(),
-                playerInfo.getPhoto()
+                adminOverrideService.apiValueUnlessOverridden(overrides, "name", player.getName(), nameOrFallback(playerInfo.getName(), player.getName())),
+                adminOverrideService.apiValueUnlessOverridden(overrides, "firstname", player.getFirstname(), playerInfo.getFirstname()),
+                adminOverrideService.apiValueUnlessOverridden(overrides, "lastname", player.getLastname(), playerInfo.getLastname()),
+                adminOverrideService.apiValueUnlessOverridden(overrides, "age", player.getAge(), playerInfo.getAge()),
+                adminOverrideService.apiValueUnlessOverridden(overrides, "birthDate", player.getBirthDate(), birth != null ? parseBirthDate(birth.getDate()) : null),
+                adminOverrideService.apiValueUnlessOverridden(overrides, "birthPlace", player.getBirthPlace(), birth != null ? birth.getPlace() : null),
+                adminOverrideService.apiValueUnlessOverridden(overrides, "birthCountry", player.getBirthCountry(), birth != null ? birth.getCountry() : null),
+                adminOverrideService.apiValueUnlessOverridden(overrides, "nationality", player.getNationality(), playerInfo.getNationality()),
+                adminOverrideService.apiValueUnlessOverridden(overrides, "height", player.getHeight(), playerInfo.getHeight()),
+                adminOverrideService.apiValueUnlessOverridden(overrides, "weight", player.getWeight(), playerInfo.getWeight()),
+                adminOverrideService.apiValueUnlessOverridden(overrides, "position", player.getPosition(), position),
+                adminOverrideService.apiValueUnlessOverridden(overrides, "number", player.getNumber(), number != null ? number : player.getNumber()),
+                adminOverrideService.apiValueUnlessOverridden(overrides, "photoUrl", player.getPhotoUrl(), playerInfo.getPhoto())
         );
         return playerRepository.save(player);
     }

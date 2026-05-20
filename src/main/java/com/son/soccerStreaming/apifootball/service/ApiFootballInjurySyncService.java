@@ -9,11 +9,13 @@ import com.son.soccerStreaming.entity.Team;
 import com.son.soccerStreaming.repository.FixtureRecordRepository;
 import com.son.soccerStreaming.repository.PlayerAbsenceRepository;
 import com.son.soccerStreaming.repository.TeamRepository;
+import jakarta.persistence.EntityManager;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
@@ -22,6 +24,7 @@ import java.util.Optional;
 @RequiredArgsConstructor
 public class ApiFootballInjurySyncService {
 
+    private static final int CHUNK_SIZE = 100;
     private static final String DEFAULT_ABSENCE_TYPE = "Missing Fixture";
     private static final String DEFAULT_REASON = "Unknown";
 
@@ -30,20 +33,40 @@ public class ApiFootballInjurySyncService {
     private final TeamRepository teamRepository;
     private final PlayerAbsenceRepository playerAbsenceRepository;
     private final ApiFootballPlayerSyncService apiFootballPlayerSyncService;
+    private final TransactionTemplate transactionTemplate;
+    private final EntityManager entityManager;
 
-    @Transactional
     public int syncInjuries(Integer league, Integer season) {
-        List<ApiFootballInjuryDto.InjuryResponse> injuries = apiFootballClient.getInjuries(league, season);
+        List<ApiFootballInjuryDto.InjuryResponse> injuries = Optional.ofNullable(apiFootballClient.getInjuries(league, season))
+                .orElse(List.of());
         int syncedCount = 0;
 
-        for (ApiFootballInjuryDto.InjuryResponse injury : injuries) {
-            if (upsertInjury(injury)) {
-                syncedCount++;
-            }
+        List<List<ApiFootballInjuryDto.InjuryResponse>> chunks = chunks(injuries);
+        for (int i = 0; i < chunks.size(); i++) {
+            List<ApiFootballInjuryDto.InjuryResponse> chunk = chunks.get(i);
+            log.info("API-Football injury chunk started. chunk={}/{}, size={}", i + 1, chunks.size(), chunk.size());
+            syncedCount += syncInjuryChunk(chunk);
+            log.info("API-Football injury chunk completed. chunk={}/{}, size={}", i + 1, chunks.size(), chunk.size());
         }
 
         log.info("API-Football injury sync completed. league={}, season={}, count={}", league, season, syncedCount);
         return syncedCount;
+    }
+
+    private int syncInjuryChunk(List<ApiFootballInjuryDto.InjuryResponse> injuries) {
+        Integer count = transactionTemplate.execute(status -> {
+            int syncedCount = 0;
+            for (ApiFootballInjuryDto.InjuryResponse injury : injuries) {
+                if (upsertInjury(injury)) {
+                    syncedCount++;
+                }
+            }
+            // Clear each injury chunk so bulk admin sync does not keep every absence managed until completion.
+            entityManager.flush();
+            entityManager.clear();
+            return syncedCount;
+        });
+        return count != null ? count : 0;
     }
 
     private boolean upsertInjury(ApiFootballInjuryDto.InjuryResponse injury) {
@@ -97,5 +120,13 @@ public class ApiFootballInjurySyncService {
 
     private String valueOrDefault(String value, String defaultValue) {
         return value == null || value.isBlank() ? defaultValue : value;
+    }
+
+    private List<List<ApiFootballInjuryDto.InjuryResponse>> chunks(List<ApiFootballInjuryDto.InjuryResponse> injuries) {
+        List<List<ApiFootballInjuryDto.InjuryResponse>> chunks = new ArrayList<>();
+        for (int i = 0; i < injuries.size(); i += CHUNK_SIZE) {
+            chunks.add(injuries.subList(i, Math.min(i + CHUNK_SIZE, injuries.size())));
+        }
+        return chunks;
     }
 }
