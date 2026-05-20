@@ -30,10 +30,20 @@ public class SecurityConfig {
                 .formLogin(AbstractHttpConfigurer::disable)
                 .httpBasic(AbstractHttpConfigurer::disable)
                 .authorizeHttpRequests(auth -> auth
+                        .requestMatchers("/admin", "/admin/**", "/admin.html", "/api/v1/admin/**").hasRole("ADMIN")
                         .requestMatchers("/api/v1/auth/me", "/api/v1/favorites/**").authenticated()
                         .anyRequest().permitAll()
                 )
                 .exceptionHandling(exception -> exception
+                        .accessDeniedHandler((request, response, accessDeniedException) -> {
+                            response.setStatus(HttpStatus.FORBIDDEN.value());
+                            response.setContentType(MediaType.APPLICATION_JSON_VALUE);
+                            objectMapper.writeValue(response.getWriter(), Map.of(
+                                    "status", HttpStatus.FORBIDDEN.value(),
+                                    "error", "ACCESS_DENIED",
+                                    "message", "관리자 권한이 필요합니다."
+                            ));
+                        })
                         .authenticationEntryPoint((request, response, authException) -> {
                             response.setStatus(HttpStatus.UNAUTHORIZED.value());
                             response.setContentType(MediaType.APPLICATION_JSON_VALUE);

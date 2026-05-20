@@ -5,6 +5,7 @@ import com.son.soccerStreaming.apifootball.dto.ApiFootballLiveDto;
 import com.son.soccerStreaming.dto.FixtureEventDto;
 import com.son.soccerStreaming.entity.Fixture;
 import com.son.soccerStreaming.repository.FixtureRecordRepository;
+import jakarta.persistence.EntityManager;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -31,6 +32,7 @@ public class ApiFootballFixtureDetailSyncService {
     private final ApiFootballFixturePlayerStatSyncService apiFootballFixturePlayerStatSyncService;
     private final FixtureRecordRepository fixtureRecordRepository;
     private final TransactionTemplate transactionTemplate;
+    private final EntityManager entityManager;
 
     @Transactional
     public FixtureDetailSyncResult syncFixtureDetail(Long fixtureId, boolean applyLiveStandingImpact) {
@@ -120,6 +122,9 @@ public class ApiFootballFixtureDetailSyncService {
                             processed.add(result);
                         }
                     }
+                    // Admin-triggered bulk sync runs in a web request, so clear managed entities per chunk.
+                    entityManager.flush();
+                    entityManager.clear();
                     return processed;
                 });
                 results.addAll(chunkResults);

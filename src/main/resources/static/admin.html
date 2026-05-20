@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="ko">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Soccer Streaming Admin</title>
+    <link rel="stylesheet" href="/styles.css">
+    <link rel="stylesheet" href="/admin.css">
+</head>
+<body>
+<div class="app-shell admin-shell">
+    <header class="topbar">
+        <div>
+            <p class="eyebrow">Admin</p>
+            <h1>Soccer Streaming Admin</h1>
+        </div>
+        <div class="toolbar">
+            <span id="adminUserLabel" class="small-pill">Checking</span>
+            <button id="adminLogoutButton" type="button" class="ghost-button">Logout</button>
+        </div>
+    </header>
+
+    <main class="admin-main">
+        <section id="adminStatus" class="panel admin-status"></section>
+
+        <section class="admin-grid">
+            <article class="panel">
+                <div class="panel-heading">
+                    <div>
+                        <p class="eyebrow">Teams</p>
+                        <h2>Team Editor</h2>
+                    </div>
+                    <div class="admin-search">
+                        <input id="teamKeyword" type="search" placeholder="Search team">
+                        <button id="teamSearchButton" type="button">Search</button>
+                    </div>
+                </div>
+                <div class="admin-panel-body">
+                    <div id="teamResults" class="admin-result-list"></div>
+                    <form id="teamForm" class="admin-form" hidden></form>
+                </div>
+            </article>
+
+            <article class="panel">
+                <div class="panel-heading">
+                    <div>
+                        <p class="eyebrow">Players</p>
+                        <h2>Player Editor</h2>
+                    </div>
+                    <div class="admin-search">
+                        <input id="playerKeyword" type="search" placeholder="Search player">
+                        <button id="playerSearchButton" type="button">Search</button>
+                    </div>
+                </div>
+                <div class="admin-panel-body">
+                    <div id="playerResults" class="admin-result-list"></div>
+                    <form id="playerForm" class="admin-form" hidden></form>
+                </div>
+            </article>
+        </section>
+
+        <section class="panel">
+            <div class="panel-heading">
+                <div>
+                    <p class="eyebrow">API-Football</p>
+                    <h2>Manual Sync</h2>
+                </div>
+            </div>
+            <div class="admin-sync-grid">
+                <label>League <input id="syncLeague" type="number" value="39"></label>
+                <label>Season <input id="syncSeason" type="number" value="2025"></label>
+                <label>Delay ms <input id="syncDelayMs" type="number" value="7000"></label>
+                <label>Fixture ID <input id="syncFixtureId" type="number" placeholder="Optional"></label>
+                <button data-sync-task="teams" type="button">Teams</button>
+                <button data-sync-task="standings" type="button">Standings</button>
+                <button data-sync-task="fixtures" type="button">Fixtures</button>
+                <button data-sync-task="fixture-details" type="button">Season Details</button>
+                <button data-sync-task="fixture-detail" type="button">Fixture Detail</button>
+                <button data-sync-task="players" type="button">Players</button>
+                <button data-sync-task="injuries" type="button">Injuries</button>
+            </div>
+            <div id="syncResult" class="admin-message"></div>
+        </section>
+
+        <section class="panel">
+            <div class="panel-heading">
+                <div>
+                    <p class="eyebrow">Audit</p>
+                    <h2>Recent Admin Logs</h2>
+                </div>
+                <button id="refreshLogsButton" type="button" class="ghost-button">Refresh</button>
+            </div>
+            <div id="auditLogs" class="admin-log-list"></div>
+        </section>
+    </main>
+</div>
+
+<script src="/admin.js" defer></script>
+</body>
+</html>
