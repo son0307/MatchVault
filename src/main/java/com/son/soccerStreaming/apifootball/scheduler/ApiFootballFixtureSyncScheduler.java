@@ -23,6 +23,7 @@ public class ApiFootballFixtureSyncScheduler {
 
     private final ApiFootballFixtureSyncService apiFootballFixtureSyncService;
     private final FixtureRecordRepository fixtureRecordRepository;
+    private final ApiFootballSyncFailureRetryScheduler failureRetryScheduler;
 
     @Value("${api-football.sync.fixtures.league:39}")
     private Integer league;
@@ -51,6 +52,11 @@ public class ApiFootballFixtureSyncScheduler {
             apiFootballFixtureSyncService.syncLiveFixtures(league, season);
         } catch (Exception e) {
             log.error("API-Football live fixture sync failed.", e);
+            failureRetryScheduler.schedule(
+                    "fixtures:live:%s:%s".formatted(league, season),
+                    "live fixture sync league=%s season=%s".formatted(league, season),
+                    () -> apiFootballFixtureSyncService.syncLiveFixtures(league, season)
+            );
         }
     }
 
@@ -59,6 +65,11 @@ public class ApiFootballFixtureSyncScheduler {
             apiFootballFixtureSyncService.syncSeasonFixtures(league, season);
         } catch (Exception e) {
             log.error("API-Football season fixture sync failed. reason={}, league={}, season={}", reason, league, season, e);
+            failureRetryScheduler.schedule(
+                    "fixtures:%s:%s:%s".formatted(reason, league, season),
+                    "season fixture sync reason=%s league=%s season=%s".formatted(reason, league, season),
+                    () -> apiFootballFixtureSyncService.syncSeasonFixtures(league, season)
+            );
         }
     }
 

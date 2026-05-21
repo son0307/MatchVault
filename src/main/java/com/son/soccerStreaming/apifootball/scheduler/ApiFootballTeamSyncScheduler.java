@@ -15,6 +15,7 @@ import org.springframework.stereotype.Component;
 public class ApiFootballTeamSyncScheduler {
 
     private final ApiFootballTeamSyncService apiFootballTeamSyncService;
+    private final ApiFootballSyncFailureRetryScheduler failureRetryScheduler;
 
     @Value("${api-football.sync.teams.league:39}")
     private Integer league;
@@ -28,6 +29,11 @@ public class ApiFootballTeamSyncScheduler {
             apiFootballTeamSyncService.syncTeams(league, season);
         } catch (Exception e) {
             log.error("API-Football team sync failed. league={}, season={}", league, season, e);
+            failureRetryScheduler.schedule(
+                    "teams:%s:%s".formatted(league, season),
+                    "team sync league=%s season=%s".formatted(league, season),
+                    () -> apiFootballTeamSyncService.syncTeams(league, season)
+            );
         }
     }
 }

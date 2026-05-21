@@ -2,6 +2,7 @@ const adminState = {
     user: null,
     selectedTeam: null,
     selectedPlayer: null,
+    syncStatuses: {},
 };
 
 const adminElements = {
@@ -21,6 +22,7 @@ const adminElements = {
     syncDelayMs: document.querySelector("#syncDelayMs"),
     syncFixtureId: document.querySelector("#syncFixtureId"),
     syncResult: document.querySelector("#syncResult"),
+    syncStatusLabels: document.querySelectorAll("[data-sync-status]"),
     refreshLogsButton: document.querySelector("#refreshLogsButton"),
     auditLogs: document.querySelector("#auditLogs"),
 };
@@ -31,7 +33,7 @@ document.addEventListener("DOMContentLoaded", () => {
     adminElements.playerSearchButton.addEventListener("click", searchPlayers);
     adminElements.teamForm.addEventListener("submit", saveTeam);
     adminElements.playerForm.addEventListener("submit", savePlayer);
-    adminElements.refreshLogsButton.addEventListener("click", loadAuditLogs);
+    adminElements.refreshLogsButton.addEventListener("click", refreshAdminLogs);
     document.querySelectorAll("[data-sync-task]").forEach((button) => {
         button.addEventListener("click", () => runSync(button.dataset.syncTask));
     });
@@ -43,6 +45,7 @@ async function initializeAdmin() {
         adminState.user = await requestJson("/api/v1/auth/me");
         adminElements.userLabel.textContent = `${adminState.user.nickname || adminState.user.email} · ${adminState.user.role}`;
         adminElements.status.innerHTML = `<strong>관리자 권한 확인됨</strong><p class="muted">팀/선수 정보 수정과 수동 동기화를 실행할 수 있습니다.</p>`;
+        await loadSyncStatuses();
         await loadAuditLogs();
     } catch (error) {
         adminElements.status.innerHTML = errorMarkup(error);
@@ -183,10 +186,35 @@ async function runSync(task) {
     try {
         const result = await requestJson(urls[task], {method: "POST"});
         adminElements.syncResult.textContent = result.message;
+        await loadSyncStatuses();
         await loadAuditLogs();
     } catch (error) {
         adminElements.syncResult.textContent = error.message;
     }
+}
+
+async function refreshAdminLogs() {
+    await loadSyncStatuses();
+    await loadAuditLogs();
+}
+
+async function loadSyncStatuses() {
+    try {
+        const response = await requestJson("/api/v1/admin/sync/statuses");
+        const statuses = Array.isArray(response.statuses) ? response.statuses : [];
+        adminState.syncStatuses = Object.fromEntries(statuses.map((status) => [status.task, status]));
+    } catch (error) {
+        adminState.syncStatuses = {};
+    }
+    renderSyncStatuses();
+}
+
+function renderSyncStatuses() {
+    adminElements.syncStatusLabels.forEach((element) => {
+        const task = element.dataset.syncStatus;
+        const status = adminState.syncStatuses[task];
+        element.textContent = `갱신 일시: ${formatKoreaDateTime(status?.lastSyncedAt)}`;
+    });
 }
 
 async function loadAuditLogs() {
@@ -290,4 +318,26 @@ function escapeHtml(value) {
 
 function escapeAttribute(value) {
     return escapeHtml(value).replaceAll("`", "&#096;");
+}
+
+function formatKoreaDateTime(value) {
+    if (!value) {
+        return "-";
+    }
+
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) {
+        return "-";
+    }
+
+    return new Intl.DateTimeFormat("ko-KR", {
+        timeZone: "Asia/Seoul",
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit",
+        hour12: false,
+    }).format(date);
 }

@@ -35,6 +35,7 @@ public class ApiFootballInjurySyncService {
     private final ApiFootballPlayerSyncService apiFootballPlayerSyncService;
     private final TransactionTemplate transactionTemplate;
     private final EntityManager entityManager;
+    private final ApiFootballSyncStatusService apiFootballSyncStatusService;
 
     public int syncInjuries(Integer league, Integer season) {
         List<ApiFootballInjuryDto.InjuryResponse> injuries = Optional.ofNullable(apiFootballClient.getInjuries(league, season))
@@ -50,6 +51,7 @@ public class ApiFootballInjurySyncService {
         }
 
         log.info("API-Football injury sync completed. league={}, season={}, count={}", league, season, syncedCount);
+        apiFootballSyncStatusService.recordSuccess("injuries", "Injuries");
         return syncedCount;
     }
 

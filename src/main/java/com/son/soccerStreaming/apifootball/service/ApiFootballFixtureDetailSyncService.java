@@ -8,6 +8,7 @@ import com.son.soccerStreaming.repository.FixtureRecordRepository;
 import jakarta.persistence.EntityManager;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -22,8 +23,6 @@ import java.util.Optional;
 @RequiredArgsConstructor
 public class ApiFootballFixtureDetailSyncService {
 
-    private static final int MAX_IDS_PER_REQUEST = 20;
-
     private final ApiFootballClient apiFootballClient;
     private final ApiFootballFixtureSyncService apiFootballFixtureSyncService;
     private final ApiFootballFixtureEventSyncService apiFootballFixtureEventSyncService;
@@ -33,13 +32,21 @@ public class ApiFootballFixtureDetailSyncService {
     private final FixtureRecordRepository fixtureRecordRepository;
     private final TransactionTemplate transactionTemplate;
     private final EntityManager entityManager;
+    private final ApiFootballSyncStatusService apiFootballSyncStatusService;
+
+    @Value("${api-football.sync.fixture-details.chunk-size:10}")
+    private int chunkSize;
 
     @Transactional
     public FixtureDetailSyncResult syncFixtureDetail(Long fixtureId, boolean applyLiveStandingImpact) {
-        return apiFootballClient.getFixture(fixtureId).stream()
+        FixtureDetailSyncResult result = apiFootballClient.getFixture(fixtureId).stream()
                 .findFirst()
                 .map(response -> syncFixtureDetail(response, applyLiveStandingImpact))
                 .orElseGet(() -> FixtureDetailSyncResult.empty(fixtureId));
+        if (result.fixtureId() != null) {
+            apiFootballSyncStatusService.recordSuccess("fixture-detail", "Fixture Detail");
+        }
+        return result;
     }
 
     @Transactional
@@ -102,6 +109,7 @@ public class ApiFootballFixtureDetailSyncService {
     public List<FixtureDetailSyncResult> syncFixtureDetailsByIdsWithResults(List<Long> fixtureIds, boolean applyLiveStandingImpact) {
         List<FixtureDetailSyncResult> results = new ArrayList<>();
         List<List<Long>> chunks = chunks(fixtureIds);
+        List<List<Long>> failedChunks = new ArrayList<>();
         for (int i = 0; i < chunks.size(); i++) {
             List<Long> chunk = chunks.get(i);
             StopWatch chunkWatch = new StopWatch("fixture-detail-chunk-" + (i + 1));
@@ -136,8 +144,15 @@ public class ApiFootballFixtureDetailSyncService {
                 if (chunkWatch.isRunning()) {
                     chunkWatch.stop();
                 }
+                failedChunks.add(List.copyOf(chunk));
                 log.error("API-Football fixture detail chunk sync failed. fixtureIds={}", chunk, e);
             }
+        }
+        if (!failedChunks.isEmpty()) {
+            throw new ApiFootballFixtureDetailSyncException(failedChunks, chunks.size());
+        }
+        if (!fixtureIds.isEmpty()) {
+            apiFootballSyncStatusService.recordSuccess("fixture-details", "Season Details");
         }
         return results;
     }
@@ -152,8 +167,9 @@ public class ApiFootballFixtureDetailSyncService {
 
     private List<List<Long>> chunks(List<Long> fixtureIds) {
         List<List<Long>> chunks = new ArrayList<>();
-        for (int i = 0; i < fixtureIds.size(); i += MAX_IDS_PER_REQUEST) {
-            chunks.add(fixtureIds.subList(i, Math.min(i + MAX_IDS_PER_REQUEST, fixtureIds.size())));
+        int size = Math.max(1, chunkSize);
+        for (int i = 0; i < fixtureIds.size(); i += size) {
+            chunks.add(fixtureIds.subList(i, Math.min(i + size, fixtureIds.size())));
         }
         return chunks;
     }

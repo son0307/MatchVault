@@ -7,6 +7,7 @@ import lombok.NoArgsConstructor;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 import java.util.List;
 
 public class AdminDto {
@@ -113,5 +114,19 @@ public class AdminDto {
     @Builder
     public static class AuditLogListResponse {
         private List<AuditLogResponse> logs;
+    }
+
+    @Getter
+    @Builder
+    public static class SyncStatusResponse {
+        private List<SyncStatusItem> statuses;
+    }
+
+    @Getter
+    @Builder
+    public static class SyncStatusItem {
+        private String task;
+        private String label;
+        private OffsetDateTime lastSyncedAt;
     }
 }

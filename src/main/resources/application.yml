@@ -16,6 +16,10 @@ live:
     base-url: ${LIVE_API_FOOTBALL_BASE_URL:https://v3.football.api-sports.io}
     api-key: ${API_FOOTBALL_KEY:}
     api-host: ${API_FOOTBALL_HOST:}
+    retry:
+      max-attempts: ${LIVE_API_FOOTBALL_RETRY_MAX_ATTEMPTS:3}
+      initial-delay-ms: ${LIVE_API_FOOTBALL_RETRY_INITIAL_DELAY_MS:500}
+      multiplier: ${LIVE_API_FOOTBALL_RETRY_MULTIPLIER:2.0}
   sync:
     enabled: ${LIVE_SYNC_ENABLED:false}
     interval-ms: ${LIVE_SYNC_INTERVAL_MS:5000}
@@ -23,6 +27,10 @@ live:
 
 api-football:
   sync:
+    failure-retry:
+      enabled: ${API_FOOTBALL_SYNC_FAILURE_RETRY_ENABLED:true}
+      max-attempts: ${API_FOOTBALL_SYNC_FAILURE_RETRY_MAX_ATTEMPTS:2}
+      delay-minutes: ${API_FOOTBALL_SYNC_FAILURE_RETRY_DELAY_MINUTES:1}
     teams:
       enabled: ${API_FOOTBALL_TEAMS_SYNC_ENABLED:false}
       run-on-startup: ${API_FOOTBALL_TEAMS_SYNC_RUN_ON_STARTUP:false}
@@ -53,32 +61,7 @@ api-football:
       run-on-startup: ${API_FOOTBALL_FIXTURE_DETAILS_SYNC_RUN_ON_STARTUP:false}
       live-cron: ${API_FOOTBALL_FIXTURE_DETAILS_LIVE_CRON:0 * * * * *}
       daily-cron: ${API_FOOTBALL_FIXTURE_DETAILS_DAILY_CRON:0 55 4 * * *}
-    fixture-events:
-      enabled: ${API_FOOTBALL_FIXTURE_EVENTS_SYNC_ENABLED:false}
-      live-cron: ${API_FOOTBALL_FIXTURE_EVENTS_LIVE_CRON:0 * * * * *}
-      daily-cron: ${API_FOOTBALL_FIXTURE_EVENTS_DAILY_CRON:0 30 4 * * *}
-      run-on-startup: ${API_FOOTBALL_FIXTURE_EVENTS_SYNC_RUN_ON_STARTUP:false}
-      startup-delay-ms: ${API_FOOTBALL_FIXTURE_EVENTS_STARTUP_DELAY_MS:300}
-    fixture-lineups:
-      enabled: ${API_FOOTBALL_FIXTURE_LINEUPS_SYNC_ENABLED:false}
-      run-on-startup: ${API_FOOTBALL_FIXTURE_LINEUPS_SYNC_RUN_ON_STARTUP:false}
-      live-cron: ${API_FOOTBALL_FIXTURE_LINEUPS_LIVE_CRON:0 */15 * * * *}
-      daily-cron: ${API_FOOTBALL_FIXTURE_LINEUPS_DAILY_CRON:0 40 4 * * *}
-      window-before-minutes: ${API_FOOTBALL_FIXTURE_LINEUPS_WINDOW_BEFORE_MINUTES:45}
-      window-after-hours: ${API_FOOTBALL_FIXTURE_LINEUPS_WINDOW_AFTER_HOURS:4}
-      startup-delay-ms: ${API_FOOTBALL_FIXTURE_LINEUPS_STARTUP_DELAY_MS:300}
-    fixture-player-stats:
-      enabled: ${API_FOOTBALL_FIXTURE_PLAYER_STATS_SYNC_ENABLED:false}
-      run-on-startup: ${API_FOOTBALL_FIXTURE_PLAYER_STATS_SYNC_RUN_ON_STARTUP:false}
-      live-cron: ${API_FOOTBALL_FIXTURE_PLAYER_STATS_LIVE_CRON:0 * * * * *}
-      daily-cron: ${API_FOOTBALL_FIXTURE_PLAYER_STATS_DAILY_CRON:0 45 4 * * *}
-      startup-delay-ms: ${API_FOOTBALL_FIXTURE_PLAYER_STATS_STARTUP_DELAY_MS:300}
-    fixture-statistics:
-      enabled: ${API_FOOTBALL_FIXTURE_STATISTICS_SYNC_ENABLED:false}
-      run-on-startup: ${API_FOOTBALL_FIXTURE_STATISTICS_SYNC_RUN_ON_STARTUP:false}
-      live-cron: ${API_FOOTBALL_FIXTURE_STATISTICS_LIVE_CRON:0 * * * * *}
-      daily-cron: ${API_FOOTBALL_FIXTURE_STATISTICS_DAILY_CRON:0 50 4 * * *}
-      startup-delay-ms: ${API_FOOTBALL_FIXTURE_STATISTICS_STARTUP_DELAY_MS:300}
+      chunk-size: ${API_FOOTBALL_FIXTURE_DETAILS_CHUNK_SIZE:10}
     players:
       profile-fallback-enabled: ${API_FOOTBALL_PLAYERS_PROFILE_FALLBACK_ENABLED:false}
       registered:

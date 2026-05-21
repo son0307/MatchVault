@@ -23,6 +23,7 @@ public class ApiFootballTeamSyncService {
     private final ApiFootballClient apiFootballClient;
     private final TeamRepository teamRepository;
     private final AdminOverrideService adminOverrideService;
+    private final ApiFootballSyncStatusService apiFootballSyncStatusService;
     private static final List<String> OVERRIDE_FIELDS = List.of(
             "name", "code", "country", "founded", "logoUrl",
             "venueId", "venueName", "venueAddress", "venueCity", "capacity", "surface", "venueImageUrl"
@@ -69,6 +70,7 @@ public class ApiFootballTeamSyncService {
         }
 
         log.info("API-Football team sync completed. league={}, season={}, count={}", league, season, syncedCount);
+        apiFootballSyncStatusService.recordSuccess("teams", "Teams");
         return syncedCount;
     }
 
