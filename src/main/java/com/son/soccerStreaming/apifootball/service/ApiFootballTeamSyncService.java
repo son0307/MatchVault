@@ -2,11 +2,11 @@ package com.son.soccerStreaming.apifootball.service;
 
 import com.son.soccerStreaming.apifootball.client.ApiFootballClient;
 import com.son.soccerStreaming.apifootball.dto.ApiFootballTeamDto;
-import com.son.soccerStreaming.entity.AdminOverrideTargetType;
-import com.son.soccerStreaming.entity.Team;
-import com.son.soccerStreaming.entity.Venue;
-import com.son.soccerStreaming.repository.TeamRepository;
-import com.son.soccerStreaming.service.AdminOverrideService;
+import com.son.soccerStreaming.admin.entity.AdminOverrideTargetType;
+import com.son.soccerStreaming.team.entity.Team;
+import com.son.soccerStreaming.team.entity.Venue;
+import com.son.soccerStreaming.team.repository.TeamRepository;
+import com.son.soccerStreaming.admin.service.AdminOverrideService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;

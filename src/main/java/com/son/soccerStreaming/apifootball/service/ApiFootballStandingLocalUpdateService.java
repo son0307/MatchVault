@@ -1,6 +1,6 @@
 package com.son.soccerStreaming.apifootball.service;
 
-import com.son.soccerStreaming.entity.Fixture;
+import com.son.soccerStreaming.fixture.entity.Fixture;
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import lombok.Getter;

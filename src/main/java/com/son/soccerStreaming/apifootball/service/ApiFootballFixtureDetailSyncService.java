@@ -2,9 +2,9 @@ package com.son.soccerStreaming.apifootball.service;
 
 import com.son.soccerStreaming.apifootball.client.ApiFootballClient;
 import com.son.soccerStreaming.apifootball.dto.ApiFootballLiveDto;
-import com.son.soccerStreaming.dto.FixtureEventDto;
-import com.son.soccerStreaming.entity.Fixture;
-import com.son.soccerStreaming.repository.FixtureRecordRepository;
+import com.son.soccerStreaming.fixture.dto.FixtureEventDto;
+import com.son.soccerStreaming.fixture.entity.Fixture;
+import com.son.soccerStreaming.fixture.repository.FixtureRecordRepository;
 import jakarta.persistence.EntityManager;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

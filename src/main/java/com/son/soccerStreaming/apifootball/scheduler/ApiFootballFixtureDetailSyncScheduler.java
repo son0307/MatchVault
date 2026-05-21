@@ -2,8 +2,8 @@ package com.son.soccerStreaming.apifootball.scheduler;
 
 import com.son.soccerStreaming.apifootball.service.ApiFootballFixtureDetailSyncException;
 import com.son.soccerStreaming.apifootball.service.ApiFootballFixtureDetailSyncService;
-import com.son.soccerStreaming.service.LiveFixtureBroadcastService;
-import com.son.soccerStreaming.repository.FixtureRecordRepository;
+import com.son.soccerStreaming.live.service.LiveFixtureBroadcastService;
+import com.son.soccerStreaming.fixture.repository.FixtureRecordRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;

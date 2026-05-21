@@ -1,7 +1,7 @@
 package com.son.soccerStreaming.apifootball.service;
 
-import com.son.soccerStreaming.entity.ApiFootballSyncStatus;
-import com.son.soccerStreaming.repository.ApiFootballSyncStatusRepository;
+import com.son.soccerStreaming.apifootball.entity.ApiFootballSyncStatus;
+import com.son.soccerStreaming.apifootball.repository.ApiFootballSyncStatusRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;

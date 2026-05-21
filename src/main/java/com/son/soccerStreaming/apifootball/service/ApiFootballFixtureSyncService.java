@@ -2,10 +2,10 @@ package com.son.soccerStreaming.apifootball.service;
 
 import com.son.soccerStreaming.apifootball.client.ApiFootballClient;
 import com.son.soccerStreaming.apifootball.dto.ApiFootballLiveDto;
-import com.son.soccerStreaming.entity.Fixture;
-import com.son.soccerStreaming.entity.Team;
-import com.son.soccerStreaming.repository.FixtureRecordRepository;
-import com.son.soccerStreaming.repository.TeamRepository;
+import com.son.soccerStreaming.fixture.entity.Fixture;
+import com.son.soccerStreaming.team.entity.Team;
+import com.son.soccerStreaming.fixture.repository.FixtureRecordRepository;
+import com.son.soccerStreaming.team.repository.TeamRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
