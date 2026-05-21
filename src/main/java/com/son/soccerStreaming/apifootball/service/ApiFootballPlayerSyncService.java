@@ -39,6 +39,7 @@ public class ApiFootballPlayerSyncService {
     private final AdminOverrideService adminOverrideService;
     private final TransactionTemplate transactionTemplate;
     private final EntityManager entityManager;
+    private final ApiFootballSyncStatusService apiFootballSyncStatusService;
     private static final List<String> PROFILE_OVERRIDE_FIELDS = List.of(
             "name", "firstname", "lastname", "age", "birthDate", "birthPlace", "birthCountry",
             "nationality", "height", "weight", "position", "number", "photoUrl"
@@ -49,18 +50,31 @@ public class ApiFootballPlayerSyncService {
 
     public int syncRegisteredPlayers(Integer league, Integer season, Long delayMs) {
         int syncedCount = 0;
+        List<Long> failedTeamIds = new java.util.ArrayList<>();
         for (Team team : teamRepository.findAllByOrderByNameAsc()) {
             try {
                 syncedCount += syncRegisteredPlayersByTeam(team, league, season, delayMs);
             } catch (Exception e) {
+                failedTeamIds.add(team.getTeamId());
                 log.error("API-Football registered players team sync failed. teamId={}, season={}",
                         team.getTeamId(), season, e);
             }
         }
 
+        if (!failedTeamIds.isEmpty()) {
+            throw new ApiFootballRegisteredPlayerSyncException(failedTeamIds);
+        }
+
         log.info("API-Football registered players sync completed. league={}, season={}, count={}",
                 league, season, syncedCount);
+        apiFootballSyncStatusService.recordSuccess("players", "Players");
         return syncedCount;
+    }
+
+    public int syncRegisteredPlayersByTeamId(Long teamId, Integer league, Integer season, Long delayMs) {
+        Team team = teamRepository.findByTeamId(teamId)
+                .orElseThrow(() -> new IllegalArgumentException("Team not found. teamId=" + teamId));
+        return syncRegisteredPlayersByTeam(team, league, season, delayMs);
     }
 
     public int syncRegisteredPlayersByTeam(Team team, Integer league, Integer season, Long delayMs) {

@@ -17,6 +17,7 @@ public class ApiFootballStandingSyncScheduler {
 
     private final ApiFootballStandingSyncService apiFootballStandingSyncService;
     private final FixtureRecordRepository fixtureRecordRepository;
+    private final ApiFootballSyncFailureRetryScheduler failureRetryScheduler;
 
     @Value("${api-football.sync.standings.league:39}")
     private Integer league;
@@ -42,6 +43,11 @@ public class ApiFootballStandingSyncScheduler {
             apiFootballStandingSyncService.syncStandings(league, season);
         } catch (Exception e) {
             log.error("API-Football standing sync failed. reason={}, league={}, season={}", reason, league, season, e);
+            failureRetryScheduler.schedule(
+                    "standings:%s:%s:%s".formatted(reason, league, season),
+                    "standing sync reason=%s league=%s season=%s".formatted(reason, league, season),
+                    () -> apiFootballStandingSyncService.syncStandings(league, season)
+            );
         }
     }
 }

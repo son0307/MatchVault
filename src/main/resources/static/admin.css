@@ -81,6 +81,22 @@
     padding: 16px;
 }
 
+.admin-sync-item {
+    display: grid;
+    gap: 6px;
+    align-content: start;
+}
+
+.admin-sync-item button {
+    width: 100%;
+}
+
+.admin-sync-time {
+    color: var(--muted);
+    font-size: 12px;
+    line-height: 1.35;
+}
+
 .admin-message {
     min-height: 42px;
     padding: 0 16px 16px;

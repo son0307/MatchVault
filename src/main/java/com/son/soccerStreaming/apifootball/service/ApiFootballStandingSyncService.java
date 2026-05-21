@@ -25,6 +25,7 @@ public class ApiFootballStandingSyncService {
     private final ApiFootballClient apiFootballClient;
     private final TeamRepository teamRepository;
     private final TeamStandingRepository teamStandingRepository;
+    private final ApiFootballSyncStatusService apiFootballSyncStatusService;
 
     @Transactional
     public int syncStandings(Integer league, Integer season) {
@@ -48,6 +49,7 @@ public class ApiFootballStandingSyncService {
         }
 
         log.info("API-Football standing sync completed. league={}, season={}, count={}", league, season, syncedCount);
+        apiFootballSyncStatusService.recordSuccess("standings", "Standings");
         return syncedCount;
     }
 

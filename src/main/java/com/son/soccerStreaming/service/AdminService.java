@@ -17,6 +17,7 @@ import com.son.soccerStreaming.entity.Venue;
 import com.son.soccerStreaming.exception.CustomException;
 import com.son.soccerStreaming.exception.ErrorCode;
 import com.son.soccerStreaming.repository.AdminAuditLogRepository;
+import com.son.soccerStreaming.repository.ApiFootballSyncStatusRepository;
 import com.son.soccerStreaming.repository.AppUserRepository;
 import com.son.soccerStreaming.repository.PlayerRepository;
 import com.son.soccerStreaming.repository.TeamRepository;
@@ -24,6 +25,9 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -33,11 +37,24 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class AdminService {
 
+    private static final ZoneId KOREA_ZONE = ZoneId.of("Asia/Seoul");
+
+    private static final List<SyncStatusDefinition> SYNC_STATUS_DEFINITIONS = List.of(
+            new SyncStatusDefinition("teams", "Teams"),
+            new SyncStatusDefinition("standings", "Standings"),
+            new SyncStatusDefinition("fixtures", "Fixtures"),
+            new SyncStatusDefinition("fixture-details", "Season Details"),
+            new SyncStatusDefinition("fixture-detail", "Fixture Detail"),
+            new SyncStatusDefinition("players", "Players"),
+            new SyncStatusDefinition("injuries", "Injuries")
+    );
+
     private final AppUserRepository appUserRepository;
     private final TeamRepository teamRepository;
     private final PlayerRepository playerRepository;
     private final AdminOverrideService adminOverrideService;
     private final AdminAuditLogRepository adminAuditLogRepository;
+    private final ApiFootballSyncStatusRepository apiFootballSyncStatusRepository;
     private final ApiFootballTeamSyncService apiFootballTeamSyncService;
     private final ApiFootballStandingSyncService apiFootballStandingSyncService;
     private final ApiFootballFixtureSyncService apiFootballFixtureSyncService;
@@ -168,6 +185,15 @@ public class AdminService {
                 .logs(adminAuditLogRepository.findTop50ByOrderByCreatedAtDesc()
                         .stream()
                         .map(this::toAuditLogResponse)
+                        .toList())
+                .build();
+    }
+
+    @Transactional(readOnly = true)
+    public AdminDto.SyncStatusResponse getSyncStatuses() {
+        return AdminDto.SyncStatusResponse.builder()
+                .statuses(SYNC_STATUS_DEFINITIONS.stream()
+                        .map(this::toSyncStatusItem)
                         .toList())
                 .build();
     }
@@ -354,6 +380,28 @@ public class AdminService {
                 .success(log.isSuccess())
                 .createdAt(log.getCreatedAt())
                 .build();
+    }
+
+    private AdminDto.SyncStatusItem toSyncStatusItem(SyncStatusDefinition definition) {
+        return AdminDto.SyncStatusItem.builder()
+                .task(definition.task())
+                .label(definition.label())
+                .lastSyncedAt(latestCompletedSyncTime(definition.task()))
+                .build();
+    }
+
+    private OffsetDateTime latestCompletedSyncTime(String task) {
+        return apiFootballSyncStatusRepository.findById(task)
+                .map(status -> status.getLastSyncedAt())
+                .map(this::toKoreaOffsetDateTime)
+                .orElse(null);
+    }
+
+    private OffsetDateTime toKoreaOffsetDateTime(LocalDateTime dateTime) {
+        return dateTime.atZone(KOREA_ZONE).toOffsetDateTime();
+    }
+
+    private record SyncStatusDefinition(String task, String label) {
     }
 
     @FunctionalInterface

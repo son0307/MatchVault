@@ -1,5 +1,6 @@
 package com.son.soccerStreaming.apifootball.runner;
 
+import com.son.soccerStreaming.apifootball.scheduler.ApiFootballSyncFailureRetryScheduler;
 import com.son.soccerStreaming.apifootball.service.ApiFootballInjurySyncService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -19,6 +20,7 @@ import org.springframework.stereotype.Component;
 public class ApiFootballInjuryStartupSyncRunner implements CommandLineRunner {
 
     private final ApiFootballInjurySyncService apiFootballInjurySyncService;
+    private final ApiFootballSyncFailureRetryScheduler failureRetryScheduler;
 
     @Value("${api-football.sync.injuries.league:39}")
     private Integer league;
@@ -33,6 +35,11 @@ public class ApiFootballInjuryStartupSyncRunner implements CommandLineRunner {
             apiFootballInjurySyncService.syncInjuries(league, season);
         } catch (Exception e) {
             log.error("API-Football startup injury sync failed. league={}, season={}", league, season, e);
+            failureRetryScheduler.schedule(
+                    "startup:injuries:%s:%s".formatted(league, season),
+                    "startup injury sync league=%s season=%s".formatted(league, season),
+                    () -> apiFootballInjurySyncService.syncInjuries(league, season)
+            );
         }
     }
 }

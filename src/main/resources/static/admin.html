@@ -71,13 +71,34 @@
                 <label>Season <input id="syncSeason" type="number" value="2025"></label>
                 <label>Delay ms <input id="syncDelayMs" type="number" value="7000"></label>
                 <label>Fixture ID <input id="syncFixtureId" type="number" placeholder="Optional"></label>
-                <button data-sync-task="teams" type="button">Teams</button>
-                <button data-sync-task="standings" type="button">Standings</button>
-                <button data-sync-task="fixtures" type="button">Fixtures</button>
-                <button data-sync-task="fixture-details" type="button">Season Details</button>
-                <button data-sync-task="fixture-detail" type="button">Fixture Detail</button>
-                <button data-sync-task="players" type="button">Players</button>
-                <button data-sync-task="injuries" type="button">Injuries</button>
+                <div class="admin-sync-item">
+                    <button data-sync-task="teams" type="button">Teams</button>
+                    <span class="admin-sync-time" data-sync-status="teams">갱신 일시: -</span>
+                </div>
+                <div class="admin-sync-item">
+                    <button data-sync-task="standings" type="button">Standings</button>
+                    <span class="admin-sync-time" data-sync-status="standings">갱신 일시: -</span>
+                </div>
+                <div class="admin-sync-item">
+                    <button data-sync-task="fixtures" type="button">Fixtures</button>
+                    <span class="admin-sync-time" data-sync-status="fixtures">갱신 일시: -</span>
+                </div>
+                <div class="admin-sync-item">
+                    <button data-sync-task="fixture-details" type="button">Season Details</button>
+                    <span class="admin-sync-time" data-sync-status="fixture-details">갱신 일시: -</span>
+                </div>
+                <div class="admin-sync-item">
+                    <button data-sync-task="fixture-detail" type="button">Fixture Detail</button>
+                    <span class="admin-sync-time" data-sync-status="fixture-detail">갱신 일시: -</span>
+                </div>
+                <div class="admin-sync-item">
+                    <button data-sync-task="players" type="button">Players</button>
+                    <span class="admin-sync-time" data-sync-status="players">갱신 일시: -</span>
+                </div>
+                <div class="admin-sync-item">
+                    <button data-sync-task="injuries" type="button">Injuries</button>
+                    <span class="admin-sync-time" data-sync-status="injuries">갱신 일시: -</span>
+                </div>
             </div>
             <div id="syncResult" class="admin-message"></div>
         </section>

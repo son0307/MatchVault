@@ -118,4 +118,9 @@ public class AdminController {
     public ResponseEntity<AdminDto.AuditLogListResponse> getAuditLogs() {
         return ResponseEntity.ok(adminService.getAuditLogs());
     }
+
+    @GetMapping("/sync/statuses")
+    public ResponseEntity<AdminDto.SyncStatusResponse> getSyncStatuses() {
+        return ResponseEntity.ok(adminService.getSyncStatuses());
+    }
 }

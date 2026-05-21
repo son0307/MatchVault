@@ -27,10 +27,13 @@ public class ApiFootballFixtureSyncService {
     private final FixtureRecordRepository fixtureRecordRepository;
     private final TeamRepository teamRepository;
     private final ApiFootballStandingLocalUpdateService apiFootballStandingLocalUpdateService;
+    private final ApiFootballSyncStatusService apiFootballSyncStatusService;
 
     @Transactional
     public int syncSeasonFixtures(Integer league, Integer season) {
-        return upsertFixtures(apiFootballClient.getFixtures(league, season), false);
+        int syncedCount = upsertFixtures(apiFootballClient.getFixtures(league, season), false);
+        apiFootballSyncStatusService.recordSuccess("fixtures", "Fixtures");
+        return syncedCount;
     }
 
     @Transactional
@@ -39,7 +42,9 @@ public class ApiFootballFixtureSyncService {
                 .filter(response -> matchesSeason(response, season))
                 .toList();
 
-        return upsertFixtures(liveFixtures, true);
+        int syncedCount = upsertFixtures(liveFixtures, true);
+        apiFootballSyncStatusService.recordSuccess("fixtures", "Fixtures");
+        return syncedCount;
     }
 
     @Transactional

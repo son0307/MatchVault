@@ -1,5 +1,6 @@
 package com.son.soccerStreaming.apifootball.runner;
 
+import com.son.soccerStreaming.apifootball.scheduler.ApiFootballSyncFailureRetryScheduler;
 import com.son.soccerStreaming.apifootball.service.ApiFootballFixtureSyncService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -19,6 +20,7 @@ import org.springframework.stereotype.Component;
 public class ApiFootballFixtureStartupSyncRunner implements CommandLineRunner {
 
     private final ApiFootballFixtureSyncService apiFootballFixtureSyncService;
+    private final ApiFootballSyncFailureRetryScheduler failureRetryScheduler;
 
     @Value("${api-football.sync.fixtures.league:39}")
     private Integer league;
@@ -33,6 +35,11 @@ public class ApiFootballFixtureStartupSyncRunner implements CommandLineRunner {
             apiFootballFixtureSyncService.syncSeasonFixtures(league, season);
         } catch (Exception e) {
             log.error("API-Football startup fixture sync failed. league={}, season={}", league, season, e);
+            failureRetryScheduler.schedule(
+                    "startup:fixtures:%s:%s".formatted(league, season),
+                    "startup fixture sync league=%s season=%s".formatted(league, season),
+                    () -> apiFootballFixtureSyncService.syncSeasonFixtures(league, season)
+            );
         }
     }
 }

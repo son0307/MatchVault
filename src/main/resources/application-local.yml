@@ -15,18 +15,7 @@ api-football:
     fixture-details:
       enabled: false
       run-on-startup: false
-    fixture-events:
-      enabled: false
-      run-on-startup: false
-    fixture-lineups:
-      enabled: false
-      run-on-startup: false
-    fixture-player-stats:
-      enabled: false
-      run-on-startup: false
-    fixture-statistics:
-      enabled: false
-      run-on-startup: false
+      chunk-size: 10
     players:
       profile-fallback-enabled: false
       registered:
