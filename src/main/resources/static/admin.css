@@ -74,6 +74,30 @@
     font-weight: 700;
 }
 
+.admin-field-label,
+.admin-override-summary {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.admin-clear-override {
+    width: fit-content;
+    min-height: 32px;
+}
+
+.admin-override-summary {
+    margin-bottom: 12px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: #fbfcfe;
+    padding: 10px;
+    color: var(--muted);
+    font-size: 13px;
+    font-weight: 700;
+}
+
 .admin-sync-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
@@ -125,6 +149,12 @@
     }
 
     .admin-search {
+        flex-direction: column;
+    }
+
+    .admin-field-label,
+    .admin-override-summary {
+        align-items: flex-start;
         flex-direction: column;
     }
 }

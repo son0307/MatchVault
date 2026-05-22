@@ -24,6 +24,24 @@ public interface FixtureRecordRepository extends JpaRepository<Fixture, Long>, F
 
     List<Fixture> findAllByFixtureDateBetweenAndFixtureStatusIn(LocalDateTime start, LocalDateTime end, Collection<String> fixtureStatuses);
 
+    @EntityGraph(attributePaths = {"homeTeam", "awayTeam"})
+    List<Fixture> findAllBySeasonAndFixtureDateGreaterThanEqualAndFixtureDateLessThanOrderByFixtureDateAsc(
+            Integer season,
+            LocalDateTime start,
+            LocalDateTime end
+    );
+
+    @EntityGraph(attributePaths = {"homeTeam", "awayTeam"})
+    List<Fixture> findAllBySeasonAndFixtureDateGreaterThanEqualAndFixtureDateLessThanAndFixtureStatusOrderByFixtureDateAsc(
+            Integer season,
+            LocalDateTime start,
+            LocalDateTime end,
+            String fixtureStatus
+    );
+
+    @EntityGraph(attributePaths = {"homeTeam", "awayTeam"})
+    List<Fixture> findAllBySeasonAndFixtureStatusOrderByFixtureDateAsc(Integer season, String fixtureStatus);
+
     List<Fixture> findAllByFixtureStatus(String fixtureStatus);
 
     List<Fixture> findAllByFixtureStatusNot(String fixtureStatus);
@@ -38,6 +56,31 @@ public interface FixtureRecordRepository extends JpaRepository<Fixture, Long>, F
             @Param("teamId") Long teamId,
             @Param("season") Integer season,
             @Param("now") LocalDateTime now,
+            org.springframework.data.domain.Pageable pageable
+    );
+
+    @EntityGraph(attributePaths = {"homeTeam", "awayTeam"})
+    @Query("SELECT f FROM Fixture f " +
+            "WHERE f.season = :season " +
+            "AND (f.homeTeam.teamId = :teamId OR f.awayTeam.teamId = :teamId) " +
+            "AND f.fixtureDate > :now " +
+            "ORDER BY f.fixtureDate ASC")
+    List<Fixture> findNextByTeam(
+            @Param("teamId") Long teamId,
+            @Param("season") Integer season,
+            @Param("now") LocalDateTime now,
+            org.springframework.data.domain.Pageable pageable
+    );
+
+    @EntityGraph(attributePaths = {"homeTeam", "awayTeam"})
+    @Query("SELECT f FROM Fixture f " +
+            "WHERE f.season = :season " +
+            "AND (f.homeTeam.teamId = :teamId OR f.awayTeam.teamId = :teamId) " +
+            "AND f.fixtureStatus = 'LIVE' " +
+            "ORDER BY f.fixtureDate ASC")
+    List<Fixture> findLiveByTeam(
+            @Param("teamId") Long teamId,
+            @Param("season") Integer season,
             org.springframework.data.domain.Pageable pageable
     );
 }

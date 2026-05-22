@@ -105,11 +105,24 @@ public class FavoriteService {
     private FavoriteDashboardResponseDto.TeamCard toTeamCard(Team team, Integer season) {
         TeamStanding standing = teamStandingRepository.findByTeamTeamIdAndSeason(team.getTeamId(), season)
                 .orElse(null);
+        LocalDateTime now = LocalDateTime.now();
         List<FavoriteDashboardResponseDto.TeamFixture> recentFixtures = fixtureRecordRepository
-                .findRecentByTeam(team.getTeamId(), season, LocalDateTime.now(), PageRequest.of(0, 5))
+                .findRecentByTeam(team.getTeamId(), season, now, PageRequest.of(0, 5))
                 .stream()
                 .map(fixture -> toTeamFixture(fixture, team))
                 .toList();
+        FavoriteDashboardResponseDto.TeamFixture nextFixture = fixtureRecordRepository
+                .findNextByTeam(team.getTeamId(), season, now, PageRequest.of(0, 1))
+                .stream()
+                .findFirst()
+                .map(fixture -> toTeamFixture(fixture, team))
+                .orElse(null);
+        FavoriteDashboardResponseDto.LiveTeamFixture liveFixture = fixtureRecordRepository
+                .findLiveByTeam(team.getTeamId(), season, PageRequest.of(0, 1))
+                .stream()
+                .findFirst()
+                .map(this::toLiveTeamFixture)
+                .orElse(null);
 
         return FavoriteDashboardResponseDto.TeamCard.builder()
                 .teamId(team.getTeamId())
@@ -119,6 +132,8 @@ public class FavoriteService {
                 .points(standing != null ? standing.getPoints() : null)
                 .form(standing != null ? standing.getForm() : null)
                 .recentFixtures(recentFixtures)
+                .nextFixture(nextFixture)
+                .liveFixture(liveFixture)
                 .build();
     }
 
@@ -132,6 +147,21 @@ public class FavoriteService {
                 .awayScore(fixture.getAwayScore())
                 .fixtureStatus(fixture.getFixtureStatus())
                 .result(resultOf(fixture, favoriteTeam))
+                .build();
+    }
+
+    private FavoriteDashboardResponseDto.LiveTeamFixture toLiveTeamFixture(Fixture fixture) {
+        return FavoriteDashboardResponseDto.LiveTeamFixture.builder()
+                .fixtureId(fixture.getFixtureId())
+                .fixtureDate(fixture.getFixtureDate())
+                .homeTeamName(fixture.getHomeTeam().getName())
+                .awayTeamName(fixture.getAwayTeam().getName())
+                .homeScore(fixture.getHomeScore())
+                .awayScore(fixture.getAwayScore())
+                .fixtureStatus(fixture.getFixtureStatus())
+                .statusShort(fixture.getStatusShort())
+                .statusLong(fixture.getStatusLong())
+                .elapsed(fixture.getElapsed())
                 .build();
     }
 

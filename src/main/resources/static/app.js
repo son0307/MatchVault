@@ -19,6 +19,9 @@ const state = {
         lineups: null,
         playerStats: null,
     },
+    searchTimer: null,
+    searchRequestId: 0,
+    searchType: "all",
 };
 
 const elements = {
@@ -59,11 +62,15 @@ const elements = {
     liveConnectionStatus: document.querySelector("#liveConnectionStatus"),
     liveFixtureLabel: document.querySelector("#liveFixtureLabel"),
     liveFixtureDetail: document.querySelector("#liveFixtureDetail"),
+    globalSearchInput: document.querySelector("#globalSearchInput"),
+    globalSearchResults: document.querySelector("#globalSearchResults"),
+    searchTabs: document.querySelectorAll("[data-search-type]"),
 };
 
 document.addEventListener("DOMContentLoaded", () => {
     setupFixtureDateControls();
     setupAuthControls();
+    setupSearchControls();
     elements.refreshButton.addEventListener("click", refreshAll);
     elements.loadMoreFixtures.addEventListener("click", () => loadFixtures(false));
     elements.previousFixtureDate.addEventListener("click", () => moveSelectedFixtureDate(-1));
@@ -76,6 +83,153 @@ document.addEventListener("DOMContentLoaded", () => {
     loadCurrentUser();
     refreshAll();
 });
+
+function setupSearchControls() {
+    elements.globalSearchInput.addEventListener("input", scheduleSearch);
+    elements.globalSearchInput.addEventListener("focus", () => {
+        if (elements.globalSearchResults.innerHTML.trim()) {
+            elements.globalSearchResults.hidden = false;
+        }
+    });
+    elements.searchTabs.forEach((button) => {
+        button.addEventListener("click", () => selectSearchType(button.dataset.searchType));
+    });
+    document.addEventListener("click", (event) => {
+        if (!event.target.closest(".global-search")) {
+            elements.globalSearchResults.hidden = true;
+        }
+    });
+}
+
+function selectSearchType(type) {
+    if (state.searchType === type) {
+        return;
+    }
+
+    state.searchType = type;
+    elements.searchTabs.forEach((button) => {
+        button.classList.toggle("active", button.dataset.searchType === type);
+    });
+    scheduleSearch();
+}
+
+function scheduleSearch() {
+    window.clearTimeout(state.searchTimer);
+    const keyword = elements.globalSearchInput.value.trim();
+
+    if (!keyword) {
+        state.searchRequestId += 1;
+        elements.globalSearchResults.hidden = true;
+        elements.globalSearchResults.innerHTML = "";
+        return;
+    }
+
+    state.searchTimer = window.setTimeout(() => runSearch(keyword), 500);
+}
+
+async function runSearch(keyword) {
+    const requestId = state.searchRequestId + 1;
+    state.searchRequestId = requestId;
+    elements.globalSearchResults.hidden = false;
+    elements.globalSearchResults.innerHTML = loadingMarkup();
+
+    try {
+        const type = encodeURIComponent(state.searchType);
+        const result = await requestJson(`/api/v1/search?q=${encodeURIComponent(keyword)}&type=${type}`);
+        if (requestId !== state.searchRequestId) {
+            return;
+        }
+        renderSearchResults(result);
+    } catch (error) {
+        if (requestId !== state.searchRequestId) {
+            return;
+        }
+        elements.globalSearchResults.innerHTML = errorMarkup(error);
+    }
+}
+
+function renderSearchResults(result) {
+    const teams = Array.isArray(result?.teams) ? result.teams : [];
+    const players = Array.isArray(result?.players) ? result.players : [];
+    const fixtures = Array.isArray(result?.fixtures) ? result.fixtures : [];
+
+    if (!teams.length && !players.length && !fixtures.length) {
+        elements.globalSearchResults.innerHTML = emptyMarkup("No search results.");
+        return;
+    }
+
+    elements.globalSearchResults.innerHTML = [
+        searchSectionMarkup("팀", teams, searchTeamMarkup),
+        searchSectionMarkup("선수", players, searchPlayerMarkup),
+        searchSectionMarkup("경기", fixtures, searchFixtureMarkup),
+    ].filter(Boolean).join("");
+
+    elements.globalSearchResults.querySelectorAll("[data-search-team]").forEach((button) => {
+        button.addEventListener("click", () => chooseSearchResult(() => selectTeam(Number(button.dataset.searchTeam))));
+    });
+    elements.globalSearchResults.querySelectorAll("[data-search-player]").forEach((button) => {
+        button.addEventListener("click", () => chooseSearchResult(() => selectPlayer(Number(button.dataset.searchPlayer))));
+    });
+    elements.globalSearchResults.querySelectorAll("[data-search-fixture]").forEach((button) => {
+        button.addEventListener("click", () => chooseSearchResult(() => selectFixture(Number(button.dataset.searchFixture))));
+    });
+}
+
+function searchSectionMarkup(title, items, itemMarkup) {
+    if (!items.length) {
+        return "";
+    }
+
+    return `
+        <section class="search-result-section">
+            <h3>${escapeHtml(title)}</h3>
+            <div class="search-result-list">
+                ${items.map(itemMarkup).join("")}
+            </div>
+        </section>
+    `;
+}
+
+function searchTeamMarkup(team) {
+    return `
+        <button type="button" class="search-result-item" data-search-team="${team.teamId}">
+            ${imageMarkup(team.logoUrl, team.teamName, "club-logo")}
+            <span>
+                <strong>${escapeHtml(team.teamName || "-")}</strong>
+                <small>${escapeHtml(team.code || "Team")}</small>
+            </span>
+        </button>
+    `;
+}
+
+function searchPlayerMarkup(player) {
+    return `
+        <button type="button" class="search-result-item" data-search-player="${player.playerId}">
+            ${imageMarkup(player.photoUrl, player.playerName, "player-thumb")}
+            <span>
+                <strong>${escapeHtml(player.playerName || "-")}</strong>
+                <small>${escapeHtml(player.position || "Player")}</small>
+            </span>
+        </button>
+    `;
+}
+
+function searchFixtureMarkup(fixture) {
+    return `
+        <button type="button" class="search-result-item fixture-search-result" data-search-fixture="${fixture.fixtureId}">
+            <span>
+                <strong>${escapeHtml(fixture.homeTeamName || "-")} vs ${escapeHtml(fixture.awayTeamName || "-")}</strong>
+                <small>${escapeHtml(dateText(fixture.fixtureDate))} · ${escapeHtml(fixture.fixtureStatus || "Fixture")}</small>
+            </span>
+            <b>${numberText(fixture.homeScore)}:${numberText(fixture.awayScore)}</b>
+        </button>
+    `;
+}
+
+function chooseSearchResult(action) {
+    elements.globalSearchResults.hidden = true;
+    action();
+}
 
 function setupAuthControls() {
     elements.loginButton.addEventListener("click", login);
@@ -249,10 +403,15 @@ function renderFavoriteDashboard() {
     document.querySelectorAll("[data-remove-favorite-player]").forEach((button) => {
         button.addEventListener("click", () => toggleFavoritePlayer(Number(button.dataset.removeFavoritePlayer)));
     });
+    document.querySelectorAll("[data-live-fixture-id]").forEach((button) => {
+        button.addEventListener("click", () => selectFixture(Number(button.dataset.liveFixtureId)));
+    });
 }
 
 function favoriteTeamCardMarkup(team) {
     const fixtures = Array.isArray(team.recentFixtures) ? team.recentFixtures : [];
+    const nextFixture = team.nextFixture;
+    const liveFixture = team.liveFixture;
 
     return `
         <article class="favorite-card">
@@ -264,6 +423,8 @@ function favoriteTeamCardMarkup(team) {
                 </div>
                 <button type="button" class="icon-text-button ghost-button" data-remove-favorite-team="${team.teamId}">Remove</button>
             </div>
+            ${liveFixture ? favoriteLiveFixtureMarkup(liveFixture) : ""}
+            ${nextFixture ? favoriteNextFixtureMarkup(nextFixture) : `<div class="favorite-upcoming muted">No upcoming fixture.</div>`}
             <div class="favorite-mini-list">
                 ${fixtures.map((fixture) => `
                     <div class="favorite-mini-row">
@@ -273,6 +434,30 @@ function favoriteTeamCardMarkup(team) {
                 `).join("") || `<div class="muted">No recent fixtures.</div>`}
             </div>
         </article>
+    `;
+}
+
+function favoriteLiveFixtureMarkup(fixture) {
+    return `
+        <button type="button" class="favorite-live-fixture" data-live-fixture-id="${fixture.fixtureId}">
+            <span class="small-pill live-pill">LIVE ${numberText(fixture.elapsed)}'</span>
+            <span class="favorite-live-teams">
+                <strong>${escapeHtml(fixture.homeTeamName || "-")} ${numberText(fixture.homeScore)}:${numberText(fixture.awayScore)} ${escapeHtml(fixture.awayTeamName || "-")}</strong>
+                <small>${escapeHtml(fixture.statusLong || fixture.statusShort || "Live")}</small>
+            </span>
+        </button>
+    `;
+}
+
+function favoriteNextFixtureMarkup(fixture) {
+    return `
+        <div class="favorite-upcoming">
+            <span class="small-pill">Next</span>
+            <span>
+                <strong>${escapeHtml(fixture.homeTeamName || "-")} vs ${escapeHtml(fixture.awayTeamName || "-")}</strong>
+                <small>${escapeHtml(dateText(fixture.fixtureDate))} ${escapeHtml(timeText(fixture.fixtureDate))}</small>
+            </span>
+        </div>
     `;
 }
 

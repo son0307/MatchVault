@@ -65,6 +65,7 @@ public class AdminDto {
         private Integer capacity;
         private String surface;
         private String venueImageUrl;
+        private List<ManualOverrideResponse> manualOverrides;
     }
 
     @Getter
@@ -84,6 +85,14 @@ public class AdminDto {
         private String position;
         private Integer number;
         private String photoUrl;
+        private List<ManualOverrideResponse> manualOverrides;
+    }
+
+    @Getter
+    @Builder
+    public static class ManualOverrideResponse {
+        private String fieldName;
+        private LocalDateTime updatedAt;
     }
 
     @Getter
