@@ -13,6 +13,13 @@ public class FavoriteDashboardResponseDto {
     private List<TeamCard> teams;
     private List<PlayerCard> players;
 
+    public static FavoriteDashboardResponseDto empty() {
+        return FavoriteDashboardResponseDto.builder()
+                .teams(List.of())
+                .players(List.of())
+                .build();
+    }
+
     @Getter
     @Builder
     public static class TeamCard {
@@ -23,6 +30,8 @@ public class FavoriteDashboardResponseDto {
         private Integer points;
         private String form;
         private List<TeamFixture> recentFixtures;
+        private TeamFixture nextFixture;
+        private LiveTeamFixture liveFixture;
     }
 
     @Getter
@@ -36,6 +45,21 @@ public class FavoriteDashboardResponseDto {
         private Integer awayScore;
         private String fixtureStatus;
         private String result;
+    }
+
+    @Getter
+    @Builder
+    public static class LiveTeamFixture {
+        private Long fixtureId;
+        private LocalDateTime fixtureDate;
+        private String homeTeamName;
+        private String awayTeamName;
+        private Integer homeScore;
+        private Integer awayScore;
+        private String fixtureStatus;
+        private String statusShort;
+        private String statusLong;
+        private Integer elapsed;
     }
 
     @Getter

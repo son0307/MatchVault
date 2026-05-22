@@ -1,6 +1,7 @@
 package com.son.soccerStreaming.fixture.repository;
 
 import com.querydsl.core.types.dsl.BooleanExpression;
+import com.querydsl.core.types.dsl.Expressions;
 import com.querydsl.jpa.impl.JPAQueryFactory;
 import com.son.soccerStreaming.fixture.entity.Fixture;
 import lombok.RequiredArgsConstructor;
@@ -34,6 +35,24 @@ public class FixtureRecordRepositoryImpl implements FixtureRecordRepositoryCusto
                 .fetch();
     }
 
+    @Override
+    public List<Fixture> searchByTeamNameTokens(List<String> tokens, int size) {
+        if (tokens == null || tokens.isEmpty()) {
+            return List.of();
+        }
+
+        return queryFactory
+                .selectFrom(fixture)
+                .join(fixture.homeTeam).fetchJoin()
+                .join(fixture.awayTeam).fetchJoin()
+                .where(tokens.stream()
+                        .map(this::containsHomeOrAwayTeamName)
+                        .reduce(Expressions.TRUE, BooleanExpression::and))
+                .orderBy(fixture.fixtureDate.desc())
+                .limit(size)
+                .fetch();
+    }
+
     private BooleanExpression ltCursorId(Long cursorId) {
         return cursorId == null ? null : fixture.id.lt(cursorId);
     }
@@ -48,5 +67,10 @@ public class FixtureRecordRepositoryImpl implements FixtureRecordRepositoryCusto
 
     private BooleanExpression ltFixtureDate(LocalDateTime endDateTime) {
         return endDateTime == null ? null : fixture.fixtureDate.lt(endDateTime);
+    }
+
+    private BooleanExpression containsHomeOrAwayTeamName(String token) {
+        return fixture.homeTeam.name.containsIgnoreCase(token)
+                .or(fixture.awayTeam.name.containsIgnoreCase(token));
     }
 }

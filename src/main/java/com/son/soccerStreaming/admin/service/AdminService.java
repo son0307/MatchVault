@@ -31,6 +31,7 @@ import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
@@ -38,6 +39,35 @@ import java.util.stream.Collectors;
 public class AdminService {
 
     private static final ZoneId KOREA_ZONE = ZoneId.of("Asia/Seoul");
+    private static final Set<String> TEAM_OVERRIDE_FIELDS = Set.of(
+            "name",
+            "code",
+            "country",
+            "founded",
+            "logoUrl",
+            "venueId",
+            "venueName",
+            "venueAddress",
+            "venueCity",
+            "capacity",
+            "surface",
+            "venueImageUrl"
+    );
+    private static final Set<String> PLAYER_OVERRIDE_FIELDS = Set.of(
+            "name",
+            "firstname",
+            "lastname",
+            "age",
+            "birthDate",
+            "birthPlace",
+            "birthCountry",
+            "nationality",
+            "height",
+            "weight",
+            "position",
+            "number",
+            "photoUrl"
+    );
 
     private static final List<SyncStatusDefinition> SYNC_STATUS_DEFINITIONS = List.of(
             new SyncStatusDefinition("teams", "Teams"),
@@ -145,6 +175,44 @@ public class AdminService {
                 detailsOf(changes),
                 true
         ));
+        return toPlayerResponse(player);
+    }
+
+    @Transactional
+    public AdminDto.TeamAdminResponse clearTeamOverride(Long adminUserId, Long teamId, String fieldName) {
+        validateOverrideField(TEAM_OVERRIDE_FIELDS, fieldName);
+        Team team = teamRepository.findByTeamId(teamId)
+                .orElseThrow(() -> new CustomException(ErrorCode.TEAM_NOT_FOUND));
+        long deletedCount = adminOverrideService.clearOverride(AdminOverrideTargetType.TEAM, team.getTeamId(), fieldName);
+        saveOverrideClearLog(adminUserId, "TEAM", team.getTeamId(), fieldName, deletedCount);
+        return toTeamResponse(team);
+    }
+
+    @Transactional
+    public AdminDto.TeamAdminResponse clearTeamOverrides(Long adminUserId, Long teamId) {
+        Team team = teamRepository.findByTeamId(teamId)
+                .orElseThrow(() -> new CustomException(ErrorCode.TEAM_NOT_FOUND));
+        long deletedCount = adminOverrideService.clearOverrides(AdminOverrideTargetType.TEAM, team.getTeamId());
+        saveOverrideClearLog(adminUserId, "TEAM", team.getTeamId(), "ALL", deletedCount);
+        return toTeamResponse(team);
+    }
+
+    @Transactional
+    public AdminDto.PlayerAdminResponse clearPlayerOverride(Long adminUserId, Long playerId, String fieldName) {
+        validateOverrideField(PLAYER_OVERRIDE_FIELDS, fieldName);
+        Player player = playerRepository.findByPlayerId(playerId)
+                .orElseThrow(() -> new CustomException(ErrorCode.PLAYER_NOT_FOUND));
+        long deletedCount = adminOverrideService.clearOverride(AdminOverrideTargetType.PLAYER, player.getPlayerId(), fieldName);
+        saveOverrideClearLog(adminUserId, "PLAYER", player.getPlayerId(), fieldName, deletedCount);
+        return toPlayerResponse(player);
+    }
+
+    @Transactional
+    public AdminDto.PlayerAdminResponse clearPlayerOverrides(Long adminUserId, Long playerId) {
+        Player player = playerRepository.findByPlayerId(playerId)
+                .orElseThrow(() -> new CustomException(ErrorCode.PLAYER_NOT_FOUND));
+        long deletedCount = adminOverrideService.clearOverrides(AdminOverrideTargetType.PLAYER, player.getPlayerId());
+        saveOverrideClearLog(adminUserId, "PLAYER", player.getPlayerId(), "ALL", deletedCount);
         return toPlayerResponse(player);
     }
 
@@ -309,6 +377,25 @@ public class AdminService {
                 .toList();
     }
 
+    private void validateOverrideField(Set<String> allowedFields, String fieldName) {
+        if (!allowedFields.contains(fieldName)) {
+            throw new CustomException(ErrorCode.INVALID_ADMIN_OVERRIDE_FIELD);
+        }
+    }
+
+    private void saveOverrideClearLog(Long adminUserId, String targetType, Long targetId, String fieldName, long deletedCount) {
+        String target = "ALL".equals(fieldName) ? "all manual overrides" : "manual override field=" + fieldName;
+        adminAuditLogRepository.save(AdminAuditLog.of(
+                findUser(adminUserId),
+                AdminAuditType.OVERRIDE_CLEAR,
+                targetType,
+                targetId,
+                "Cleared " + target + " for " + targetType + " #" + targetId,
+                "field=" + fieldName + "; deletedCount=" + deletedCount,
+                true
+        ));
+    }
+
     private String detailsOf(List<FieldChange> changes) {
         if (changes.isEmpty()) {
             return "changedFields=[]";
@@ -346,6 +433,7 @@ public class AdminService {
                 .capacity(venue != null ? venue.getCapacity() : null)
                 .surface(venue != null ? venue.getSurface() : null)
                 .venueImageUrl(venue != null ? venue.getVenueImageUrl() : null)
+                .manualOverrides(toOverrideResponses(AdminOverrideTargetType.TEAM, team.getTeamId()))
                 .build();
     }
 
@@ -365,7 +453,21 @@ public class AdminService {
                 .position(player.getPosition())
                 .number(player.getNumber())
                 .photoUrl(player.getPhotoUrl())
+                .manualOverrides(toOverrideResponses(AdminOverrideTargetType.PLAYER, player.getPlayerId()))
                 .build();
+    }
+
+    private List<AdminDto.ManualOverrideResponse> toOverrideResponses(AdminOverrideTargetType targetType, Long targetId) {
+        List<AdminOverrideService.OverrideInfo> overrides = adminOverrideService.overrideInfos(targetType, targetId);
+        if (overrides == null) {
+            return List.of();
+        }
+        return overrides.stream()
+                .map(override -> AdminDto.ManualOverrideResponse.builder()
+                        .fieldName(override.fieldName())
+                        .updatedAt(override.updatedAt())
+                        .build())
+                .toList();
     }
 
     private AdminDto.AuditLogResponse toAuditLogResponse(AdminAuditLog log) {

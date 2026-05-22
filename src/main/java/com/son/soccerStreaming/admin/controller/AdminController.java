@@ -6,6 +6,7 @@ import com.son.soccerStreaming.admin.service.AdminService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -38,6 +39,23 @@ public class AdminController {
         return ResponseEntity.ok(adminService.updateTeam(userDetails.getId(), teamId, request));
     }
 
+    @DeleteMapping("/teams/{teamId}/overrides")
+    public ResponseEntity<AdminDto.TeamAdminResponse> clearTeamOverrides(
+            @AuthenticationPrincipal AuthUserDetails userDetails,
+            @PathVariable Long teamId
+    ) {
+        return ResponseEntity.ok(adminService.clearTeamOverrides(userDetails.getId(), teamId));
+    }
+
+    @DeleteMapping("/teams/{teamId}/overrides/{fieldName}")
+    public ResponseEntity<AdminDto.TeamAdminResponse> clearTeamOverride(
+            @AuthenticationPrincipal AuthUserDetails userDetails,
+            @PathVariable Long teamId,
+            @PathVariable String fieldName
+    ) {
+        return ResponseEntity.ok(adminService.clearTeamOverride(userDetails.getId(), teamId, fieldName));
+    }
+
     @GetMapping("/players")
     public List<AdminDto.PlayerAdminResponse> searchPlayers(@RequestParam(defaultValue = "") String keyword) {
         return adminService.searchPlayers(keyword);
@@ -50,6 +68,23 @@ public class AdminController {
             @RequestBody AdminDto.PlayerUpdateRequest request
     ) {
         return ResponseEntity.ok(adminService.updatePlayer(userDetails.getId(), playerId, request));
+    }
+
+    @DeleteMapping("/players/{playerId}/overrides")
+    public ResponseEntity<AdminDto.PlayerAdminResponse> clearPlayerOverrides(
+            @AuthenticationPrincipal AuthUserDetails userDetails,
+            @PathVariable Long playerId
+    ) {
+        return ResponseEntity.ok(adminService.clearPlayerOverrides(userDetails.getId(), playerId));
+    }
+
+    @DeleteMapping("/players/{playerId}/overrides/{fieldName}")
+    public ResponseEntity<AdminDto.PlayerAdminResponse> clearPlayerOverride(
+            @AuthenticationPrincipal AuthUserDetails userDetails,
+            @PathVariable Long playerId,
+            @PathVariable String fieldName
+    ) {
+        return ResponseEntity.ok(adminService.clearPlayerOverride(userDetails.getId(), playerId, fieldName));
     }
 
     @PostMapping("/sync/teams")

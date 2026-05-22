@@ -9,4 +9,6 @@ public interface FixtureRecordRepositoryCustom {
     List<Fixture> findRecentFixturesWithCursor(Long cursorId, Integer season,
                                                 LocalDateTime startDateTime, LocalDateTime endDateTime,
                                                 int size);
+
+    List<Fixture> searchByTeamNameTokens(List<String> tokens, int size);
 }

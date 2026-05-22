@@ -1,10 +1,12 @@
 package com.son.soccerStreaming.live.controller;
 
 import com.son.soccerStreaming.fixture.dto.FixturePlayerStatResponseDto;
+import com.son.soccerStreaming.fixture.dto.FixtureResponseDto;
 import com.son.soccerStreaming.fixture.dto.FixtureStatResponseDto;
 import com.son.soccerStreaming.fixture.service.FixturePlayerStatService;
 import com.son.soccerStreaming.fixture.service.FixtureRedisService;
 import com.son.soccerStreaming.fixture.service.FixtureStatService;
+import com.son.soccerStreaming.live.service.LiveFixtureQueryService;
 import com.son.soccerStreaming.live.service.SseService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -20,8 +22,11 @@ import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
+
+import java.util.List;
 
 @Tag(name = "실시간 경기", description = "SSE 기반 실시간 경기 중계와 최신 경기 데이터 보강 조회 API")
 @RestController
@@ -34,6 +39,24 @@ public class LiveFixtureController {
     private final FixtureRedisService fixtureRedisService;
     private final FixtureStatService fixtureStatService;
     private final FixturePlayerStatService fixturePlayerStatService;
+    private final LiveFixtureQueryService liveFixtureQueryService;
+
+    @Operation(
+            summary = "현재 라이브 경기 목록 조회",
+            description = "현재 LIVE 상태인 경기 목록을 조회합니다."
+    )
+    @ApiResponse(
+            responseCode = "200",
+            description = "현재 라이브 중인 경기 목록",
+            content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE)
+    )
+    @GetMapping(value = "/fixtures", produces = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<List<FixtureResponseDto.Summary>> getLiveFixtures(
+            @Parameter(description = "조회할 시즌", example = "2025")
+            @RequestParam(defaultValue = "2025") Integer season
+    ) {
+        return ResponseEntity.ok(liveFixtureQueryService.getTodayLiveFixtures(season));
+    }
 
     // 클라이언트가 특정 fixture 방에 SSE로 접속하는 엔드포인트입니다.
     @Operation(

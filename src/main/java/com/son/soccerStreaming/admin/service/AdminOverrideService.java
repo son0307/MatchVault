@@ -7,7 +7,9 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.Collection;
+import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -38,7 +40,29 @@ public class AdminOverrideService {
                 .collect(Collectors.toSet());
     }
 
+    @Transactional(readOnly = true)
+    public List<OverrideInfo> overrideInfos(AdminOverrideTargetType targetType, Long targetId) {
+        return adminFieldOverrideRepository
+                .findAllByTargetTypeAndTargetIdOrderByFieldNameAsc(targetType, targetId)
+                .stream()
+                .map(override -> new OverrideInfo(override.getFieldName(), override.getUpdatedAt()))
+                .toList();
+    }
+
+    @Transactional
+    public long clearOverrides(AdminOverrideTargetType targetType, Long targetId) {
+        return adminFieldOverrideRepository.deleteByTargetTypeAndTargetId(targetType, targetId);
+    }
+
+    @Transactional
+    public long clearOverride(AdminOverrideTargetType targetType, Long targetId, String fieldName) {
+        return adminFieldOverrideRepository.deleteByTargetTypeAndTargetIdAndFieldName(targetType, targetId, fieldName);
+    }
+
     public <T> T apiValueUnlessOverridden(Set<String> overrides, String fieldName, T currentValue, T apiValue) {
         return overrides.contains(fieldName) ? currentValue : apiValue;
+    }
+
+    public record OverrideInfo(String fieldName, LocalDateTime updatedAt) {
     }
 }

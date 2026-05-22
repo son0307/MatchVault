@@ -92,49 +92,55 @@ async function searchPlayers() {
 
 function renderTeamForm(team) {
     adminState.selectedTeam = team;
+    const overrides = overrideMap(team.manualOverrides);
     adminElements.teamForm.hidden = false;
     adminElements.teamForm.innerHTML = `
         <h3>${escapeHtml(team.name || "Team")}</h3>
+        ${overrideSummaryMarkup(team.manualOverrides, "team")}
         <div class="admin-form-grid">
-            ${inputMarkup("name", "Name", team.name)}
-            ${inputMarkup("code", "Code", team.code)}
-            ${inputMarkup("country", "Country", team.country)}
-            ${inputMarkup("founded", "Founded", team.founded, "number")}
-            ${inputMarkup("logoUrl", "Logo URL", team.logoUrl)}
-            ${inputMarkup("venueId", "Venue ID", team.venueId, "number")}
-            ${inputMarkup("venueName", "Venue Name", team.venueName)}
-            ${inputMarkup("venueAddress", "Venue Address", team.venueAddress)}
-            ${inputMarkup("venueCity", "Venue City", team.venueCity)}
-            ${inputMarkup("capacity", "Capacity", team.capacity, "number")}
-            ${inputMarkup("surface", "Surface", team.surface)}
-            ${inputMarkup("venueImageUrl", "Venue Image URL", team.venueImageUrl)}
+            ${inputMarkup("name", "Name", team.name, "text", overrides.name)}
+            ${inputMarkup("code", "Code", team.code, "text", overrides.code)}
+            ${inputMarkup("country", "Country", team.country, "text", overrides.country)}
+            ${inputMarkup("founded", "Founded", team.founded, "number", overrides.founded)}
+            ${inputMarkup("logoUrl", "Logo URL", team.logoUrl, "text", overrides.logoUrl)}
+            ${inputMarkup("venueId", "Venue ID", team.venueId, "number", overrides.venueId)}
+            ${inputMarkup("venueName", "Venue Name", team.venueName, "text", overrides.venueName)}
+            ${inputMarkup("venueAddress", "Venue Address", team.venueAddress, "text", overrides.venueAddress)}
+            ${inputMarkup("venueCity", "Venue City", team.venueCity, "text", overrides.venueCity)}
+            ${inputMarkup("capacity", "Capacity", team.capacity, "number", overrides.capacity)}
+            ${inputMarkup("surface", "Surface", team.surface, "text", overrides.surface)}
+            ${inputMarkup("venueImageUrl", "Venue Image URL", team.venueImageUrl, "text", overrides.venueImageUrl)}
         </div>
         <button type="submit">Save Team</button>
     `;
+    bindOverrideButtons(adminElements.teamForm, "team");
 }
 
 function renderPlayerForm(player) {
     adminState.selectedPlayer = player;
+    const overrides = overrideMap(player.manualOverrides);
     adminElements.playerForm.hidden = false;
     adminElements.playerForm.innerHTML = `
         <h3>${escapeHtml(player.name || "Player")}</h3>
+        ${overrideSummaryMarkup(player.manualOverrides, "player")}
         <div class="admin-form-grid">
-            ${inputMarkup("name", "Name", player.name)}
-            ${inputMarkup("firstname", "Firstname", player.firstname)}
-            ${inputMarkup("lastname", "Lastname", player.lastname)}
-            ${inputMarkup("age", "Age", player.age, "number")}
-            ${inputMarkup("birthDate", "Birth Date", player.birthDate, "date")}
-            ${inputMarkup("birthPlace", "Birth Place", player.birthPlace)}
-            ${inputMarkup("birthCountry", "Birth Country", player.birthCountry)}
-            ${inputMarkup("nationality", "Nationality", player.nationality)}
-            ${inputMarkup("height", "Height", player.height)}
-            ${inputMarkup("weight", "Weight", player.weight)}
-            ${inputMarkup("position", "Position", player.position)}
-            ${inputMarkup("number", "Number", player.number, "number")}
-            ${inputMarkup("photoUrl", "Photo URL", player.photoUrl)}
+            ${inputMarkup("name", "Name", player.name, "text", overrides.name)}
+            ${inputMarkup("firstname", "Firstname", player.firstname, "text", overrides.firstname)}
+            ${inputMarkup("lastname", "Lastname", player.lastname, "text", overrides.lastname)}
+            ${inputMarkup("age", "Age", player.age, "number", overrides.age)}
+            ${inputMarkup("birthDate", "Birth Date", player.birthDate, "date", overrides.birthDate)}
+            ${inputMarkup("birthPlace", "Birth Place", player.birthPlace, "text", overrides.birthPlace)}
+            ${inputMarkup("birthCountry", "Birth Country", player.birthCountry, "text", overrides.birthCountry)}
+            ${inputMarkup("nationality", "Nationality", player.nationality, "text", overrides.nationality)}
+            ${inputMarkup("height", "Height", player.height, "text", overrides.height)}
+            ${inputMarkup("weight", "Weight", player.weight, "text", overrides.weight)}
+            ${inputMarkup("position", "Position", player.position, "text", overrides.position)}
+            ${inputMarkup("number", "Number", player.number, "number", overrides.number)}
+            ${inputMarkup("photoUrl", "Photo URL", player.photoUrl, "text", overrides.photoUrl)}
         </div>
         <button type="submit">Save Player</button>
     `;
+    bindOverrideButtons(adminElements.playerForm, "player");
 }
 
 async function saveTeam(event) {
@@ -159,6 +165,24 @@ async function savePlayer(event) {
     } catch (error) {
         adminElements.playerResults.innerHTML = errorMarkup(error);
     }
+}
+
+async function clearTeamOverride(fieldName) {
+    const url = fieldName
+        ? `/api/v1/admin/teams/${adminState.selectedTeam.teamId}/overrides/${encodeURIComponent(fieldName)}`
+        : `/api/v1/admin/teams/${adminState.selectedTeam.teamId}/overrides`;
+    adminState.selectedTeam = await deleteJson(url);
+    renderTeamForm(adminState.selectedTeam);
+    await loadAuditLogs();
+}
+
+async function clearPlayerOverride(fieldName) {
+    const url = fieldName
+        ? `/api/v1/admin/players/${adminState.selectedPlayer.playerId}/overrides/${encodeURIComponent(fieldName)}`
+        : `/api/v1/admin/players/${adminState.selectedPlayer.playerId}/overrides`;
+    adminState.selectedPlayer = await deleteJson(url);
+    renderPlayerForm(adminState.selectedPlayer);
+    await loadAuditLogs();
 }
 
 async function runSync(task) {
@@ -242,12 +266,78 @@ async function logout() {
     window.location.href = "/";
 }
 
-function inputMarkup(name, label, value, type = "text") {
+function inputMarkup(name, label, value, type = "text", override = null) {
     return `
-        <label>${label}
+        <label>${labelMarkup(label, override)}
             <input name="${name}" type="${type}" value="${escapeAttribute(value ?? "")}">
+            ${override ? `<button class="ghost-button admin-clear-override" type="button" data-override-field="${escapeAttribute(name)}">해제</button>` : ""}
         </label>
     `;
+}
+
+function labelMarkup(label, override) {
+    if (!override) {
+        return escapeHtml(label);
+    }
+    return `
+        <span class="admin-field-label">
+            <span>${escapeHtml(label)}</span>
+            <span class="small-pill">수동 수정 · ${formatKoreaDateTime(override.updatedAt)}</span>
+        </span>
+    `;
+}
+
+function overrideSummaryMarkup(overrides, type) {
+    const items = Array.isArray(overrides) ? overrides : [];
+    if (items.length === 0) {
+        return "";
+    }
+    return `
+        <div class="admin-override-summary">
+            <span>${items.length}개 필드가 수동 수정 보호 중입니다.</span>
+            <button class="ghost-button" type="button" data-clear-all-overrides="${type}">전체 해제</button>
+        </div>
+    `;
+}
+
+function bindOverrideButtons(form, type) {
+    form.querySelectorAll("[data-override-field]").forEach((button) => {
+        button.addEventListener("click", async () => {
+            if (!confirm("현재 값은 유지되고 다음 전체 동기화 때 API 값으로 갱신됩니다. 이 필드의 수동 수정 보호를 해제할까요?")) {
+                return;
+            }
+            try {
+                if (type === "team") {
+                    await clearTeamOverride(button.dataset.overrideField);
+                } else {
+                    await clearPlayerOverride(button.dataset.overrideField);
+                }
+            } catch (error) {
+                form.insertAdjacentHTML("afterbegin", errorMarkup(error));
+            }
+        });
+    });
+    form.querySelectorAll("[data-clear-all-overrides]").forEach((button) => {
+        button.addEventListener("click", async () => {
+            if (!confirm("현재 값은 유지되고 다음 전체 동기화 때 API 값으로 갱신됩니다. 모든 수동 수정 보호를 해제할까요?")) {
+                return;
+            }
+            try {
+                if (type === "team") {
+                    await clearTeamOverride(null);
+                } else {
+                    await clearPlayerOverride(null);
+                }
+            } catch (error) {
+                form.insertAdjacentHTML("afterbegin", errorMarkup(error));
+            }
+        });
+    });
+}
+
+function overrideMap(overrides) {
+    const entries = Array.isArray(overrides) ? overrides : [];
+    return Object.fromEntries(entries.map((override) => [override.fieldName, override]));
 }
 
 function formBody(form) {
@@ -267,6 +357,10 @@ async function putJson(url, body) {
         headers: {"Content-Type": "application/json"},
         body: JSON.stringify(body),
     });
+}
+
+async function deleteJson(url) {
+    return requestJson(url, {method: "DELETE"});
 }
 
 async function requestJson(url, options = {}) {

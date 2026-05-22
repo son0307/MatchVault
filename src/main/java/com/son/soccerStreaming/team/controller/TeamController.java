@@ -35,8 +35,8 @@ public class TeamController {
     @Operation(summary = "팀 순위 조회", description = "EPL 시즌 팀 순위를 조회합니다.")
     @GetMapping("/standings")
     public List<TeamStandingResponseDto> getStandings(
-            @Parameter(description = "조회할 시즌", example = "2019")
-            @RequestParam(defaultValue = "2019") Integer season
+            @Parameter(description = "조회할 시즌", example = "2025")
+            @RequestParam(defaultValue = "2025") Integer season
     ) {
         return teamStandingService.getStandings(season);
     }

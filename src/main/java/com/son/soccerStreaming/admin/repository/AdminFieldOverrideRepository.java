@@ -21,4 +21,17 @@ public interface AdminFieldOverrideRepository extends JpaRepository<AdminFieldOv
             Long targetId,
             Collection<String> fieldNames
     );
+
+    List<AdminFieldOverride> findAllByTargetTypeAndTargetIdOrderByFieldNameAsc(
+            AdminOverrideTargetType targetType,
+            Long targetId
+    );
+
+    long deleteByTargetTypeAndTargetId(AdminOverrideTargetType targetType, Long targetId);
+
+    long deleteByTargetTypeAndTargetIdAndFieldName(
+            AdminOverrideTargetType targetType,
+            Long targetId,
+            String fieldName
+    );
 }
