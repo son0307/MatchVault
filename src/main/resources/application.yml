@@ -23,7 +23,6 @@ live:
   sync:
     enabled: ${LIVE_SYNC_ENABLED:false}
     interval-ms: ${LIVE_SYNC_INTERVAL_MS:5000}
-    fixture-ids: ${LIVE_SYNC_FIXTURE_IDS:1208000}
 
 api-football:
   sync:

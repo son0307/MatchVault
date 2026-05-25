@@ -4,7 +4,7 @@ live:
     api-key: ${API_FOOTBALL_KEY}
     api-host: ${API_FOOTBALL_HOST:}
   sync:
-    enabled: ${LIVE_SYNC_ENABLED:false}
+    enabled: ${LIVE_SYNC_ENABLED:true}
 
 api-football:
   sync:

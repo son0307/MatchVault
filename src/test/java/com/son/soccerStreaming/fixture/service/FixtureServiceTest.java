@@ -1,0 +1,70 @@
+package com.son.soccerStreaming.fixture.service;
+
+import com.son.soccerStreaming.fixture.entity.Fixture;
+import com.son.soccerStreaming.fixture.repository.FixtureRecordRepository;
+import com.son.soccerStreaming.team.entity.Team;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.util.List;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
+@ExtendWith(MockitoExtension.class)
+class FixtureServiceTest {
+
+    @Mock
+    private FixtureRecordRepository fixtureRecordRepository;
+
+    @InjectMocks
+    private FixtureService fixtureService;
+
+    @Test
+    void getRecentFixturesPassesRoundFilterAndReturnsRound() {
+        Team homeTeam = Team.builder().teamId(47L).name("Tottenham").build();
+        Team awayTeam = Team.builder().teamId(49L).name("Chelsea").build();
+        Fixture fixture = Fixture.builder()
+                .id(1L)
+                .fixtureId(100L)
+                .fixtureDate(LocalDateTime.of(2026, 5, 22, 12, 0))
+                .round(38)
+                .homeTeam(homeTeam)
+                .awayTeam(awayTeam)
+                .fixtureStatus("SCHEDULED")
+                .build();
+
+        when(fixtureRecordRepository.findRecentFixturesWithCursor(
+                org.mockito.ArgumentMatchers.isNull(),
+                org.mockito.ArgumentMatchers.eq(2025),
+                org.mockito.ArgumentMatchers.eq(38),
+                org.mockito.ArgumentMatchers.any(LocalDateTime.class),
+                org.mockito.ArgumentMatchers.any(LocalDateTime.class),
+                org.mockito.ArgumentMatchers.eq(100)
+        )).thenReturn(List.of(fixture));
+
+        var response = fixtureService.getRecentFixtures(null, 2025, 38, LocalDate.of(2026, 5, 22), 100);
+
+        assertThat(response.getContent()).hasSize(1);
+        assertThat(response.getContent().get(0).getRound()).isEqualTo(38);
+
+        ArgumentCaptor<LocalDateTime> startCaptor = ArgumentCaptor.forClass(LocalDateTime.class);
+        ArgumentCaptor<LocalDateTime> endCaptor = ArgumentCaptor.forClass(LocalDateTime.class);
+        verify(fixtureRecordRepository).findRecentFixturesWithCursor(
+                org.mockito.ArgumentMatchers.isNull(),
+                org.mockito.ArgumentMatchers.eq(2025),
+                org.mockito.ArgumentMatchers.eq(38),
+                startCaptor.capture(),
+                endCaptor.capture(),
+                org.mockito.ArgumentMatchers.eq(100)
+        );
+        assertThat(endCaptor.getValue()).isEqualTo(startCaptor.getValue().plusDays(1));
+    }
+}

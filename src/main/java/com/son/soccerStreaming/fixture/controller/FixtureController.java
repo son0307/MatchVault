@@ -46,12 +46,14 @@ public class FixtureController {
             @RequestParam(required = false) Long cursorId,
             @Parameter(description = "조회할 시즌", example = "2025")
             @RequestParam(required = false) Integer season,
+            @Parameter(description = "Round number", example = "38")
+            @RequestParam(required = false) Integer round,
             @Parameter(description = "한국 시간 기준 경기 날짜", example = "2026-05-15")
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
             @Parameter(description = "한 번에 가져올 경기 수", example = "10")
             @RequestParam(defaultValue = "10") int size
     ) {
-        return ResponseEntity.ok(fixtureService.getRecentFixtures(cursorId, season, date, size));
+        return ResponseEntity.ok(fixtureService.getRecentFixtures(cursorId, season, round, date, size));
     }
 
     @Operation(summary = "특정 경기 라인업 조회", description = "선발, 교체, 결장 선수 정보를 팀별로 조회합니다.")

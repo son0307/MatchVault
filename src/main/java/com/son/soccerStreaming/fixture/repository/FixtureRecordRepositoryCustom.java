@@ -6,7 +6,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 public interface FixtureRecordRepositoryCustom {
-    List<Fixture> findRecentFixturesWithCursor(Long cursorId, Integer season,
+    List<Fixture> findRecentFixturesWithCursor(Long cursorId, Integer season, Integer round,
                                                 LocalDateTime startDateTime, LocalDateTime endDateTime,
                                                 int size);
 

@@ -19,7 +19,7 @@ public class FixtureRecordRepositoryImpl implements FixtureRecordRepositoryCusto
     private final JPAQueryFactory queryFactory;
 
     @Override
-    public List<Fixture> findRecentFixturesWithCursor(Long cursorId, Integer season,
+    public List<Fixture> findRecentFixturesWithCursor(Long cursorId, Integer season, Integer round,
                                                        LocalDateTime startDateTime, LocalDateTime endDateTime,
                                                        int size) {
         return queryFactory
@@ -27,6 +27,7 @@ public class FixtureRecordRepositoryImpl implements FixtureRecordRepositoryCusto
                 .where(
                         ltCursorId(cursorId),
                         eqSeason(season),
+                        eqRound(round),
                         goeFixtureDate(startDateTime),
                         ltFixtureDate(endDateTime)
                 )
@@ -59,6 +60,10 @@ public class FixtureRecordRepositoryImpl implements FixtureRecordRepositoryCusto
 
     private BooleanExpression eqSeason(Integer season) {
         return season == null ? null : fixture.season.eq(season);
+    }
+
+    private BooleanExpression eqRound(Integer round) {
+        return round == null ? null : fixture.round.eq(round);
     }
 
     private BooleanExpression goeFixtureDate(LocalDateTime startDateTime) {

@@ -538,7 +538,47 @@ h3 {
     padding: 14px;
 }
 
+.fixture-schedule-controls {
+    display: grid;
+    gap: 10px;
+    min-width: min(100%, 360px);
+}
+
+.fixture-view-toggle {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 4px;
+    width: 100%;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: var(--surface-soft);
+    padding: 4px;
+}
+
+.fixture-view-button {
+    min-height: 34px;
+    border: 0;
+    border-radius: 6px;
+    background: transparent;
+    color: var(--muted);
+    font-size: 13px;
+    font-weight: 800;
+}
+
+.fixture-view-button.active {
+    background: #fff;
+    color: var(--text);
+    box-shadow: 0 1px 4px rgba(17, 24, 39, 0.08);
+}
+
 .fixture-date-controls {
+    display: grid;
+    grid-template-columns: 40px minmax(120px, 180px) 40px;
+    align-items: center;
+    gap: 8px;
+}
+
+.fixture-round-controls {
     display: grid;
     grid-template-columns: 40px minmax(120px, 180px) 40px;
     align-items: center;
@@ -564,6 +604,31 @@ h3 {
     min-width: 0;
     padding: 0 12px;
     font-weight: 800;
+}
+
+.fixture-round-field {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: center;
+    gap: 8px;
+    min-height: 40px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: #fff;
+    padding: 0 12px;
+    color: var(--muted);
+    font-size: 12px;
+    font-weight: 800;
+}
+
+.fixture-round-field input {
+    width: 100%;
+    min-width: 0;
+    border: 0;
+    background: transparent;
+    color: var(--text);
+    font: inherit;
+    text-align: right;
 }
 
 .date-nav-button:hover,
@@ -602,6 +667,38 @@ h3 {
     color: var(--muted);
     font-size: 13px;
     white-space: nowrap;
+}
+
+.fixture-round-heading {
+    display: grid;
+    grid-template-columns: 36px minmax(0, 1fr) 36px;
+    align-items: center;
+    gap: 10px;
+    min-height: 46px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: #fff;
+    padding: 5px;
+}
+
+.fixture-round-heading strong {
+    text-align: center;
+    font-size: 16px;
+}
+
+.round-inline-nav {
+    width: 36px;
+    min-height: 36px;
+    border: 0;
+    border-radius: 50%;
+    background: var(--surface-soft);
+    color: var(--text);
+    font-size: 22px;
+    line-height: 1;
+}
+
+.round-inline-nav:hover {
+    background: #e8f4f8;
 }
 
 .fixture-card {
@@ -1192,8 +1289,13 @@ th {
         max-height: 68vh;
     }
 
-    .fixture-date-controls {
+    .fixture-date-controls,
+    .fixture-round-controls {
         grid-template-columns: 40px minmax(0, 1fr) 40px;
+    }
+
+    .fixture-schedule-controls {
+        width: 100%;
     }
 
     .live-controls input {

@@ -30,6 +30,7 @@ public class LiveFixtureQueryService {
         return FixtureResponseDto.Summary.builder()
                 .fixtureId(fixture.getFixtureId())
                 .fixtureDate(fixture.getFixtureDate())
+                .round(fixture.getRound())
                 .homeTeamName(fixture.getHomeTeam().getName())
                 .awayTeamName(fixture.getAwayTeam().getName())
                 .homeScore(valueOf(fixture.getHomeScore()))

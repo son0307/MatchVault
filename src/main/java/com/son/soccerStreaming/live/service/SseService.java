@@ -5,7 +5,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.io.IOException;
+import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -23,18 +25,28 @@ public class SseService {
         room.add(emitter);
 
         // 연결 종료, 타임 아웃 -> 목록에서 제거
-        emitter.onCompletion(() -> room.remove(emitter));
-        emitter.onTimeout(() -> room.remove(emitter));
-        emitter.onError(error -> room.remove(emitter));
+        emitter.onCompletion(() -> removeEmitter(fixtureId, room, emitter));
+        emitter.onTimeout(() -> removeEmitter(fixtureId, room, emitter));
+        emitter.onError(error -> removeEmitter(fixtureId, room, emitter));
 
         try {
             // 첫 연결 시 더미 데이터 전송 (503 에러 방지)
             emitter.send(SseEmitter.event().name("CONNECT").data(fixtureId + ": Successfully connected!"));
         } catch (IOException e) {
-            room.remove(emitter);
+            removeEmitter(fixtureId, room, emitter);
         }
 
         return emitter;
+    }
+
+    // The fast live poller follows only fixtures with active SSE subscribers.
+    public List<Long> getSubscribedFixtureIds() {
+        return fixtureEmitters.entrySet().stream()
+                .filter(entry -> !entry.getValue().isEmpty())
+                .map(Map.Entry::getKey)
+                .map(this::parseFixtureId)
+                .flatMap(Optional::stream)
+                .toList();
     }
 
     // Broadcast live fixture updates to connected clients.
@@ -56,8 +68,24 @@ public class SseService {
                         .data(jsonMessage));
             } catch (IOException e) {
                 // 전송 실패한 파이프는 죽은 클라이언트이므로 제거
-                room.remove(emitter);
+                removeEmitter(fixtureId, room, emitter);
             }
+        }
+    }
+
+    private void removeEmitter(String fixtureId, Set<SseEmitter> room, SseEmitter emitter) {
+        room.remove(emitter);
+        if (room.isEmpty()) {
+            fixtureEmitters.remove(fixtureId, room);
+        }
+    }
+
+    private Optional<Long> parseFixtureId(String fixtureId) {
+        try {
+            return Optional.of(Long.valueOf(fixtureId));
+        } catch (NumberFormatException e) {
+            log.warn("Skip live polling for invalid fixtureId subscription. fixtureId={}", fixtureId);
+            return Optional.empty();
         }
     }
 }

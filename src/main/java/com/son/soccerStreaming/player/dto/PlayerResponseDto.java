@@ -90,7 +90,7 @@ public class PlayerResponseDto {
         private Long fixtureId;
         private LocalDateTime fixtureDate;
         private Integer season;
-        private String round;
+        private Integer round;
         private Long teamId;
         private String teamName;
         private Long opponentTeamId;

@@ -4,7 +4,9 @@ const state = {
     standings: [],
     nextCursor: null,
     hasNext: false,
+    fixtureViewMode: "date",
     selectedFixtureDate: todayKoreaDateKey(),
+    selectedFixtureRound: 1,
     selectedFixtureId: null,
     selectedFixturePlayerStats: null,
     selectedTeamId: null,
@@ -32,6 +34,10 @@ const elements = {
     fixtureDateButton: document.querySelector("#fixtureDateButton"),
     fixtureDateInput: document.querySelector("#fixtureDateInput"),
     nextFixtureDate: document.querySelector("#nextFixtureDate"),
+    fixtureViewModeButtons: document.querySelectorAll("[data-fixture-view-mode]"),
+    previousFixtureRound: document.querySelector("#previousFixtureRound"),
+    fixtureRoundInput: document.querySelector("#fixtureRoundInput"),
+    nextFixtureRound: document.querySelector("#nextFixtureRound"),
     teamCount: document.querySelector("#teamCount"),
     fixtureCount: document.querySelector("#fixtureCount"),
     standingCount: document.querySelector("#standingCount"),
@@ -77,6 +83,12 @@ document.addEventListener("DOMContentLoaded", () => {
     elements.nextFixtureDate.addEventListener("click", () => moveSelectedFixtureDate(1));
     elements.fixtureDateButton.addEventListener("click", openFixtureDatePicker);
     elements.fixtureDateInput.addEventListener("change", selectFixtureDateFromInput);
+    elements.fixtureViewModeButtons.forEach((button) => {
+        button.addEventListener("click", () => selectFixtureViewMode(button.dataset.fixtureViewMode));
+    });
+    elements.previousFixtureRound.addEventListener("click", () => moveSelectedFixtureRound(-1));
+    elements.nextFixtureRound.addEventListener("click", () => moveSelectedFixtureRound(1));
+    elements.fixtureRoundInput.addEventListener("change", selectFixtureRoundFromInput);
     elements.liveConnectButton.addEventListener("click", connectLiveFixture);
     elements.liveDisconnectButton.addEventListener("click", disconnectLiveFixture);
     renderFixtureDateControl();
@@ -540,19 +552,35 @@ function favoritePlayerButton(playerId) {
 }
 
 function setupFixtureDateControls() {
-    if (!elements.previousFixtureDate || !elements.fixtureDateButton || !elements.fixtureDateInput || !elements.nextFixtureDate) {
+    if (!elements.previousFixtureDate || !elements.fixtureDateButton || !elements.fixtureDateInput || !elements.nextFixtureDate
+            || !elements.previousFixtureRound || !elements.fixtureRoundInput || !elements.nextFixtureRound
+            || !elements.fixtureViewModeButtons.length) {
         const heading = document.querySelector(".fixtures-panel .panel-heading");
         const loadMoreButton = elements.loadMoreFixtures;
 
         if (heading && loadMoreButton) {
             const controls = document.createElement("div");
-            controls.className = "fixture-date-controls";
-            controls.setAttribute("aria-label", "경기 날짜 선택");
+            controls.className = "fixture-schedule-controls";
+            controls.setAttribute("aria-label", "경기 일정 보기 선택");
             controls.innerHTML = `
-                <button id="previousFixtureDate" type="button" class="date-nav-button" aria-label="이전 날짜">‹</button>
-                <button id="fixtureDateButton" type="button" class="fixture-date-button">오늘</button>
-                <input id="fixtureDateInput" class="fixture-date-input" type="date" aria-label="경기 날짜">
-                <button id="nextFixtureDate" type="button" class="date-nav-button" aria-label="다음 날짜">›</button>
+                <div class="fixture-view-toggle" role="tablist" aria-label="경기 보기 방식">
+                    <button type="button" class="fixture-view-button active" data-fixture-view-mode="date">날짜</button>
+                    <button type="button" class="fixture-view-button" data-fixture-view-mode="round">라운드</button>
+                </div>
+                <div class="fixture-date-controls" data-fixture-controls="date">
+                    <button id="previousFixtureDate" type="button" class="date-nav-button" aria-label="이전 날짜">‹</button>
+                    <button id="fixtureDateButton" type="button" class="fixture-date-button">오늘</button>
+                    <input id="fixtureDateInput" class="fixture-date-input" type="date" aria-label="경기 날짜">
+                    <button id="nextFixtureDate" type="button" class="date-nav-button" aria-label="다음 날짜">›</button>
+                </div>
+                <div class="fixture-round-controls" data-fixture-controls="round" hidden>
+                    <button id="previousFixtureRound" type="button" class="date-nav-button" aria-label="이전 라운드">‹</button>
+                    <label class="fixture-round-field">
+                        <span>라운드</span>
+                        <input id="fixtureRoundInput" type="number" min="1" max="99" step="1" inputmode="numeric" aria-label="경기 라운드">
+                    </label>
+                    <button id="nextFixtureRound" type="button" class="date-nav-button" aria-label="다음 라운드">›</button>
+                </div>
             `;
             heading.insertBefore(controls, loadMoreButton);
             loadMoreButton.textContent = "더 보기";
@@ -562,18 +590,47 @@ function setupFixtureDateControls() {
         elements.fixtureDateButton = document.querySelector("#fixtureDateButton");
         elements.fixtureDateInput = document.querySelector("#fixtureDateInput");
         elements.nextFixtureDate = document.querySelector("#nextFixtureDate");
+        elements.fixtureViewModeButtons = document.querySelectorAll("[data-fixture-view-mode]");
+        elements.previousFixtureRound = document.querySelector("#previousFixtureRound");
+        elements.fixtureRoundInput = document.querySelector("#fixtureRoundInput");
+        elements.nextFixtureRound = document.querySelector("#nextFixtureRound");
     }
 }
 
 function renderFixtureDateControl() {
     elements.fixtureDateInput.value = state.selectedFixtureDate;
     elements.fixtureDateButton.textContent = selectedFixtureDateLabel();
+    elements.fixtureRoundInput.value = state.selectedFixtureRound;
+
+    document.querySelectorAll("[data-fixture-controls]").forEach((controls) => {
+        controls.hidden = controls.dataset.fixtureControls !== state.fixtureViewMode;
+    });
+    elements.fixtureViewModeButtons.forEach((button) => {
+        const active = button.dataset.fixtureViewMode === state.fixtureViewMode;
+        button.classList.toggle("active", active);
+        button.setAttribute("aria-selected", String(active));
+    });
+}
+
+function selectFixtureViewMode(mode) {
+    if (!["date", "round"].includes(mode) || mode === state.fixtureViewMode) {
+        return;
+    }
+
+    state.fixtureViewMode = mode;
+    state.selectedFixtureId = null;
+    state.selectedFixturePlayerStats = null;
+    resetFixtureListState();
+    renderFixtureDateControl();
+    resetFixtureDetail();
+    loadFixtures(true);
 }
 
 function moveSelectedFixtureDate(dayDelta) {
     state.selectedFixtureDate = addDaysToDateKey(state.selectedFixtureDate, dayDelta);
     state.selectedFixtureId = null;
     state.selectedFixturePlayerStats = null;
+    resetFixtureListState();
     renderFixtureDateControl();
     resetFixtureDetail();
     loadFixtures(true);
@@ -595,16 +652,48 @@ function selectFixtureDateFromInput() {
 
     state.selectedFixtureDate = elements.fixtureDateInput.value;
     state.selectedFixtureId = null;
+    state.selectedFixturePlayerStats = null;
+    resetFixtureListState();
     renderFixtureDateControl();
     resetFixtureDetail();
     loadFixtures(true);
 }
 
-async function refreshAll() {
-    setApiStatus("Loading");
+function moveSelectedFixtureRound(roundDelta) {
+    state.selectedFixtureRound = Math.max(1, state.selectedFixtureRound + roundDelta);
+    state.selectedFixtureId = null;
+    state.selectedFixturePlayerStats = null;
+    resetFixtureListState();
+    renderFixtureDateControl();
+    resetFixtureDetail();
+    loadFixtures(true);
+}
+
+function selectFixtureRoundFromInput() {
+    const round = Number(elements.fixtureRoundInput.value);
+    if (!Number.isInteger(round) || round < 1 || round === state.selectedFixtureRound) {
+        elements.fixtureRoundInput.value = state.selectedFixtureRound;
+        return;
+    }
+
+    state.selectedFixtureRound = round;
+    state.selectedFixtureId = null;
+    state.selectedFixturePlayerStats = null;
+    resetFixtureListState();
+    renderFixtureDateControl();
+    resetFixtureDetail();
+    loadFixtures(true);
+}
+
+function resetFixtureListState() {
     state.fixtures = [];
     state.nextCursor = null;
     state.hasNext = false;
+}
+
+async function refreshAll() {
+    setApiStatus("Loading");
+    resetFixtureListState();
     state.selectedFixtureId = null;
     state.selectedTeamId = null;
     state.selectedPlayerId = null;
@@ -677,12 +766,13 @@ async function loadFixtures(reset) {
 
     elements.loadMoreFixtures.disabled = true;
     const season = encodeURIComponent(elements.seasonInput.value || "2025");
-    const date = encodeURIComponent(state.selectedFixtureDate);
+    const date = state.fixtureViewMode === "date" ? `&date=${encodeURIComponent(state.selectedFixtureDate)}` : "";
+    const round = state.fixtureViewMode === "round" ? `&round=${encodeURIComponent(state.selectedFixtureRound)}` : "";
     const cursor = reset || !state.nextCursor ? "" : `&cursorId=${encodeURIComponent(state.nextCursor)}`;
 
     try {
         // 선택한 날짜는 한국 시간 기준으로 서버에 전달하고, 서버가 UTC 저장 범위로 변환해 조회한다.
-        const response = await requestJson(`/api/v1/fixtures?size=100&season=${season}&date=${date}${cursor}`);
+        const response = await requestJson(`/api/v1/fixtures?size=100&season=${season}${date}${round}${cursor}`);
         const content = Array.isArray(response.content) ? response.content : [];
         state.fixtures = reset ? content : [...state.fixtures, ...content];
         state.nextCursor = response.nextCursor || null;
@@ -699,28 +789,25 @@ async function loadFixtures(reset) {
 
 function renderFixtures() {
     if (!state.fixtures.length) {
-        elements.fixturesList.innerHTML = emptyMarkup(`${selectedFixtureDateLabel()}에 예정된 경기 데이터가 없습니다.`);
+        elements.fixturesList.innerHTML = emptyMarkup(`${fixtureViewLabel()}에 예정된 경기 데이터가 없습니다.`);
         return;
     }
 
-    const selectedDateFixtures = fixturesForSelectedDate(state.fixtures);
-    if (!selectedDateFixtures.length) {
-        elements.fixturesList.innerHTML = emptyMarkup(`${selectedFixtureDateLabel()}에 예정된 경기 데이터가 없습니다.`);
+    const visibleFixtures = fixturesForCurrentView(state.fixtures);
+    if (!visibleFixtures.length) {
+        elements.fixturesList.innerHTML = emptyMarkup(`${fixtureViewLabel()}에 예정된 경기 데이터가 없습니다.`);
         return;
     }
 
-    elements.fixturesList.innerHTML = `
-        <section class="fixture-date-group" aria-label="${escapeAttribute(selectedFixtureDateLabel())}">
-            <div class="fixture-date-heading">
-                <strong>${escapeHtml(selectedFixtureDateLabel())}</strong>
-                <span>${selectedDateFixtures.length}경기</span>
-            </div>
-            ${selectedDateFixtures.map(fixtureCardMarkup).join("")}
-        </section>
-    `;
+    elements.fixturesList.innerHTML = state.fixtureViewMode === "round"
+        ? roundFixtureGroupsMarkup(visibleFixtures)
+        : dateFixtureGroupMarkup(selectedFixtureDateLabel(), visibleFixtures);
 
     document.querySelectorAll(".fixture-card").forEach((button) => {
         button.addEventListener("click", () => selectFixture(Number(button.dataset.fixtureId)));
+    });
+    document.querySelectorAll("[data-round-step]").forEach((button) => {
+        button.addEventListener("click", () => moveSelectedFixtureRound(Number(button.dataset.roundStep)));
     });
 }
 
@@ -752,10 +839,58 @@ function fixtureCardMarkup(fixture) {
     `;
 }
 
-function fixturesForSelectedDate(fixtures) {
+function fixturesForCurrentView(fixtures) {
+    if (state.fixtureViewMode === "round") {
+        return fixtures
+            .filter((fixture) => Number(fixture.round) === state.selectedFixtureRound)
+            .sort((a, b) => fixtureTimeValue(a) - fixtureTimeValue(b));
+    }
+
     return fixtures
         .filter((fixture) => dateKey(fixture.fixtureDate) === state.selectedFixtureDate)
         .sort((a, b) => fixtureTimeValue(a) - fixtureTimeValue(b));
+}
+
+function dateFixtureGroupMarkup(title, fixtures) {
+    return `
+        <section class="fixture-date-group" aria-label="${escapeAttribute(title)}">
+            <div class="fixture-date-heading">
+                <strong>${escapeHtml(title)}</strong>
+                <span>${fixtures.length}경기</span>
+            </div>
+            ${fixtures.map(fixtureCardMarkup).join("")}
+        </section>
+    `;
+}
+
+function roundFixtureGroupsMarkup(fixtures) {
+    const groups = fixtures.reduce((acc, fixture) => {
+        const key = dateKey(fixture.fixtureDate) || "unknown";
+        if (!acc.has(key)) {
+            acc.set(key, []);
+        }
+        acc.get(key).push(fixture);
+        return acc;
+    }, new Map());
+
+    const groupMarkup = Array.from(groups.entries())
+        .map(([date, dateFixtures]) => dateFixtureGroupMarkup(dateGroupTitle(date), dateFixtures))
+        .join("");
+
+    return `
+        <div class="fixture-round-heading">
+            <button type="button" class="round-inline-nav" data-round-step="-1" aria-label="이전 라운드">‹</button>
+            <strong>라운드 ${state.selectedFixtureRound}</strong>
+            <button type="button" class="round-inline-nav" data-round-step="1" aria-label="다음 라운드">›</button>
+        </div>
+        ${groupMarkup}
+    `;
+}
+
+function fixtureViewLabel() {
+    return state.fixtureViewMode === "round"
+        ? `라운드 ${state.selectedFixtureRound}`
+        : selectedFixtureDateLabel();
 }
 
 async function selectFixture(fixtureId) {
@@ -784,7 +919,7 @@ async function selectFixture(fixtureId) {
         renderLineups(settledValue(lineups)),
         renderPlayerStats(state.selectedFixturePlayerStats),
     ].join("");
-    bindLineupPlayerButtons();
+    bindLineupPlayerButtons(elements.fixtureDetail, state.selectedFixturePlayerStats);
 }
 
 async function connectLiveFixture() {
@@ -894,6 +1029,7 @@ function renderLiveFixture() {
         renderLineups(state.liveData.lineups),
         renderPlayerStats(state.liveData.playerStats),
     ].join("");
+    bindLineupPlayerButtons(elements.liveFixtureDetail, state.liveData.playerStats);
 }
 
 function renderLiveSnapshot(snapshot) {
@@ -1050,14 +1186,14 @@ function playerMarkup(player) {
     `;
 }
 
-function bindLineupPlayerButtons() {
-    document.querySelectorAll(".lineup-player-button").forEach((button) => {
-        button.addEventListener("click", () => openFixturePlayerStatModal(Number(button.dataset.playerId)));
+function bindLineupPlayerButtons(root = document, playerStats = state.selectedFixturePlayerStats) {
+    root.querySelectorAll(".lineup-player-button").forEach((button) => {
+        button.addEventListener("click", () => openFixturePlayerStatModal(Number(button.dataset.playerId), playerStats));
     });
 }
 
-function openFixturePlayerStatModal(playerId) {
-    const playerStat = findFixturePlayerStat(playerId);
+function openFixturePlayerStatModal(playerId, playerStats = state.selectedFixturePlayerStats) {
+    const playerStat = findFixturePlayerStat(playerId, playerStats);
     if (!playerStat) {
         showFixturePlayerStatModal(`
             <div class="modal-header">
@@ -1075,8 +1211,8 @@ function openFixturePlayerStatModal(playerId) {
     showFixturePlayerStatModal(playerStatModalMarkup(playerStat));
 }
 
-function findFixturePlayerStat(playerId) {
-    const groups = [state.selectedFixturePlayerStats?.homeTeam, state.selectedFixturePlayerStats?.awayTeam].filter(Boolean);
+function findFixturePlayerStat(playerId, playerStats = state.selectedFixturePlayerStats) {
+    const groups = [playerStats?.homeTeam, playerStats?.awayTeam].filter(Boolean);
     for (const group of groups) {
         const player = Array.isArray(group.players)
             ? group.players.find((item) => Number(item.playerId) === Number(playerId))
@@ -1199,12 +1335,12 @@ function renderPlayerStats(data) {
                 <strong>${escapeHtml(group.teamName || "Team")}</strong>
                 <div class="player-list">
                     ${players.map((player) => `
-                        <div class="player-item">
+                        <button class="player-item lineup-player-button" type="button" data-player-id="${player.playerId}">
                             <strong>${player.jerseyNumber ? `${player.jerseyNumber}. ` : ""}${escapeHtml(player.playerName || "-")}</strong>
                             <p class="muted">
                                 ${numberText(player.minutesPlayed)}분 · 평점 ${numberText(player.rating)} · 골 ${numberText(player.goals)} · 도움 ${numberText(player.assists)}
                             </p>
-                        </div>
+                        </button>
                     `).join("") || `<div class="player-item muted">선수 통계 없음</div>`}
                 </div>
             </div>

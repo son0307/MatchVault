@@ -152,7 +152,7 @@ public class BulkDataService {
             ps.setLong(3, awayTeam.id());
             ps.setTimestamp(4, Timestamp.valueOf(LocalDateTime.now().minusDays(index % 180L)));
             ps.setString(5, "Bulk Referee " + (index % 12 + 1));
-            ps.setString(6, "Regular Season - " + (index % 38 + 1));
+            ps.setInt(6, index % 38 + 1);
             ps.setLong(7, homeTeam.venueId());
             ps.setString(8, homeTeam.venueName());
             ps.setString(9, homeTeam.venueCity());

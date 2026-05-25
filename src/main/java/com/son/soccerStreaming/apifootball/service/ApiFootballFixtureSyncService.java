@@ -166,7 +166,7 @@ public class ApiFootballFixtureSyncService {
             );
         }
 
-        if (league != null && league.getRound() != null) {
+        if (league != null) {
             fixture.updateRound(league.getRound());
         }
 

@@ -22,10 +22,11 @@ public class FixtureService {
     private static final ZoneId KOREA_ZONE = ZoneId.of("Asia/Seoul");
 
     @Transactional(readOnly = true)
-    public CursorResponse<FixtureResponseDto.Summary> getRecentFixtures(Long cursorId, Integer season, LocalDate date, int size) {
+    public CursorResponse<FixtureResponseDto.Summary> getRecentFixtures(Long cursorId, Integer season, Integer round,
+                                                                         LocalDate date, int size) {
         DateRange dateRange = utcRangeForKoreaDate(date);
         List<Fixture> fixtures = fixtureRecordRepository.findRecentFixturesWithCursor(
-                cursorId, season, dateRange.startDateTime(), dateRange.endDateTime(), size);
+                cursorId, season, round, dateRange.startDateTime(), dateRange.endDateTime(), size);
 
         boolean hasNext = false;
         if (fixtures.size() > size) {
@@ -37,6 +38,7 @@ public class FixtureService {
                 .map(fixture -> FixtureResponseDto.Summary.builder()
                         .fixtureId(fixture.getFixtureId())
                         .fixtureDate(fixture.getFixtureDate())
+                        .round(fixture.getRound())
                         .homeTeamName(fixture.getHomeTeam().getName())
                         .awayTeamName(fixture.getAwayTeam().getName())
                         .homeScore(valueOf(fixture.getHomeScore()))
