@@ -1,12 +1,15 @@
 package com.son.soccerStreaming.live.service;
 
+import com.son.soccerStreaming.fixture.repository.FixtureRecordRepository;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 import java.time.Clock;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -17,29 +20,35 @@ public class LiveFixturePollingScheduler {
 
     private final LiveFixtureSyncService liveFixtureSyncService;
     private final SseService sseService;
+    private final FixtureRecordRepository fixtureRecordRepository;
     private final Clock clock;
     private final Map<Long, FailureState> failureStates = new ConcurrentHashMap<>();
     private final int failureThreshold;
     private final long failureCooldownMs;
 
+    @Autowired
     public LiveFixturePollingScheduler(
             LiveFixtureSyncService liveFixtureSyncService,
             SseService sseService,
+            FixtureRecordRepository fixtureRecordRepository,
             @Value("${live.sync.failure-threshold:3}") int failureThreshold,
             @Value("${live.sync.failure-cooldown-ms:60000}") long failureCooldownMs
     ) {
-        this(liveFixtureSyncService, sseService, Clock.systemUTC(), failureThreshold, failureCooldownMs);
+        this(liveFixtureSyncService, sseService, fixtureRecordRepository, Clock.systemUTC(),
+                failureThreshold, failureCooldownMs);
     }
 
     LiveFixturePollingScheduler(
             LiveFixtureSyncService liveFixtureSyncService,
             SseService sseService,
+            FixtureRecordRepository fixtureRecordRepository,
             Clock clock,
             int failureThreshold,
             long failureCooldownMs
     ) {
         this.liveFixtureSyncService = liveFixtureSyncService;
         this.sseService = sseService;
+        this.fixtureRecordRepository = fixtureRecordRepository;
         this.clock = clock;
         this.failureThreshold = failureThreshold;
         this.failureCooldownMs = failureCooldownMs;
@@ -48,9 +57,12 @@ public class LiveFixturePollingScheduler {
     @Scheduled(fixedDelayString = "${live.sync.interval-ms:10000}")
     public void pollLiveFixtures() {
         // Poll only fixtures with active SSE subscribers to avoid unnecessary API calls.
-        for (Long fixtureId : sseService.getSubscribedFixtureIds()) {
+        for (Long fixtureId : subscribedFixtureIds()) {
             long now = clock.millis();
             if (shouldSkip(fixtureId, now)) {
+                continue;
+            }
+            if (!isLiveFixture(fixtureId)) {
                 continue;
             }
 
@@ -65,6 +77,26 @@ public class LiveFixturePollingScheduler {
                             fixtureId, failureState.failureCount(), failureState.cooldownUntilEpochMs());
                 }
             }
+        }
+    }
+
+    private List<Long> subscribedFixtureIds() {
+        try {
+            return sseService.getSubscribedFixtureIds();
+        } catch (Exception e) {
+            log.error("Failed to read SSE subscribed fixture ids. Skip this live polling tick.", e);
+            return List.of();
+        }
+    }
+
+    private boolean isLiveFixture(Long fixtureId) {
+        try {
+            return fixtureRecordRepository.findByFixtureId(fixtureId)
+                    .map(fixture -> "LIVE".equals(fixture.getFixtureStatus()))
+                    .orElse(false);
+        } catch (Exception e) {
+            log.error("Failed to check live fixture status. fixtureId={}", fixtureId, e);
+            return false;
         }
     }
 

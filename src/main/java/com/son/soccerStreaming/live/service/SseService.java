@@ -1,23 +1,20 @@
 package com.son.soccerStreaming.live.service;
 
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
-@Slf4j
 @Service
 public class SseService {
 
-    private final Map<String, Set<SseEmitter>> fixtureEmitters = new ConcurrentHashMap<>();
+    private final Map<Long, Set<SseEmitter>> fixtureEmitters = new ConcurrentHashMap<>();
 
-    public SseEmitter subscribe(String fixtureId) {
+    public SseEmitter subscribe(Long fixtureId) {
         SseEmitter emitter = new SseEmitter(1000 * 60 * 5L);
 
         // 해당 fixtureId의 방이 있으면 합류, 없으면 새로 생성
@@ -44,17 +41,15 @@ public class SseService {
         return fixtureEmitters.entrySet().stream()
                 .filter(entry -> !entry.getValue().isEmpty())
                 .map(Map.Entry::getKey)
-                .map(this::parseFixtureId)
-                .flatMap(Optional::stream)
                 .toList();
     }
 
     // Broadcast live fixture updates to connected clients.
-    public void broadcastToFixture(String fixtureId, String jsonMessage) {
+    public void broadcastToFixture(Long fixtureId, String jsonMessage) {
         broadcastToFixture(fixtureId, "FIXTURE_EVENT", jsonMessage);
     }
 
-    public void broadcastToFixture(String fixtureId, String eventName, String jsonMessage) {
+    public void broadcastToFixture(Long fixtureId, String eventName, String jsonMessage) {
         Set<SseEmitter> room = fixtureEmitters.get(fixtureId);
 
         if (room == null || room.isEmpty()) {
@@ -73,19 +68,11 @@ public class SseService {
         }
     }
 
-    private void removeEmitter(String fixtureId, Set<SseEmitter> room, SseEmitter emitter) {
+    private void removeEmitter(Long fixtureId, Set<SseEmitter> room, SseEmitter emitter) {
         room.remove(emitter);
         if (room.isEmpty()) {
             fixtureEmitters.remove(fixtureId, room);
         }
     }
 
-    private Optional<Long> parseFixtureId(String fixtureId) {
-        try {
-            return Optional.of(Long.valueOf(fixtureId));
-        } catch (NumberFormatException e) {
-            log.warn("Skip live polling for invalid fixtureId subscription. fixtureId={}", fixtureId);
-            return Optional.empty();
-        }
-    }
 }
