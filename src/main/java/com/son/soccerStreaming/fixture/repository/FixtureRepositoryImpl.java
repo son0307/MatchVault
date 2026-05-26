@@ -14,7 +14,7 @@ import static com.son.soccerStreaming.fixture.entity.QFixture.fixture;
 
 @Repository
 @RequiredArgsConstructor
-public class FixtureRecordRepositoryImpl implements FixtureRecordRepositoryCustom {
+public class FixtureRepositoryImpl implements FixtureRepositoryCustom {
 
     private final JPAQueryFactory queryFactory;
 

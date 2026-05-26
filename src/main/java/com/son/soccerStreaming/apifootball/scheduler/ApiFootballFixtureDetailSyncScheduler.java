@@ -3,7 +3,7 @@ package com.son.soccerStreaming.apifootball.scheduler;
 import com.son.soccerStreaming.apifootball.service.ApiFootballFixtureDetailSyncException;
 import com.son.soccerStreaming.apifootball.service.ApiFootballFixtureDetailSyncService;
 import com.son.soccerStreaming.live.service.LiveFixtureBroadcastService;
-import com.son.soccerStreaming.fixture.repository.FixtureRecordRepository;
+import com.son.soccerStreaming.fixture.repository.FixtureRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -19,7 +19,7 @@ public class ApiFootballFixtureDetailSyncScheduler {
 
     private final ApiFootballFixtureDetailSyncService apiFootballFixtureDetailSyncService;
     private final LiveFixtureBroadcastService liveFixtureBroadcastService;
-    private final FixtureRecordRepository fixtureRecordRepository;
+    private final FixtureRepository fixtureRepository;
     private final ApiFootballSyncFailureRetryScheduler failureRetryScheduler;
 
     @Value("${api-football.sync.fixtures.season:2025}")
@@ -47,7 +47,7 @@ public class ApiFootballFixtureDetailSyncScheduler {
 
     private void syncLiveFixtureDetailsNow() {
         apiFootballFixtureDetailSyncService.syncFixtureDetailsWithResults(
-                fixtureRecordRepository.findAllByFixtureStatus("LIVE"),
+                fixtureRepository.findAllByFixtureStatus("LIVE"),
                 true
         ).forEach(result -> liveFixtureBroadcastService.broadcastFixture(result.fixtureId(), result.latestEvent()));
     }

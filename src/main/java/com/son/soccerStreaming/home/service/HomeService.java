@@ -4,7 +4,7 @@ import com.son.soccerStreaming.favorite.dto.FavoriteDashboardResponseDto;
 import com.son.soccerStreaming.favorite.service.FavoriteService;
 import com.son.soccerStreaming.fixture.dto.FixtureResponseDto;
 import com.son.soccerStreaming.fixture.entity.Fixture;
-import com.son.soccerStreaming.fixture.repository.FixtureRecordRepository;
+import com.son.soccerStreaming.fixture.repository.FixtureRepository;
 import com.son.soccerStreaming.home.dto.HomeSummaryResponseDto;
 import com.son.soccerStreaming.team.dto.TeamStandingResponseDto;
 import com.son.soccerStreaming.team.service.TeamStandingService;
@@ -24,7 +24,7 @@ public class HomeService {
 
     private static final ZoneId KOREA_ZONE = ZoneId.of("Asia/Seoul");
 
-    private final FixtureRecordRepository fixtureRecordRepository;
+    private final FixtureRepository fixtureRepository;
     private final TeamStandingService teamStandingService;
     private final FavoriteService favoriteService;
 
@@ -38,7 +38,7 @@ public class HomeService {
                 .withZoneSameInstant(ZoneOffset.UTC)
                 .toLocalDateTime();
 
-        List<FixtureResponseDto.Summary> todayFixtures = fixtureRecordRepository
+        List<FixtureResponseDto.Summary> todayFixtures = fixtureRepository
                 .findAllBySeasonAndFixtureDateGreaterThanEqualAndFixtureDateLessThanOrderByFixtureDateAsc(
                         season,
                         startDateTime,

@@ -1,7 +1,7 @@
 package com.son.soccerStreaming.live.service;
 
 import com.son.soccerStreaming.fixture.entity.Fixture;
-import com.son.soccerStreaming.fixture.repository.FixtureRecordRepository;
+import com.son.soccerStreaming.fixture.repository.FixtureRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -14,7 +14,6 @@ import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
-import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -26,7 +25,7 @@ class LiveFixturePollingSchedulerTest {
 
     private LiveFixtureSyncService liveFixtureSyncService;
     private SseService sseService;
-    private FixtureRecordRepository fixtureRecordRepository;
+    private FixtureRepository fixtureRepository;
     private MutableClock clock;
     private LiveFixturePollingScheduler scheduler;
 
@@ -34,19 +33,19 @@ class LiveFixturePollingSchedulerTest {
     void setUp() {
         liveFixtureSyncService = mock(LiveFixtureSyncService.class);
         sseService = mock(SseService.class);
-        fixtureRecordRepository = mock(FixtureRecordRepository.class);
+        fixtureRepository = mock(FixtureRepository.class);
         clock = new MutableClock(Instant.parse("2026-05-26T00:00:00Z"));
         scheduler = new LiveFixturePollingScheduler(
                 liveFixtureSyncService,
                 sseService,
-                fixtureRecordRepository,
+                fixtureRepository,
                 clock,
                 3,
                 60_000
         );
 
         when(sseService.getSubscribedFixtureIds()).thenReturn(List.of(100L));
-        when(fixtureRecordRepository.findByFixtureId(100L)).thenReturn(Optional.of(fixtureWithStatus("LIVE")));
+        when(fixtureRepository.findByFixtureId(100L)).thenReturn(Optional.of(fixtureWithStatus("LIVE")));
     }
 
     @Test
@@ -83,7 +82,7 @@ class LiveFixturePollingSchedulerTest {
         scheduler = new LiveFixturePollingScheduler(
                 liveFixtureSyncService,
                 sseService,
-                fixtureRecordRepository,
+                fixtureRepository,
                 clock,
                 2,
                 60_000
@@ -125,7 +124,7 @@ class LiveFixturePollingSchedulerTest {
 
     @Test
     void skipsFixtureWhenStoredFixtureDoesNotExist() {
-        when(fixtureRecordRepository.findByFixtureId(100L)).thenReturn(Optional.empty());
+        when(fixtureRepository.findByFixtureId(100L)).thenReturn(Optional.empty());
 
         scheduler.pollLiveFixtures();
 
@@ -134,7 +133,7 @@ class LiveFixturePollingSchedulerTest {
 
     @Test
     void skipsFixtureWhenStoredFixtureIsNotLive() {
-        when(fixtureRecordRepository.findByFixtureId(100L)).thenReturn(Optional.of(fixtureWithStatus("SCHEDULED")));
+        when(fixtureRepository.findByFixtureId(100L)).thenReturn(Optional.of(fixtureWithStatus("SCHEDULED")));
 
         scheduler.pollLiveFixtures();
 

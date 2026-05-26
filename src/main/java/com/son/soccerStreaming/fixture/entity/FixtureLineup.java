@@ -16,6 +16,7 @@ import jakarta.persistence.Index;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -23,8 +24,9 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 
 @Entity
-@Table(name = "fixture_lineup", indexes = {
-        @Index(name = "idx_fixture_lineup_fixture_team_starter", columnList = "fixture_id, team_id, is_starter"),
+@Table(name = "fixture_lineup", uniqueConstraints = {
+        @UniqueConstraint(columnNames = {"fixture_id", "team_id", "player_id"})
+}, indexes = {
         @Index(name = "idx_fixture_lineup_player", columnList = "player_id")
 })
 @Getter

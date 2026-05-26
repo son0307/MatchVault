@@ -9,7 +9,7 @@ import com.son.soccerStreaming.team.entity.Team;
 import com.son.soccerStreaming.global.exception.CustomException;
 import com.son.soccerStreaming.global.exception.ErrorCode;
 import com.son.soccerStreaming.fixture.repository.FixtureLineupRepository;
-import com.son.soccerStreaming.fixture.repository.FixtureRecordRepository;
+import com.son.soccerStreaming.fixture.repository.FixtureRepository;
 import com.son.soccerStreaming.team.repository.TeamRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -27,14 +27,14 @@ public class ApiFootballFixtureLineupSyncService {
     private static final String UNKNOWN_POSITION = "N/A";
 
     private final ApiFootballClient apiFootballClient;
-    private final FixtureRecordRepository fixtureRecordRepository;
+    private final FixtureRepository fixtureRepository;
     private final FixtureLineupRepository fixtureLineupRepository;
     private final TeamRepository teamRepository;
     private final ApiFootballPlayerSyncService apiFootballPlayerSyncService;
 
     @Transactional
     public int syncLineups(Long fixtureId) {
-        Fixture fixture = fixtureRecordRepository.findByFixtureId(fixtureId)
+        Fixture fixture = fixtureRepository.findByFixtureId(fixtureId)
                 .orElseThrow(() -> new CustomException(ErrorCode.FIXTURE_NOT_FOUND));
 
         List<ApiFootballLineupDto.LineupResponse> lineups = apiFootballClient.getLineups(fixtureId);
@@ -43,7 +43,7 @@ public class ApiFootballFixtureLineupSyncService {
 
     @Transactional
     public int syncLineups(Long fixtureId, List<ApiFootballLineupDto.LineupResponse> lineups) {
-        Fixture fixture = fixtureRecordRepository.findByFixtureId(fixtureId)
+        Fixture fixture = fixtureRepository.findByFixtureId(fixtureId)
                 .orElseThrow(() -> new CustomException(ErrorCode.FIXTURE_NOT_FOUND));
         return syncLineups(fixture, lineups);
     }

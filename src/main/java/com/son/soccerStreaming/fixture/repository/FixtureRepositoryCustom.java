@@ -5,7 +5,7 @@ import com.son.soccerStreaming.fixture.entity.Fixture;
 import java.time.LocalDateTime;
 import java.util.List;
 
-public interface FixtureRecordRepositoryCustom {
+public interface FixtureRepositoryCustom {
     List<Fixture> findRecentFixturesWithCursor(Long cursorId, Integer season, Integer round,
                                                 LocalDateTime startDateTime, LocalDateTime endDateTime,
                                                 int size);

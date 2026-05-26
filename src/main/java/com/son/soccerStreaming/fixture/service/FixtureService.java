@@ -3,7 +3,7 @@ package com.son.soccerStreaming.fixture.service;
 import com.son.soccerStreaming.fixture.dto.CursorResponse;
 import com.son.soccerStreaming.fixture.dto.FixtureResponseDto;
 import com.son.soccerStreaming.fixture.entity.Fixture;
-import com.son.soccerStreaming.fixture.repository.FixtureRecordRepository;
+import com.son.soccerStreaming.fixture.repository.FixtureRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -18,14 +18,14 @@ import java.util.List;
 @RequiredArgsConstructor
 public class FixtureService {
 
-    private final FixtureRecordRepository fixtureRecordRepository;
+    private final FixtureRepository fixtureRepository;
     private static final ZoneId KOREA_ZONE = ZoneId.of("Asia/Seoul");
 
     @Transactional(readOnly = true)
     public CursorResponse<FixtureResponseDto.Summary> getRecentFixtures(Long cursorId, Integer season, Integer round,
                                                                          LocalDate date, int size) {
         DateRange dateRange = utcRangeForKoreaDate(date);
-        List<Fixture> fixtures = fixtureRecordRepository.findRecentFixturesWithCursor(
+        List<Fixture> fixtures = fixtureRepository.findRecentFixturesWithCursor(
                 cursorId, season, round, dateRange.startDateTime(), dateRange.endDateTime(), size);
 
         boolean hasNext = false;

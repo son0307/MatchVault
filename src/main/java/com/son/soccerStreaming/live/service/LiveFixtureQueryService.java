@@ -2,7 +2,7 @@ package com.son.soccerStreaming.live.service;
 
 import com.son.soccerStreaming.fixture.dto.FixtureResponseDto;
 import com.son.soccerStreaming.fixture.entity.Fixture;
-import com.son.soccerStreaming.fixture.repository.FixtureRecordRepository;
+import com.son.soccerStreaming.fixture.repository.FixtureRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -15,11 +15,11 @@ public class LiveFixtureQueryService {
 
     private static final String LIVE_STATUS = "LIVE";
 
-    private final FixtureRecordRepository fixtureRecordRepository;
+    private final FixtureRepository fixtureRepository;
 
     @Transactional(readOnly = true)
     public List<FixtureResponseDto.Summary> getTodayLiveFixtures(Integer season) {
-        return fixtureRecordRepository
+        return fixtureRepository
                 .findAllBySeasonAndFixtureStatusOrderByFixtureDateAsc(season, LIVE_STATUS)
                 .stream()
                 .map(this::toFixtureSummary)

@@ -7,7 +7,7 @@ import com.son.soccerStreaming.team.entity.Team;
 import com.son.soccerStreaming.global.exception.CustomException;
 import com.son.soccerStreaming.global.exception.ErrorCode;
 import com.son.soccerStreaming.fixture.repository.FixtureEventRepository;
-import com.son.soccerStreaming.fixture.repository.FixtureRecordRepository;
+import com.son.soccerStreaming.fixture.repository.FixtureRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -18,12 +18,12 @@ import java.util.List;
 @RequiredArgsConstructor
 public class FixtureEventService {
 
-    private final FixtureRecordRepository fixtureRecordRepository;
+    private final FixtureRepository fixtureRepository;
     private final FixtureEventRepository fixtureEventRepository;
 
     @Transactional(readOnly = true)
     public FixtureEventResponseDto getFixtureEvents(Long fixtureId) {
-        if (fixtureRecordRepository.findByFixtureId(fixtureId).isEmpty()) {
+        if (fixtureRepository.findByFixtureId(fixtureId).isEmpty()) {
             throw new CustomException(ErrorCode.FIXTURE_NOT_FOUND);
         }
 

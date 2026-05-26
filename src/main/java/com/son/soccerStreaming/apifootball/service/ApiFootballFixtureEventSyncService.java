@@ -10,7 +10,7 @@ import com.son.soccerStreaming.team.entity.Team;
 import com.son.soccerStreaming.global.exception.CustomException;
 import com.son.soccerStreaming.global.exception.ErrorCode;
 import com.son.soccerStreaming.fixture.repository.FixtureEventRepository;
-import com.son.soccerStreaming.fixture.repository.FixtureRecordRepository;
+import com.son.soccerStreaming.fixture.repository.FixtureRepository;
 import com.son.soccerStreaming.team.repository.TeamRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -26,14 +26,14 @@ import java.util.Optional;
 public class ApiFootballFixtureEventSyncService {
 
     private final ApiFootballClient apiFootballClient;
-    private final FixtureRecordRepository fixtureRecordRepository;
+    private final FixtureRepository fixtureRepository;
     private final FixtureEventRepository fixtureEventRepository;
     private final TeamRepository teamRepository;
     private final ApiFootballPlayerSyncService apiFootballPlayerSyncService;
 
     @Transactional
     public FixtureEventDto syncEvents(Long fixtureId) {
-        Fixture fixture = fixtureRecordRepository.findByFixtureId(fixtureId)
+        Fixture fixture = fixtureRepository.findByFixtureId(fixtureId)
                 .orElseThrow(() -> new CustomException(ErrorCode.FIXTURE_NOT_FOUND));
 
         List<ApiFootballLiveDto.EventResponse> events = apiFootballClient.getEvents(fixtureId);
@@ -42,7 +42,7 @@ public class ApiFootballFixtureEventSyncService {
 
     @Transactional
     public FixtureEventDto syncEvents(Long fixtureId, List<ApiFootballLiveDto.EventResponse> events) {
-        Fixture fixture = fixtureRecordRepository.findByFixtureId(fixtureId)
+        Fixture fixture = fixtureRepository.findByFixtureId(fixtureId)
                 .orElseThrow(() -> new CustomException(ErrorCode.FIXTURE_NOT_FOUND));
         return syncEvents(fixture, events);
     }

@@ -8,7 +8,7 @@ import com.son.soccerStreaming.fixture.entity.PlayerFixtureStat;
 import com.son.soccerStreaming.team.entity.Team;
 import com.son.soccerStreaming.global.exception.CustomException;
 import com.son.soccerStreaming.global.exception.ErrorCode;
-import com.son.soccerStreaming.fixture.repository.FixtureRecordRepository;
+import com.son.soccerStreaming.fixture.repository.FixtureRepository;
 import com.son.soccerStreaming.fixture.repository.PlayerFixtureStatRepository;
 import com.son.soccerStreaming.team.repository.TeamRepository;
 import lombok.RequiredArgsConstructor;
@@ -25,14 +25,14 @@ import java.util.Optional;
 public class ApiFootballFixturePlayerStatSyncService {
 
     private final ApiFootballClient apiFootballClient;
-    private final FixtureRecordRepository fixtureRecordRepository;
+    private final FixtureRepository fixtureRepository;
     private final PlayerFixtureStatRepository playerFixtureStatRepository;
     private final TeamRepository teamRepository;
     private final ApiFootballPlayerSyncService apiFootballPlayerSyncService;
 
     @Transactional
     public int syncPlayerStats(Long fixtureId) {
-        Fixture fixture = fixtureRecordRepository.findByFixtureId(fixtureId)
+        Fixture fixture = fixtureRepository.findByFixtureId(fixtureId)
                 .orElseThrow(() -> new CustomException(ErrorCode.FIXTURE_NOT_FOUND));
 
         List<ApiFootballLiveDto.FixturePlayersResponse> teamStats = apiFootballClient.getPlayerStats(fixtureId);
@@ -41,7 +41,7 @@ public class ApiFootballFixturePlayerStatSyncService {
 
     @Transactional
     public int syncPlayerStats(Long fixtureId, List<ApiFootballLiveDto.FixturePlayersResponse> teamStats) {
-        Fixture fixture = fixtureRecordRepository.findByFixtureId(fixtureId)
+        Fixture fixture = fixtureRepository.findByFixtureId(fixtureId)
                 .orElseThrow(() -> new CustomException(ErrorCode.FIXTURE_NOT_FOUND));
         return syncPlayerStats(fixture, teamStats);
     }

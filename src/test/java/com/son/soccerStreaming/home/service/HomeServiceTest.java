@@ -3,7 +3,7 @@ package com.son.soccerStreaming.home.service;
 import com.son.soccerStreaming.favorite.dto.FavoriteDashboardResponseDto;
 import com.son.soccerStreaming.favorite.service.FavoriteService;
 import com.son.soccerStreaming.fixture.entity.Fixture;
-import com.son.soccerStreaming.fixture.repository.FixtureRecordRepository;
+import com.son.soccerStreaming.fixture.repository.FixtureRepository;
 import com.son.soccerStreaming.home.dto.HomeSummaryResponseDto;
 import com.son.soccerStreaming.team.dto.TeamStandingResponseDto;
 import com.son.soccerStreaming.team.entity.Team;
@@ -27,7 +27,7 @@ import static org.mockito.Mockito.when;
 class HomeServiceTest {
 
     @Mock
-    private FixtureRecordRepository fixtureRecordRepository;
+    private FixtureRepository fixtureRepository;
     @Mock
     private TeamStandingService teamStandingService;
     @Mock
@@ -62,7 +62,7 @@ class HomeServiceTest {
                 .players(List.of())
                 .build();
 
-        when(fixtureRecordRepository.findAllBySeasonAndFixtureDateGreaterThanEqualAndFixtureDateLessThanOrderByFixtureDateAsc(
+        when(fixtureRepository.findAllBySeasonAndFixtureDateGreaterThanEqualAndFixtureDateLessThanOrderByFixtureDateAsc(
                 org.mockito.ArgumentMatchers.eq(2025),
                 org.mockito.ArgumentMatchers.any(LocalDateTime.class),
                 org.mockito.ArgumentMatchers.any(LocalDateTime.class)
@@ -80,7 +80,7 @@ class HomeServiceTest {
 
     @Test
     void getSummaryUsesKoreaTodayUtcRange() {
-        when(fixtureRecordRepository.findAllBySeasonAndFixtureDateGreaterThanEqualAndFixtureDateLessThanOrderByFixtureDateAsc(
+        when(fixtureRepository.findAllBySeasonAndFixtureDateGreaterThanEqualAndFixtureDateLessThanOrderByFixtureDateAsc(
                 org.mockito.ArgumentMatchers.eq(2025),
                 org.mockito.ArgumentMatchers.any(LocalDateTime.class),
                 org.mockito.ArgumentMatchers.any(LocalDateTime.class)
@@ -91,7 +91,7 @@ class HomeServiceTest {
 
         ArgumentCaptor<LocalDateTime> startCaptor = ArgumentCaptor.forClass(LocalDateTime.class);
         ArgumentCaptor<LocalDateTime> endCaptor = ArgumentCaptor.forClass(LocalDateTime.class);
-        verify(fixtureRecordRepository).findAllBySeasonAndFixtureDateGreaterThanEqualAndFixtureDateLessThanOrderByFixtureDateAsc(
+        verify(fixtureRepository).findAllBySeasonAndFixtureDateGreaterThanEqualAndFixtureDateLessThanOrderByFixtureDateAsc(
                 org.mockito.ArgumentMatchers.eq(2025),
                 startCaptor.capture(),
                 endCaptor.capture()
@@ -103,7 +103,7 @@ class HomeServiceTest {
 
     @Test
     void getSummaryReturnsEmptyFavoritesForGuest() {
-        when(fixtureRecordRepository.findAllBySeasonAndFixtureDateGreaterThanEqualAndFixtureDateLessThanOrderByFixtureDateAsc(
+        when(fixtureRepository.findAllBySeasonAndFixtureDateGreaterThanEqualAndFixtureDateLessThanOrderByFixtureDateAsc(
                 org.mockito.ArgumentMatchers.eq(2025),
                 org.mockito.ArgumentMatchers.any(LocalDateTime.class),
                 org.mockito.ArgumentMatchers.any(LocalDateTime.class)

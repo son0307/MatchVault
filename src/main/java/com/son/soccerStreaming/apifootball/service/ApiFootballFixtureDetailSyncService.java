@@ -4,7 +4,7 @@ import com.son.soccerStreaming.apifootball.client.ApiFootballClient;
 import com.son.soccerStreaming.apifootball.dto.ApiFootballLiveDto;
 import com.son.soccerStreaming.fixture.dto.FixtureEventDto;
 import com.son.soccerStreaming.fixture.entity.Fixture;
-import com.son.soccerStreaming.fixture.repository.FixtureRecordRepository;
+import com.son.soccerStreaming.fixture.repository.FixtureRepository;
 import jakarta.persistence.EntityManager;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -29,7 +29,7 @@ public class ApiFootballFixtureDetailSyncService {
     private final ApiFootballFixtureLineupSyncService apiFootballFixtureLineupSyncService;
     private final ApiFootballFixtureStatSyncService apiFootballFixtureStatSyncService;
     private final ApiFootballFixturePlayerStatSyncService apiFootballFixturePlayerStatSyncService;
-    private final FixtureRecordRepository fixtureRecordRepository;
+    private final FixtureRepository fixtureRepository;
     private final TransactionTemplate transactionTemplate;
     private final EntityManager entityManager;
     private final ApiFootballSyncStatusService apiFootballSyncStatusService;
@@ -157,12 +157,8 @@ public class ApiFootballFixtureDetailSyncService {
         return results;
     }
 
-    public int syncAllStoredFixtureDetails(boolean applyLiveStandingImpact) {
-        return syncFixtureDetails(fixtureRecordRepository.findAllByOrderByFixtureDateAsc(), applyLiveStandingImpact);
-    }
-
     public int syncSeasonFixtureDetails(Integer season, boolean applyLiveStandingImpact) {
-        return syncFixtureDetails(fixtureRecordRepository.findAllBySeasonOrderByFixtureDateAsc(season), applyLiveStandingImpact);
+        return syncFixtureDetails(fixtureRepository.findAllBySeasonOrderByFixtureDateAsc(season), applyLiveStandingImpact);
     }
 
     private List<List<Long>> chunks(List<Long> fixtureIds) {

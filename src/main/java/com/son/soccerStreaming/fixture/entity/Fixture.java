@@ -10,6 +10,12 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 @Entity
+@Table(indexes = {
+        @Index(name = "idx_fixture_season_date", columnList = "season, fixture_date"),
+        @Index(name = "idx_fixture_season_status_date", columnList = "season, fixture_status, fixture_date"),
+        @Index(name = "idx_fixture_home_season_date", columnList = "home_team_id, season, fixture_date"),
+        @Index(name = "idx_fixture_away_season_date", columnList = "away_team_id, season, fixture_date")
+})
 @Getter
 @Builder
 @NoArgsConstructor(access = AccessLevel.PROTECTED)

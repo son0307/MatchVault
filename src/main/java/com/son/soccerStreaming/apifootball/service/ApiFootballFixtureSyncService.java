@@ -4,7 +4,7 @@ import com.son.soccerStreaming.apifootball.client.ApiFootballClient;
 import com.son.soccerStreaming.apifootball.dto.ApiFootballLiveDto;
 import com.son.soccerStreaming.fixture.entity.Fixture;
 import com.son.soccerStreaming.team.entity.Team;
-import com.son.soccerStreaming.fixture.repository.FixtureRecordRepository;
+import com.son.soccerStreaming.fixture.repository.FixtureRepository;
 import com.son.soccerStreaming.team.repository.TeamRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -24,7 +24,7 @@ import java.util.Optional;
 public class ApiFootballFixtureSyncService {
 
     private final ApiFootballClient apiFootballClient;
-    private final FixtureRecordRepository fixtureRecordRepository;
+    private final FixtureRepository fixtureRepository;
     private final TeamRepository teamRepository;
     private final ApiFootballStandingLocalUpdateService apiFootballStandingLocalUpdateService;
     private final ApiFootballSyncStatusService apiFootballSyncStatusService;
@@ -93,7 +93,7 @@ public class ApiFootballFixtureSyncService {
             return Optional.empty();
         }
 
-        Fixture fixture = fixtureRecordRepository.findByFixtureId(fixtureInfo.getId())
+        Fixture fixture = fixtureRepository.findByFixtureId(fixtureInfo.getId())
                 .orElseGet(() -> Fixture.builder()
                         .fixtureId(fixtureInfo.getId())
                         .homeTeam(homeTeam.get())
@@ -102,7 +102,7 @@ public class ApiFootballFixtureSyncService {
                         .build());
 
         updateFixture(fixture, response);
-        return Optional.of(fixtureRecordRepository.save(fixture));
+        return Optional.of(fixtureRepository.save(fixture));
     }
 
     private boolean matchesSeason(ApiFootballLiveDto.FixtureResponse response, Integer season) {

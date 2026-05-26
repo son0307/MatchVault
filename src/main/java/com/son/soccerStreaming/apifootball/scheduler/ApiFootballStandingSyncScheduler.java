@@ -1,7 +1,7 @@
 package com.son.soccerStreaming.apifootball.scheduler;
 
 import com.son.soccerStreaming.apifootball.service.ApiFootballStandingSyncService;
-import com.son.soccerStreaming.fixture.repository.FixtureRecordRepository;
+import com.son.soccerStreaming.fixture.repository.FixtureRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -16,7 +16,7 @@ import org.springframework.stereotype.Component;
 public class ApiFootballStandingSyncScheduler {
 
     private final ApiFootballStandingSyncService apiFootballStandingSyncService;
-    private final FixtureRecordRepository fixtureRecordRepository;
+    private final FixtureRepository fixtureRepository;
     private final ApiFootballSyncFailureRetryScheduler failureRetryScheduler;
 
     @Value("${api-football.sync.standings.league:39}")
@@ -32,7 +32,7 @@ public class ApiFootballStandingSyncScheduler {
 
     @Scheduled(cron = "${api-football.sync.standings.live-cron:0 0 * * * *}")
     public void syncStandingsHourlyWhenLive() {
-        if (!fixtureRecordRepository.existsByFixtureStatus("LIVE")) {
+        if (!fixtureRepository.existsByFixtureStatus("LIVE")) {
             return;
         }
         syncStandings("hourly-live");

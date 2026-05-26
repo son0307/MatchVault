@@ -12,9 +12,7 @@ import lombok.*;
         @UniqueConstraint(columnNames = {"fixture_id", "player_id"})
 }
     , indexes = {
-        @Index(name = "idx_fixture_id", columnList = "fixture_id"),
-        @Index(name = "idx_team_id", columnList = "team_id"),
-        @Index(name = "idx_player_id", columnList = "player_id")
+        @Index(name = "idx_player_fixture_stat_player_fixture", columnList = "player_id, fixture_id")
 })
 @Getter
 @Builder

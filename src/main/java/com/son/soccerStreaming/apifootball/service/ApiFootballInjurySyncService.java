@@ -6,7 +6,7 @@ import com.son.soccerStreaming.fixture.entity.Fixture;
 import com.son.soccerStreaming.player.entity.Player;
 import com.son.soccerStreaming.player.entity.PlayerAbsence;
 import com.son.soccerStreaming.team.entity.Team;
-import com.son.soccerStreaming.fixture.repository.FixtureRecordRepository;
+import com.son.soccerStreaming.fixture.repository.FixtureRepository;
 import com.son.soccerStreaming.player.repository.PlayerAbsenceRepository;
 import com.son.soccerStreaming.team.repository.TeamRepository;
 import jakarta.persistence.EntityManager;
@@ -29,7 +29,7 @@ public class ApiFootballInjurySyncService {
     private static final String DEFAULT_REASON = "Unknown";
 
     private final ApiFootballClient apiFootballClient;
-    private final FixtureRecordRepository fixtureRecordRepository;
+    private final FixtureRepository fixtureRepository;
     private final TeamRepository teamRepository;
     private final PlayerAbsenceRepository playerAbsenceRepository;
     private final ApiFootballPlayerSyncService apiFootballPlayerSyncService;
@@ -82,7 +82,7 @@ public class ApiFootballInjurySyncService {
             return false;
         }
 
-        Optional<Fixture> fixture = fixtureRecordRepository.findByFixtureId(fixtureInfo.getId());
+        Optional<Fixture> fixture = fixtureRepository.findByFixtureId(fixtureInfo.getId());
         Optional<Team> team = teamRepository.findByTeamId(teamInfo.getId());
         if (fixture.isEmpty() || team.isEmpty()) {
             log.warn("Skip injury sync because fixture or team does not exist. fixtureId={}, teamId={}",

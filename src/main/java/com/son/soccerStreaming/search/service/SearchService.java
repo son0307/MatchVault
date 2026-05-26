@@ -1,7 +1,7 @@
 package com.son.soccerStreaming.search.service;
 
 import com.son.soccerStreaming.fixture.entity.Fixture;
-import com.son.soccerStreaming.fixture.repository.FixtureRecordRepository;
+import com.son.soccerStreaming.fixture.repository.FixtureRepository;
 import com.son.soccerStreaming.player.entity.Player;
 import com.son.soccerStreaming.player.repository.PlayerRepository;
 import com.son.soccerStreaming.search.dto.SearchResponseDto;
@@ -23,7 +23,7 @@ public class SearchService {
 
     private final TeamRepository teamRepository;
     private final PlayerRepository playerRepository;
-    private final FixtureRecordRepository fixtureRecordRepository;
+    private final FixtureRepository fixtureRepository;
 
     @Transactional(readOnly = true)
     public SearchResponseDto search(String keyword) {
@@ -65,7 +65,7 @@ public class SearchService {
     }
 
     private List<SearchResponseDto.FixtureResult> searchFixtures(List<String> tokens) {
-        return fixtureRecordRepository.searchByTeamNameTokens(tokens, RESULT_LIMIT).stream()
+        return fixtureRepository.searchByTeamNameTokens(tokens, RESULT_LIMIT).stream()
                 .map(this::toFixtureResult)
                 .toList();
     }
