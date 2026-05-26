@@ -16,9 +16,12 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Comparator;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 @Service
 @RequiredArgsConstructor
@@ -61,14 +64,17 @@ public class PlayerService {
                 .orElseThrow(() -> new CustomException(ErrorCode.PLAYER_NOT_FOUND));
 
         // 시즌 요약은 API-Football의 시즌 누적 스탯을 저장한 테이블에서 바로 가져온다.
-        List<PlayerTeamSeasonStat> seasonStats = playerTeamSeasonStatRepository.findAllByPlayerPlayerIdOrderBySeasonDesc(playerId);
-        List<PlayerResponseDto.SeasonSummary> seasons = aggregateSeasonSummaries(seasonStats);
-
         List<PlayerResponseDto.MatchStat> matches = playerFixtureStatRepository
                 .findAllByPlayerPlayerIdOrderByFixtureFixtureDateDesc(playerId)
                 .stream()
                 .map(this::toMatchStat)
                 .toList();
+
+        List<PlayerTeamSeasonStat> seasonStats = playerTeamSeasonStatRepository.findAllByPlayerPlayerIdOrderBySeasonDesc(playerId);
+        List<PlayerResponseDto.SeasonSummary> seasons = aggregateSeasonSummaries(
+                seasonStats,
+                teamsBySeasonFromMatches(matches)
+        );
 
         return PlayerResponseDto.Panel.builder()
                 .profile(toDetails(player))
@@ -77,9 +83,28 @@ public class PlayerService {
                 .build();
     }
 
-    private List<PlayerResponseDto.SeasonSummary> aggregateSeasonSummaries(List<PlayerTeamSeasonStat> stats) {
+    private Map<Integer, Set<Long>> teamsBySeasonFromMatches(List<PlayerResponseDto.MatchStat> matches) {
+        Map<Integer, Set<Long>> teamsBySeason = new HashMap<>();
+        for (PlayerResponseDto.MatchStat match : matches) {
+            if (match.getSeason() == null || match.getTeamId() == null) {
+                continue;
+            }
+            teamsBySeason.computeIfAbsent(match.getSeason(), key -> new HashSet<>()).add(match.getTeamId());
+        }
+        return teamsBySeason;
+    }
+
+    private List<PlayerResponseDto.SeasonSummary> aggregateSeasonSummaries(
+            List<PlayerTeamSeasonStat> stats,
+            Map<Integer, Set<Long>> teamsBySeasonFromMatches
+    ) {
         Map<Integer, List<PlayerTeamSeasonStat>> statsBySeason = new LinkedHashMap<>();
         for (PlayerTeamSeasonStat stat : stats) {
+            Set<Long> matchTeamIds = teamsBySeasonFromMatches.get(stat.getSeason());
+            if (matchTeamIds != null && !matchTeamIds.isEmpty()
+                    && !matchTeamIds.contains(stat.getTeam().getTeamId())) {
+                continue;
+            }
             statsBySeason.computeIfAbsent(stat.getSeason(), key -> new java.util.ArrayList<>()).add(stat);
         }
 
