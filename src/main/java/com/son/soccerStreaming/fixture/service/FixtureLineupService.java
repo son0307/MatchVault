@@ -8,7 +8,7 @@ import com.son.soccerStreaming.team.entity.Team;
 import com.son.soccerStreaming.global.exception.CustomException;
 import com.son.soccerStreaming.global.exception.ErrorCode;
 import com.son.soccerStreaming.fixture.repository.FixtureLineupRepository;
-import com.son.soccerStreaming.fixture.repository.FixtureRecordRepository;
+import com.son.soccerStreaming.fixture.repository.FixtureRepository;
 import com.son.soccerStreaming.player.repository.PlayerAbsenceRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -22,11 +22,11 @@ import java.util.List;
 public class FixtureLineupService {
 
     private final FixtureLineupRepository fixtureLineupRepository;
-    private final FixtureRecordRepository fixtureRecordRepository;
+    private final FixtureRepository fixtureRepository;
     private final PlayerAbsenceRepository playerAbsenceRepository;
 
     public FixtureLineupResponseDto.Lineup getFixtureLineups(Long fixtureId) {
-        Fixture fixture = fixtureRecordRepository.findByFixtureId(fixtureId)
+        Fixture fixture = fixtureRepository.findByFixtureId(fixtureId)
                 .orElseThrow(() -> new CustomException(ErrorCode.FIXTURE_NOT_FOUND));
         List<FixtureLineup> lineups = fixtureLineupRepository.findAllByFixtureId(fixtureId);
         List<PlayerAbsence> absences = playerAbsenceRepository.findAllByFixtureFixtureId(fixtureId);

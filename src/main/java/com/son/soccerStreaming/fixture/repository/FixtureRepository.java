@@ -11,18 +11,14 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
-public interface FixtureRecordRepository extends JpaRepository<Fixture, Long>, FixtureRecordRepositoryCustom {
+public interface FixtureRepository extends JpaRepository<Fixture, Long>, FixtureRepositoryCustom {
     Optional<Fixture> findByFixtureId(Long fixtureId);
-
-    List<Fixture> findAllByOrderByFixtureDateAsc();
 
     List<Fixture> findAllBySeasonOrderByFixtureDateAsc(Integer season);
 
     boolean existsByFixtureStatus(String fixtureStatus);
 
     boolean existsByFixtureDateBetweenAndFixtureStatusIn(LocalDateTime start, LocalDateTime end, Collection<String> fixtureStatuses);
-
-    List<Fixture> findAllByFixtureDateBetweenAndFixtureStatusIn(LocalDateTime start, LocalDateTime end, Collection<String> fixtureStatuses);
 
     @EntityGraph(attributePaths = {"homeTeam", "awayTeam"})
     List<Fixture> findAllBySeasonAndFixtureDateGreaterThanEqualAndFixtureDateLessThanOrderByFixtureDateAsc(
@@ -32,19 +28,9 @@ public interface FixtureRecordRepository extends JpaRepository<Fixture, Long>, F
     );
 
     @EntityGraph(attributePaths = {"homeTeam", "awayTeam"})
-    List<Fixture> findAllBySeasonAndFixtureDateGreaterThanEqualAndFixtureDateLessThanAndFixtureStatusOrderByFixtureDateAsc(
-            Integer season,
-            LocalDateTime start,
-            LocalDateTime end,
-            String fixtureStatus
-    );
-
-    @EntityGraph(attributePaths = {"homeTeam", "awayTeam"})
     List<Fixture> findAllBySeasonAndFixtureStatusOrderByFixtureDateAsc(Integer season, String fixtureStatus);
 
     List<Fixture> findAllByFixtureStatus(String fixtureStatus);
-
-    List<Fixture> findAllByFixtureStatusNot(String fixtureStatus);
 
     @EntityGraph(attributePaths = {"homeTeam", "awayTeam"})
     @Query("SELECT f FROM Fixture f " +

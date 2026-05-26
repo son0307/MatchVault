@@ -1,6 +1,6 @@
 package com.son.soccerStreaming.live.service;
 
-import com.son.soccerStreaming.fixture.repository.FixtureRecordRepository;
+import com.son.soccerStreaming.fixture.repository.FixtureRepository;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -20,7 +20,7 @@ public class LiveFixturePollingScheduler {
 
     private final LiveFixtureSyncService liveFixtureSyncService;
     private final SseService sseService;
-    private final FixtureRecordRepository fixtureRecordRepository;
+    private final FixtureRepository fixtureRepository;
     private final Clock clock;
     private final Map<Long, FailureState> failureStates = new ConcurrentHashMap<>();
     private final int failureThreshold;
@@ -30,25 +30,25 @@ public class LiveFixturePollingScheduler {
     public LiveFixturePollingScheduler(
             LiveFixtureSyncService liveFixtureSyncService,
             SseService sseService,
-            FixtureRecordRepository fixtureRecordRepository,
+            FixtureRepository fixtureRepository,
             @Value("${live.sync.failure-threshold:3}") int failureThreshold,
             @Value("${live.sync.failure-cooldown-ms:60000}") long failureCooldownMs
     ) {
-        this(liveFixtureSyncService, sseService, fixtureRecordRepository, Clock.systemUTC(),
+        this(liveFixtureSyncService, sseService, fixtureRepository, Clock.systemUTC(),
                 failureThreshold, failureCooldownMs);
     }
 
     LiveFixturePollingScheduler(
             LiveFixtureSyncService liveFixtureSyncService,
             SseService sseService,
-            FixtureRecordRepository fixtureRecordRepository,
+            FixtureRepository fixtureRepository,
             Clock clock,
             int failureThreshold,
             long failureCooldownMs
     ) {
         this.liveFixtureSyncService = liveFixtureSyncService;
         this.sseService = sseService;
-        this.fixtureRecordRepository = fixtureRecordRepository;
+        this.fixtureRepository = fixtureRepository;
         this.clock = clock;
         this.failureThreshold = failureThreshold;
         this.failureCooldownMs = failureCooldownMs;
@@ -91,7 +91,7 @@ public class LiveFixturePollingScheduler {
 
     private boolean isLiveFixture(Long fixtureId) {
         try {
-            return fixtureRecordRepository.findByFixtureId(fixtureId)
+            return fixtureRepository.findByFixtureId(fixtureId)
                     .map(fixture -> "LIVE".equals(fixture.getFixtureStatus()))
                     .orElse(false);
         } catch (Exception e) {

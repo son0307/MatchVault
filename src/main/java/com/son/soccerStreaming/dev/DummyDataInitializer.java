@@ -31,7 +31,7 @@ public class DummyDataInitializer implements CommandLineRunner {
 
     private final TeamRepository teamRepository;
     private final PlayerRepository playerRepository;
-    private final FixtureRecordRepository fixtureRecordRepository;
+    private final FixtureRepository fixtureRepository;
     private final FixtureLineupRepository fixtureLineupRepository;
     private final PlayerFixtureStatRepository playerFixtureStatRepository;
     private final PlayerTeamSeasonStatRepository playerTeamSeasonStatRepository;
@@ -124,7 +124,7 @@ public class DummyDataInitializer implements CommandLineRunner {
                     .homeCoachName("Home Coach")
                     .awayCoachName("Away Coach")
                     .build();
-            fixtureRecordRepository.save(fixture);
+            fixtureRepository.save(fixture);
 
             // 해당 경기의 라인업 및 스탯 생성
             generateLineupAndStats(fixture, homeTeam, teamPlayersMap.get(homeTeam), random);

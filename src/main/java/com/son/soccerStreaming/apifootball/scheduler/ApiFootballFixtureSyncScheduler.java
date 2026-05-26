@@ -1,7 +1,7 @@
 package com.son.soccerStreaming.apifootball.scheduler;
 
 import com.son.soccerStreaming.apifootball.service.ApiFootballFixtureSyncService;
-import com.son.soccerStreaming.fixture.repository.FixtureRecordRepository;
+import com.son.soccerStreaming.fixture.repository.FixtureRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -22,7 +22,7 @@ public class ApiFootballFixtureSyncScheduler {
     private static final List<String> LIVE_CANDIDATE_STATUSES = List.of("SCHEDULED", "LIVE");
 
     private final ApiFootballFixtureSyncService apiFootballFixtureSyncService;
-    private final FixtureRecordRepository fixtureRecordRepository;
+    private final FixtureRepository fixtureRepository;
     private final ApiFootballSyncFailureRetryScheduler failureRetryScheduler;
 
     @Value("${api-football.sync.fixtures.league:39}")
@@ -75,7 +75,7 @@ public class ApiFootballFixtureSyncScheduler {
 
     private boolean hasFixtureInLiveWindow() {
         LocalDateTime now = LocalDateTime.now(ZoneOffset.UTC);
-        return fixtureRecordRepository.existsByFixtureDateBetweenAndFixtureStatusIn(
+        return fixtureRepository.existsByFixtureDateBetweenAndFixtureStatusIn(
                 now.minusHours(liveWindowAfterHours),
                 now.plusMinutes(liveWindowBeforeMinutes),
                 LIVE_CANDIDATE_STATUSES

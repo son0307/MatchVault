@@ -6,7 +6,7 @@ import com.son.soccerStreaming.favorite.entity.FavoriteTeam;
 import com.son.soccerStreaming.favorite.repository.FavoritePlayerRepository;
 import com.son.soccerStreaming.favorite.repository.FavoriteTeamRepository;
 import com.son.soccerStreaming.fixture.entity.Fixture;
-import com.son.soccerStreaming.fixture.repository.FixtureRecordRepository;
+import com.son.soccerStreaming.fixture.repository.FixtureRepository;
 import com.son.soccerStreaming.fixture.repository.PlayerFixtureStatRepository;
 import com.son.soccerStreaming.player.repository.PlayerRepository;
 import com.son.soccerStreaming.player.repository.PlayerTeamSeasonStatRepository;
@@ -44,7 +44,7 @@ class FavoriteServiceTest {
     @Mock
     private TeamStandingRepository teamStandingRepository;
     @Mock
-    private FixtureRecordRepository fixtureRecordRepository;
+    private FixtureRepository fixtureRepository;
     @Mock
     private PlayerFixtureStatRepository playerFixtureStatRepository;
     @Mock
@@ -96,11 +96,11 @@ class FavoriteServiceTest {
         when(favoriteTeamRepository.findAllByUserIdOrderByCreatedAtDesc(1L)).thenReturn(List.of(favorite));
         when(favoritePlayerRepository.findAllByUserIdOrderByCreatedAtDesc(1L)).thenReturn(List.of());
         when(teamStandingRepository.findByTeamTeamIdAndSeason(47L, 2025)).thenReturn(java.util.Optional.empty());
-        when(fixtureRecordRepository.findRecentByTeam(eq(47L), eq(2025), any(LocalDateTime.class), any(Pageable.class)))
+        when(fixtureRepository.findRecentByTeam(eq(47L), eq(2025), any(LocalDateTime.class), any(Pageable.class)))
                 .thenReturn(List.of());
-        when(fixtureRecordRepository.findNextByTeam(eq(47L), eq(2025), any(LocalDateTime.class), any(Pageable.class)))
+        when(fixtureRepository.findNextByTeam(eq(47L), eq(2025), any(LocalDateTime.class), any(Pageable.class)))
                 .thenReturn(List.of(nextFixture));
-        when(fixtureRecordRepository.findLiveByTeam(eq(47L), eq(2025), any(Pageable.class)))
+        when(fixtureRepository.findLiveByTeam(eq(47L), eq(2025), any(Pageable.class)))
                 .thenReturn(List.of(liveFixture));
 
         var response = favoriteService.getDashboard(1L, 2025);

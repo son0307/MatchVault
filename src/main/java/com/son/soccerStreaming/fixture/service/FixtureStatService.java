@@ -5,7 +5,7 @@ import com.son.soccerStreaming.fixture.entity.Fixture;
 import com.son.soccerStreaming.fixture.entity.FixtureStat;
 import com.son.soccerStreaming.global.exception.CustomException;
 import com.son.soccerStreaming.global.exception.ErrorCode;
-import com.son.soccerStreaming.fixture.repository.FixtureRecordRepository;
+import com.son.soccerStreaming.fixture.repository.FixtureRepository;
 import com.son.soccerStreaming.fixture.repository.FixtureStatRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -19,12 +19,12 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class FixtureStatService {
 
-    private final FixtureRecordRepository fixtureRecordRepository;
+    private final FixtureRepository fixtureRepository;
     private final FixtureStatRepository fixtureStatRepository;
 
     @Transactional(readOnly = true)
     public FixtureStatResponseDto getFixtureStats(Long fixtureId) {
-        Fixture fixture = fixtureRecordRepository.findByFixtureId(fixtureId)
+        Fixture fixture = fixtureRepository.findByFixtureId(fixtureId)
                 .orElseThrow(() -> new CustomException(ErrorCode.FIXTURE_NOT_FOUND));
 
         Map<Long, FixtureStat> statsByTeamId = fixtureStatRepository.findAllByFixtureFixtureId(fixtureId).stream()

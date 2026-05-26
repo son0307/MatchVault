@@ -1,7 +1,7 @@
 package com.son.soccerStreaming.live.service;
 
 import com.son.soccerStreaming.fixture.entity.Fixture;
-import com.son.soccerStreaming.fixture.repository.FixtureRecordRepository;
+import com.son.soccerStreaming.fixture.repository.FixtureRepository;
 import com.son.soccerStreaming.team.entity.Team;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -18,7 +18,7 @@ import static org.mockito.Mockito.when;
 class LiveFixtureQueryServiceTest {
 
     @Mock
-    private FixtureRecordRepository fixtureRecordRepository;
+    private FixtureRepository fixtureRepository;
 
     @InjectMocks
     private LiveFixtureQueryService liveFixtureQueryService;
@@ -36,7 +36,7 @@ class LiveFixtureQueryServiceTest {
                 .fixtureStatus("LIVE")
                 .build();
 
-        when(fixtureRecordRepository.findAllBySeasonAndFixtureStatusOrderByFixtureDateAsc(2025, "LIVE"))
+        when(fixtureRepository.findAllBySeasonAndFixtureStatusOrderByFixtureDateAsc(2025, "LIVE"))
                 .thenReturn(List.of(fixture));
 
         var response = liveFixtureQueryService.getTodayLiveFixtures(2025);
@@ -50,7 +50,7 @@ class LiveFixtureQueryServiceTest {
 
     @Test
     void getTodayLiveFixturesUsesSeasonAndLiveStatus() {
-        when(fixtureRecordRepository.findAllBySeasonAndFixtureStatusOrderByFixtureDateAsc(2025, "LIVE"))
+        when(fixtureRepository.findAllBySeasonAndFixtureStatusOrderByFixtureDateAsc(2025, "LIVE"))
                 .thenReturn(List.of());
 
         var response = liveFixtureQueryService.getTodayLiveFixtures(2025);

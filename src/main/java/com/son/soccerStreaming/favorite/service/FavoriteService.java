@@ -15,7 +15,7 @@ import com.son.soccerStreaming.global.exception.ErrorCode;
 import com.son.soccerStreaming.auth.repository.AppUserRepository;
 import com.son.soccerStreaming.favorite.repository.FavoritePlayerRepository;
 import com.son.soccerStreaming.favorite.repository.FavoriteTeamRepository;
-import com.son.soccerStreaming.fixture.repository.FixtureRecordRepository;
+import com.son.soccerStreaming.fixture.repository.FixtureRepository;
 import com.son.soccerStreaming.fixture.repository.PlayerFixtureStatRepository;
 import com.son.soccerStreaming.player.repository.PlayerRepository;
 import com.son.soccerStreaming.player.repository.PlayerTeamSeasonStatRepository;
@@ -39,7 +39,7 @@ public class FavoriteService {
     private final FavoriteTeamRepository favoriteTeamRepository;
     private final FavoritePlayerRepository favoritePlayerRepository;
     private final TeamStandingRepository teamStandingRepository;
-    private final FixtureRecordRepository fixtureRecordRepository;
+    private final FixtureRepository fixtureRepository;
     private final PlayerFixtureStatRepository playerFixtureStatRepository;
     private final PlayerTeamSeasonStatRepository playerTeamSeasonStatRepository;
 
@@ -106,18 +106,18 @@ public class FavoriteService {
         TeamStanding standing = teamStandingRepository.findByTeamTeamIdAndSeason(team.getTeamId(), season)
                 .orElse(null);
         LocalDateTime now = LocalDateTime.now();
-        List<FavoriteDashboardResponseDto.TeamFixture> recentFixtures = fixtureRecordRepository
+        List<FavoriteDashboardResponseDto.TeamFixture> recentFixtures = fixtureRepository
                 .findRecentByTeam(team.getTeamId(), season, now, PageRequest.of(0, 5))
                 .stream()
                 .map(fixture -> toTeamFixture(fixture, team))
                 .toList();
-        FavoriteDashboardResponseDto.TeamFixture nextFixture = fixtureRecordRepository
+        FavoriteDashboardResponseDto.TeamFixture nextFixture = fixtureRepository
                 .findNextByTeam(team.getTeamId(), season, now, PageRequest.of(0, 1))
                 .stream()
                 .findFirst()
                 .map(fixture -> toTeamFixture(fixture, team))
                 .orElse(null);
-        FavoriteDashboardResponseDto.LiveTeamFixture liveFixture = fixtureRecordRepository
+        FavoriteDashboardResponseDto.LiveTeamFixture liveFixture = fixtureRepository
                 .findLiveByTeam(team.getTeamId(), season, PageRequest.of(0, 1))
                 .stream()
                 .findFirst()

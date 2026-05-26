@@ -1,7 +1,7 @@
 package com.son.soccerStreaming.fixture.service;
 
 import com.son.soccerStreaming.fixture.entity.Fixture;
-import com.son.soccerStreaming.fixture.repository.FixtureRecordRepository;
+import com.son.soccerStreaming.fixture.repository.FixtureRepository;
 import com.son.soccerStreaming.team.entity.Team;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -22,7 +22,7 @@ import static org.mockito.Mockito.when;
 class FixtureServiceTest {
 
     @Mock
-    private FixtureRecordRepository fixtureRecordRepository;
+    private FixtureRepository fixtureRepository;
 
     @InjectMocks
     private FixtureService fixtureService;
@@ -41,7 +41,7 @@ class FixtureServiceTest {
                 .fixtureStatus("SCHEDULED")
                 .build();
 
-        when(fixtureRecordRepository.findRecentFixturesWithCursor(
+        when(fixtureRepository.findRecentFixturesWithCursor(
                 org.mockito.ArgumentMatchers.isNull(),
                 org.mockito.ArgumentMatchers.eq(2025),
                 org.mockito.ArgumentMatchers.eq(38),
@@ -57,7 +57,7 @@ class FixtureServiceTest {
 
         ArgumentCaptor<LocalDateTime> startCaptor = ArgumentCaptor.forClass(LocalDateTime.class);
         ArgumentCaptor<LocalDateTime> endCaptor = ArgumentCaptor.forClass(LocalDateTime.class);
-        verify(fixtureRecordRepository).findRecentFixturesWithCursor(
+        verify(fixtureRepository).findRecentFixturesWithCursor(
                 org.mockito.ArgumentMatchers.isNull(),
                 org.mockito.ArgumentMatchers.eq(2025),
                 org.mockito.ArgumentMatchers.eq(38),
