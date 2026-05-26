@@ -6,6 +6,8 @@ import jakarta.persistence.*;
 import lombok.*;
 
 import java.time.LocalDateTime;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 @Entity
 @Getter
@@ -13,6 +15,8 @@ import java.time.LocalDateTime;
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @AllArgsConstructor(access = AccessLevel.PROTECTED)
 public class Fixture {
+
+    private static final Pattern ROUND_NUMBER_PATTERN = Pattern.compile("(\\d+)\\s*$");
 
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -37,7 +41,7 @@ public class Fixture {
     private Long timestamp;
     private Long firstPeriod;
     private Long secondPeriod;
-    private String round;
+    private Integer round;
     private Integer season;
 
     // 경기장 정보
@@ -157,7 +161,23 @@ public class Fixture {
     }
 
     public void updateRound(String round) {
-        this.round = round;
+        Integer parsedRound = parseRoundNumber(round);
+        if (parsedRound != null) {
+            this.round = parsedRound;
+        }
+    }
+
+    public static Integer parseRoundNumber(String round) {
+        if (round == null || round.isBlank()) {
+            return null;
+        }
+
+        Matcher matcher = ROUND_NUMBER_PATTERN.matcher(round);
+        if (!matcher.find()) {
+            return null;
+        }
+
+        return Integer.valueOf(matcher.group(1));
     }
 
     public void updateSeason(Integer season) {

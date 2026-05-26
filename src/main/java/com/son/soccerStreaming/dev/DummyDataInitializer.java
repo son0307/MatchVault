@@ -109,7 +109,7 @@ public class DummyDataInitializer implements CommandLineRunner {
                     .awayTeam(awayTeam)
                     .fixtureDate(LocalDateTime.now().minusDays(random.nextInt(30)))
                     .referee("Michael Oliver")
-                    .round("Regular Season - 1")
+                    .round(1)
                     .venueId(homeTeam.getVenue().getVenueId())
                     .venueName(homeTeam.getVenue().getVenueName())
                     .venueCity(homeTeam.getVenue().getVenueCity())

@@ -4,7 +4,9 @@ live:
     api-key: ${API_FOOTBALL_KEY}
     api-host: ${API_FOOTBALL_HOST:}
   sync:
-    enabled: ${LIVE_SYNC_ENABLED:false}
+    enabled: ${LIVE_SYNC_ENABLED:false  }
+    failure-threshold: ${LIVE_SYNC_FAILURE_THRESHOLD:3}
+    failure-cooldown-ms: ${LIVE_SYNC_FAILURE_COOLDOWN_MS:60000}
 
 api-football:
   sync:

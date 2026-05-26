@@ -44,3 +44,4 @@ Rules:
 - Do not propose broad refactoring outside the PR scope.
 - Be concrete and actionable.
 - If the diff is truncated or a line number is unavailable, say so and reference the closest file or hunk.
+- Don't check the files in src/main/resource, just a demo page to see if apis works well.

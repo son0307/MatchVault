@@ -94,7 +94,7 @@ public class LiveFixtureController {
     @GetMapping(path = "/stream/fixtures/{fixtureId}", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public SseEmitter stream(
             @Parameter(description = "실시간 스트림을 구독할 fixture ID", example = "1208000")
-            @PathVariable String fixtureId) {
+            @PathVariable Long fixtureId) {
         return sseService.subscribe(fixtureId);
     }
 

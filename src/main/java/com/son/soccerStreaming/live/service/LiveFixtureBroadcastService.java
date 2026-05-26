@@ -39,7 +39,7 @@ public class LiveFixtureBroadcastService {
 
     private void broadcast(Long fixtureId, String eventName, Object payload) {
         try {
-            sseService.broadcastToFixture(String.valueOf(fixtureId), eventName, objectMapper.writeValueAsString(payload));
+            sseService.broadcastToFixture(fixtureId, eventName, objectMapper.writeValueAsString(payload));
         } catch (JacksonException e) {
             log.error("Failed to serialize SSE payload. fixtureId={}, eventName={}", fixtureId, eventName, e);
         }
