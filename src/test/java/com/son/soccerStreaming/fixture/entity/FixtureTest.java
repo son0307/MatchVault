@@ -18,4 +18,15 @@ class FixtureTest {
         assertThat(Fixture.parseRoundNumber("   ")).isNull();
         assertThat(Fixture.parseRoundNumber("Playoffs")).isNull();
     }
+
+    @Test
+    void updateRoundKeepsExistingRoundWhenParsingFails() {
+        Fixture fixture = Fixture.builder()
+                .round(38)
+                .build();
+
+        fixture.updateRound("Quarter-finals");
+
+        assertThat(fixture.getRound()).isEqualTo(38);
+    }
 }

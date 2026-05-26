@@ -161,7 +161,10 @@ public class Fixture {
     }
 
     public void updateRound(String round) {
-        this.round = parseRoundNumber(round);
+        Integer parsedRound = parseRoundNumber(round);
+        if (parsedRound != null) {
+            this.round = parsedRound;
+        }
     }
 
     public static Integer parseRoundNumber(String round) {

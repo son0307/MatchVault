@@ -23,6 +23,8 @@ live:
   sync:
     enabled: ${LIVE_SYNC_ENABLED:false}
     interval-ms: ${LIVE_SYNC_INTERVAL_MS:5000}
+    failure-threshold: ${LIVE_SYNC_FAILURE_THRESHOLD:3}
+    failure-cooldown-ms: ${LIVE_SYNC_FAILURE_COOLDOWN_MS:60000}
 
 api-football:
   sync:
