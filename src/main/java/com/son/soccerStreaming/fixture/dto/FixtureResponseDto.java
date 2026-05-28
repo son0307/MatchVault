@@ -16,6 +16,8 @@ public class FixtureResponseDto {
         private Integer round;
         private String homeTeamName;
         private String awayTeamName;
+        private String homeTeamLogoUrl;
+        private String awayTeamLogoUrl;
         private int homeScore;
         private int awayScore;
         private Boolean homeWinner;

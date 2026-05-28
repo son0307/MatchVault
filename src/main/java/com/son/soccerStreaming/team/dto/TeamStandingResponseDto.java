@@ -4,6 +4,7 @@ import lombok.Builder;
 import lombok.Getter;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Getter
 @Builder
@@ -21,6 +22,7 @@ public class TeamStandingResponseDto {
     private Record all;
     private Record home;
     private Record away;
+    private RecentForm recentForm;
     private LocalDateTime updatedAt;
 
     @Getter
@@ -46,5 +48,18 @@ public class TeamStandingResponseDto {
     public static class Goals {
         private Integer goalsFor;
         private Integer goalsAgainst;
+    }
+
+    @Getter
+    @Builder
+    public static class RecentForm {
+        private Integer played;
+        private Integer win;
+        private Integer draw;
+        private Integer lose;
+        private Goals goals;
+        private Integer points;
+        private Integer goalsDiff;
+        private List<String> results;
     }
 }

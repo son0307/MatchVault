@@ -8,7 +8,7 @@ import java.util.List;
 public interface FixtureRepositoryCustom {
     List<Fixture> findRecentFixturesWithCursor(Long cursorId, Integer season, Integer round,
                                                 LocalDateTime startDateTime, LocalDateTime endDateTime,
-                                                int size);
+                                                Long teamId, int size);
 
     List<Fixture> searchByTeamNameTokens(List<String> tokens, int size);
 }
