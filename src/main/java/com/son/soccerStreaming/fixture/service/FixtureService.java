@@ -1,6 +1,7 @@
 package com.son.soccerStreaming.fixture.service;
 
 import com.son.soccerStreaming.fixture.dto.CursorResponse;
+import com.son.soccerStreaming.fixture.dto.FixtureMetaResponseDto;
 import com.son.soccerStreaming.fixture.dto.FixtureResponseDto;
 import com.son.soccerStreaming.fixture.entity.Fixture;
 import com.son.soccerStreaming.fixture.repository.FixtureRepository;
@@ -18,15 +19,23 @@ import java.util.List;
 @RequiredArgsConstructor
 public class FixtureService {
 
-    private final FixtureRepository fixtureRepository;
     private static final ZoneId KOREA_ZONE = ZoneId.of("Asia/Seoul");
+
+    private final FixtureRepository fixtureRepository;
 
     @Transactional(readOnly = true)
     public CursorResponse<FixtureResponseDto.Summary> getRecentFixtures(Long cursorId, Integer season, Integer round,
                                                                          LocalDate date, int size) {
-        DateRange dateRange = utcRangeForKoreaDate(date);
+        return getRecentFixtures(cursorId, season, round, date, null, null, null, size);
+    }
+
+    @Transactional(readOnly = true)
+    public CursorResponse<FixtureResponseDto.Summary> getRecentFixtures(Long cursorId, Integer season, Integer round,
+                                                                         LocalDate date, LocalDate dateFrom,
+                                                                         LocalDate dateTo, Long teamId, int size) {
+        DateRange dateRange = utcRangeForKoreaDates(date, dateFrom, dateTo);
         List<Fixture> fixtures = fixtureRepository.findRecentFixturesWithCursor(
-                cursorId, season, round, dateRange.startDateTime(), dateRange.endDateTime(), size);
+                cursorId, season, round, dateRange.startDateTime(), dateRange.endDateTime(), teamId, size);
 
         boolean hasNext = false;
         if (fixtures.size() > size) {
@@ -35,26 +44,7 @@ public class FixtureService {
         }
 
         List<FixtureResponseDto.Summary> content = fixtures.stream()
-                .map(fixture -> FixtureResponseDto.Summary.builder()
-                        .fixtureId(fixture.getFixtureId())
-                        .fixtureDate(fixture.getFixtureDate())
-                        .round(fixture.getRound())
-                        .homeTeamName(fixture.getHomeTeam().getName())
-                        .awayTeamName(fixture.getAwayTeam().getName())
-                        .homeScore(valueOf(fixture.getHomeScore()))
-                        .awayScore(valueOf(fixture.getAwayScore()))
-                        .homeWinner(fixture.getHomeWinner())
-                        .awayWinner(fixture.getAwayWinner())
-                        .halftimeHomeScore(fixture.getHalftimeHomeScore())
-                        .halftimeAwayScore(fixture.getHalftimeAwayScore())
-                        .fulltimeHomeScore(fixture.getFulltimeHomeScore())
-                        .fulltimeAwayScore(fixture.getFulltimeAwayScore())
-                        .extratimeHomeScore(fixture.getExtratimeHomeScore())
-                        .extratimeAwayScore(fixture.getExtratimeAwayScore())
-                        .penaltyHomeScore(fixture.getPenaltyHomeScore())
-                        .penaltyAwayScore(fixture.getPenaltyAwayScore())
-                        .fixtureStatus(fixture.getFixtureStatus())
-                        .build())
+                .map(this::toSummary)
                 .toList();
 
         Long nextCursor = hasNext ? fixtures.get(fixtures.size() - 1).getId() : null;
@@ -66,24 +56,70 @@ public class FixtureService {
                 .build();
     }
 
+    @Transactional(readOnly = true)
+    public FixtureMetaResponseDto getFixtureMeta(Integer season) {
+        return FixtureMetaResponseDto.builder()
+                .minDate(toKoreaDate(fixtureRepository.findMinFixtureDateBySeason(season).orElse(null)))
+                .maxDate(toKoreaDate(fixtureRepository.findMaxFixtureDateBySeason(season).orElse(null)))
+                .minRound(fixtureRepository.findMinRoundBySeason(season).orElse(null))
+                .maxRound(fixtureRepository.findMaxRoundBySeason(season).orElse(null))
+                .build();
+    }
+
+    private FixtureResponseDto.Summary toSummary(Fixture fixture) {
+        return FixtureResponseDto.Summary.builder()
+                .fixtureId(fixture.getFixtureId())
+                .fixtureDate(fixture.getFixtureDate())
+                .round(fixture.getRound())
+                .homeTeamName(fixture.getHomeTeam().getName())
+                .awayTeamName(fixture.getAwayTeam().getName())
+                .homeTeamLogoUrl(fixture.getHomeTeam().getLogoUrl())
+                .awayTeamLogoUrl(fixture.getAwayTeam().getLogoUrl())
+                .homeScore(valueOf(fixture.getHomeScore()))
+                .awayScore(valueOf(fixture.getAwayScore()))
+                .homeWinner(fixture.getHomeWinner())
+                .awayWinner(fixture.getAwayWinner())
+                .halftimeHomeScore(fixture.getHalftimeHomeScore())
+                .halftimeAwayScore(fixture.getHalftimeAwayScore())
+                .fulltimeHomeScore(fixture.getFulltimeHomeScore())
+                .fulltimeAwayScore(fixture.getFulltimeAwayScore())
+                .extratimeHomeScore(fixture.getExtratimeHomeScore())
+                .extratimeAwayScore(fixture.getExtratimeAwayScore())
+                .penaltyHomeScore(fixture.getPenaltyHomeScore())
+                .penaltyAwayScore(fixture.getPenaltyAwayScore())
+                .fixtureStatus(fixture.getFixtureStatus())
+                .build();
+    }
+
     private int valueOf(Integer value) {
         return value == null ? 0 : value;
     }
 
-    private DateRange utcRangeForKoreaDate(LocalDate date) {
+    private DateRange utcRangeForKoreaDates(LocalDate date, LocalDate dateFrom, LocalDate dateTo) {
+        if (dateFrom != null || dateTo != null) {
+            LocalDateTime startDateTime = dateFrom == null ? null : koreaStartAsUtc(dateFrom);
+            LocalDateTime endDateTime = dateTo == null ? null : koreaStartAsUtc(dateTo.plusDays(1));
+            return new DateRange(startDateTime, endDateTime);
+        }
+
         if (date == null) {
             return new DateRange(null, null);
         }
 
-        // API-Football 날짜는 UTC 기준으로 저장되므로, 선택한 한국 날짜를 UTC 조회 범위로 변환한다.
-        LocalDateTime startDateTime = date.atStartOfDay(KOREA_ZONE)
-                .withZoneSameInstant(ZoneOffset.UTC)
-                .toLocalDateTime();
-        LocalDateTime endDateTime = date.plusDays(1).atStartOfDay(KOREA_ZONE)
-                .withZoneSameInstant(ZoneOffset.UTC)
-                .toLocalDateTime();
+        return new DateRange(koreaStartAsUtc(date), koreaStartAsUtc(date.plusDays(1)));
+    }
 
-        return new DateRange(startDateTime, endDateTime);
+    private LocalDateTime koreaStartAsUtc(LocalDate date) {
+        return date.atStartOfDay(KOREA_ZONE)
+                .withZoneSameInstant(ZoneOffset.UTC)
+                .toLocalDateTime();
+    }
+
+    private LocalDate toKoreaDate(LocalDateTime dateTime) {
+        if (dateTime == null) {
+            return null;
+        }
+        return dateTime.atOffset(ZoneOffset.UTC).atZoneSameInstant(KOREA_ZONE).toLocalDate();
     }
 
     private record DateRange(LocalDateTime startDateTime, LocalDateTime endDateTime) {

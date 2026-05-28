@@ -21,15 +21,18 @@ public class FixtureRepositoryImpl implements FixtureRepositoryCustom {
     @Override
     public List<Fixture> findRecentFixturesWithCursor(Long cursorId, Integer season, Integer round,
                                                        LocalDateTime startDateTime, LocalDateTime endDateTime,
-                                                       int size) {
+                                                       Long teamId, int size) {
         return queryFactory
                 .selectFrom(fixture)
+                .join(fixture.homeTeam).fetchJoin()
+                .join(fixture.awayTeam).fetchJoin()
                 .where(
                         ltCursorId(cursorId),
                         eqSeason(season),
                         eqRound(round),
                         goeFixtureDate(startDateTime),
-                        ltFixtureDate(endDateTime)
+                        ltFixtureDate(endDateTime),
+                        eqTeam(teamId)
                 )
                 .orderBy(fixture.id.desc())
                 .limit(size + 1)
@@ -72,6 +75,10 @@ public class FixtureRepositoryImpl implements FixtureRepositoryCustom {
 
     private BooleanExpression ltFixtureDate(LocalDateTime endDateTime) {
         return endDateTime == null ? null : fixture.fixtureDate.lt(endDateTime);
+    }
+
+    private BooleanExpression eqTeam(Long teamId) {
+        return teamId == null ? null : fixture.homeTeam.teamId.eq(teamId).or(fixture.awayTeam.teamId.eq(teamId));
     }
 
     private BooleanExpression containsHomeOrAwayTeamName(String token) {

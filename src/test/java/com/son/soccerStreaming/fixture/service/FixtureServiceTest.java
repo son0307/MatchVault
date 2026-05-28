@@ -47,6 +47,7 @@ class FixtureServiceTest {
                 org.mockito.ArgumentMatchers.eq(38),
                 org.mockito.ArgumentMatchers.any(LocalDateTime.class),
                 org.mockito.ArgumentMatchers.any(LocalDateTime.class),
+                org.mockito.ArgumentMatchers.isNull(),
                 org.mockito.ArgumentMatchers.eq(100)
         )).thenReturn(List.of(fixture));
 
@@ -63,8 +64,46 @@ class FixtureServiceTest {
                 org.mockito.ArgumentMatchers.eq(38),
                 startCaptor.capture(),
                 endCaptor.capture(),
+                org.mockito.ArgumentMatchers.isNull(),
                 org.mockito.ArgumentMatchers.eq(100)
         );
         assertThat(endCaptor.getValue()).isEqualTo(startCaptor.getValue().plusDays(1));
+    }
+
+    @Test
+    void getRecentFixturesPassesDateRangeAndTeamFilter() {
+        when(fixtureRepository.findRecentFixturesWithCursor(
+                org.mockito.ArgumentMatchers.eq(10L),
+                org.mockito.ArgumentMatchers.eq(2025),
+                org.mockito.ArgumentMatchers.isNull(),
+                org.mockito.ArgumentMatchers.any(LocalDateTime.class),
+                org.mockito.ArgumentMatchers.any(LocalDateTime.class),
+                org.mockito.ArgumentMatchers.eq(47L),
+                org.mockito.ArgumentMatchers.eq(20)
+        )).thenReturn(List.of());
+
+        fixtureService.getRecentFixtures(
+                10L,
+                2025,
+                null,
+                null,
+                LocalDate.of(2026, 5, 15),
+                LocalDate.of(2026, 5, 21),
+                47L,
+                20
+        );
+
+        ArgumentCaptor<LocalDateTime> startCaptor = ArgumentCaptor.forClass(LocalDateTime.class);
+        ArgumentCaptor<LocalDateTime> endCaptor = ArgumentCaptor.forClass(LocalDateTime.class);
+        verify(fixtureRepository).findRecentFixturesWithCursor(
+                org.mockito.ArgumentMatchers.eq(10L),
+                org.mockito.ArgumentMatchers.eq(2025),
+                org.mockito.ArgumentMatchers.isNull(),
+                startCaptor.capture(),
+                endCaptor.capture(),
+                org.mockito.ArgumentMatchers.eq(47L),
+                org.mockito.ArgumentMatchers.eq(20)
+        );
+        assertThat(endCaptor.getValue()).isEqualTo(startCaptor.getValue().plusDays(7));
     }
 }

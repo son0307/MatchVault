@@ -2,6 +2,8 @@ package com.son.soccerStreaming.team.service;
 
 import com.son.soccerStreaming.apifootball.service.ApiFootballStandingLocalUpdateService;
 import com.son.soccerStreaming.apifootball.service.ApiFootballStandingLocalUpdateService.LiveStandingImpact;
+import com.son.soccerStreaming.fixture.entity.Fixture;
+import com.son.soccerStreaming.fixture.repository.FixtureRepository;
 import com.son.soccerStreaming.team.dto.TeamStandingResponseDto;
 import com.son.soccerStreaming.team.entity.Team;
 import com.son.soccerStreaming.team.entity.TeamStanding;
@@ -12,7 +14,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
@@ -23,8 +27,11 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class TeamStandingService {
 
+    private static final List<String> FINISHED_FIXTURE_STATUSES = List.of("FINISHED", "FT", "AET", "PEN");
+
     private final TeamStandingRepository teamStandingRepository;
     private final ApiFootballStandingLocalUpdateService apiFootballStandingLocalUpdateService;
+    private final FixtureRepository fixtureRepository;
 
     public List<TeamStandingResponseDto> getStandings(Integer season) {
         List<StandingProjection> projections = teamStandingRepository.findAllBySeason(season).stream()
@@ -33,14 +40,15 @@ public class TeamStandingService {
 
         applyLiveImpacts(projections, apiFootballStandingLocalUpdateService.findImpacts(season));
         refreshRanks(projections);
+        Map<Long, RecentFormProjection> recentForms = findRecentForms(season, projections);
 
         return projections.stream()
                 .sorted(Comparator.comparing(StandingProjection::getRank, Comparator.nullsLast(Comparator.naturalOrder())))
-                .map(this::toResponse)
+                .map(standing -> toResponse(standing, recentForms.get(standing.getTeamId())))
                 .toList();
     }
 
-    private TeamStandingResponseDto toResponse(StandingProjection standing) {
+    private TeamStandingResponseDto toResponse(StandingProjection standing, RecentFormProjection recentForm) {
         return TeamStandingResponseDto.builder()
                 .season(standing.getSeason())
                 .rank(standing.getRank())
@@ -79,8 +87,35 @@ public class TeamStandingService {
                         standing.getAwayGoalsFor(),
                         standing.getAwayGoalsAgainst()
                 ))
+                .recentForm(toRecentForm(recentForm))
                 .updatedAt(standing.getUpdatedAt())
                 .build();
+    }
+
+    private Map<Long, RecentFormProjection> findRecentForms(Integer season, List<StandingProjection> standings) {
+        Map<Long, RecentFormProjection> recentForms = new HashMap<>();
+        standings.forEach(standing -> recentForms.put(standing.getTeamId(), new RecentFormProjection()));
+
+        fixtureRepository.findFinishedWithScoresBySeasonOrderByFixtureDateDesc(season, FINISHED_FIXTURE_STATUSES)
+                .stream()
+                .forEach(fixture -> applyRecentFixture(recentForms, fixture));
+
+        return recentForms;
+    }
+
+    private void applyRecentFixture(Map<Long, RecentFormProjection> recentForms, Fixture fixture) {
+        Long homeTeamId = fixture.getHomeTeam().getTeamId();
+        Long awayTeamId = fixture.getAwayTeam().getTeamId();
+
+        RecentFormProjection homeForm = recentForms.get(homeTeamId);
+        if (homeForm != null && homeForm.canApply()) {
+            homeForm.apply(fixture.getHomeScore(), fixture.getAwayScore());
+        }
+
+        RecentFormProjection awayForm = recentForms.get(awayTeamId);
+        if (awayForm != null && awayForm.canApply()) {
+            awayForm.apply(fixture.getAwayScore(), fixture.getHomeScore());
+        }
     }
 
     private void applyLiveImpacts(List<StandingProjection> standings, List<LiveStandingImpact> impacts) {
@@ -124,6 +159,23 @@ public class TeamStandingService {
                         .goalsFor(goalsFor)
                         .goalsAgainst(goalsAgainst)
                         .build())
+                .build();
+    }
+
+    private TeamStandingResponseDto.RecentForm toRecentForm(RecentFormProjection recentForm) {
+        RecentFormProjection form = recentForm != null ? recentForm : new RecentFormProjection();
+        return TeamStandingResponseDto.RecentForm.builder()
+                .played(form.getPlayed())
+                .win(form.getWin())
+                .draw(form.getDraw())
+                .lose(form.getLose())
+                .goals(TeamStandingResponseDto.Goals.builder()
+                        .goalsFor(form.getGoalsFor())
+                        .goalsAgainst(form.getGoalsAgainst())
+                        .build())
+                .points(form.getPoints())
+                .goalsDiff(form.getGoalsDiff())
+                .results(form.getResults())
                 .build();
     }
 
@@ -247,6 +299,51 @@ public class TeamStandingService {
 
         private void updateRank(Integer rank) {
             this.rank = rank;
+        }
+    }
+
+    @Getter
+    private static class RecentFormProjection {
+        private static final int MAX_RECENT_MATCHES = 5;
+
+        private int played;
+        private int win;
+        private int draw;
+        private int lose;
+        private int goalsFor;
+        private int goalsAgainst;
+        private int points;
+        private final List<String> results = new ArrayList<>();
+
+        boolean canApply() {
+            return played < MAX_RECENT_MATCHES;
+        }
+
+        void apply(int goalsFor, int goalsAgainst) {
+            if (!canApply()) {
+                return;
+            }
+
+            this.played++;
+            this.goalsFor += goalsFor;
+            this.goalsAgainst += goalsAgainst;
+
+            if (goalsFor > goalsAgainst) {
+                this.win++;
+                this.points += 3;
+                this.results.add("W");
+            } else if (goalsFor == goalsAgainst) {
+                this.draw++;
+                this.points += 1;
+                this.results.add("D");
+            } else {
+                this.lose++;
+                this.results.add("L");
+            }
+        }
+
+        int getGoalsDiff() {
+            return goalsFor - goalsAgainst;
         }
     }
 }

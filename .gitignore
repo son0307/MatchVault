@@ -30,6 +30,9 @@ out/
 /nbproject/private/
 /nbbuild/
 /dist/
+/frontend/node_modules/
+/frontend/dist/
+/frontend/.vite/
 /nbdist/
 /.nb-gradle/
 

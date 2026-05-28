@@ -27,8 +27,32 @@ public interface FixtureRepository extends JpaRepository<Fixture, Long>, Fixture
             LocalDateTime end
     );
 
+    @Query("SELECT MIN(f.fixtureDate) FROM Fixture f WHERE f.season = :season")
+    Optional<LocalDateTime> findMinFixtureDateBySeason(@Param("season") Integer season);
+
+    @Query("SELECT MAX(f.fixtureDate) FROM Fixture f WHERE f.season = :season")
+    Optional<LocalDateTime> findMaxFixtureDateBySeason(@Param("season") Integer season);
+
+    @Query("SELECT MIN(f.round) FROM Fixture f WHERE f.season = :season AND f.round IS NOT NULL")
+    Optional<Integer> findMinRoundBySeason(@Param("season") Integer season);
+
+    @Query("SELECT MAX(f.round) FROM Fixture f WHERE f.season = :season AND f.round IS NOT NULL")
+    Optional<Integer> findMaxRoundBySeason(@Param("season") Integer season);
+
     @EntityGraph(attributePaths = {"homeTeam", "awayTeam"})
     List<Fixture> findAllBySeasonAndFixtureStatusOrderByFixtureDateAsc(Integer season, String fixtureStatus);
+
+    @EntityGraph(attributePaths = {"homeTeam", "awayTeam"})
+    @Query("SELECT f FROM Fixture f " +
+            "WHERE f.season = :season " +
+            "AND (f.fixtureStatus IN :finishedStatuses OR f.statusShort IN :finishedStatuses) " +
+            "AND f.homeScore IS NOT NULL " +
+            "AND f.awayScore IS NOT NULL " +
+            "ORDER BY f.fixtureDate DESC")
+    List<Fixture> findFinishedWithScoresBySeasonOrderByFixtureDateDesc(
+            @Param("season") Integer season,
+            @Param("finishedStatuses") Collection<String> finishedStatuses
+    );
 
     List<Fixture> findAllByFixtureStatus(String fixtureStatus);
 
