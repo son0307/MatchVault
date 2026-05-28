@@ -4,6 +4,8 @@ import { NavLink } from "react-router-dom";
 import { fetchHomeSummary, type HomeSummary } from "../api";
 
 const DEFAULT_SEASON = 2025;
+const MIN_SEASON = 2000;
+const MAX_SEASON = 2100;
 
 export function HomePage() {
   const [season, setSeason] = useState(DEFAULT_SEASON);
@@ -39,9 +41,11 @@ export function HomePage() {
   function updateSeason(value: string) {
     const nextSeason = Number(value);
     setSeason(nextSeason);
-    if (Number.isFinite(nextSeason)) {
-      void loadSummary(nextSeason);
+    if (!isValidSeason(nextSeason)) {
+      setErrorMessage(`${MIN_SEASON}년부터 ${MAX_SEASON}년 사이의 시즌을 입력해주세요.`);
+      return;
     }
+    void loadSummary(nextSeason);
   }
 
   return (
@@ -106,6 +110,10 @@ export function HomePage() {
       </section>
     </main>
   );
+}
+
+function isValidSeason(value: number) {
+  return Number.isInteger(value) && value >= MIN_SEASON && value <= MAX_SEASON;
 }
 
 function FixtureList({ fixtures }: { fixtures: HomeSummary["todayFixtures"] }) {

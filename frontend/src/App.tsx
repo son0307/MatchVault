@@ -73,7 +73,11 @@ function LeagueLayout({ children }: { children: React.ReactNode }) {
       <nav className="league-tabs" aria-label="리그 메뉴">
         {leagueTabs.map((tab) =>
           tab.enabled ? (
-            <NavLink className="league-tab" key={tab.to} to={tab.to}>
+            <NavLink
+              className={({ isActive }) => `league-tab${isActive ? " active" : ""}`}
+              key={tab.to}
+              to={tab.to}
+            >
               {tab.label}
             </NavLink>
           ) : (

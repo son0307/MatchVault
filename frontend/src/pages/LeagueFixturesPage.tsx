@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { ChevronDown, ChevronLeft, ChevronRight } from "lucide-react";
 import { Link } from "react-router-dom";
 import {
@@ -39,7 +39,10 @@ export function LeagueFixturesPage() {
   const [fixtures, setFixtures] = useState<FixtureSummary[]>([]);
   const [teamPage, setTeamPage] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
+  const [isLoadingTeams, setIsLoadingTeams] = useState(true);
   const [errorMessage, setErrorMessage] = useState("");
+  const [teamErrorMessage, setTeamErrorMessage] = useState("");
+  const fixtureRequestId = useRef(0);
 
   const minRound = 1;
   const maxRound = meta?.maxRound ?? 38;
@@ -65,7 +68,8 @@ export function LeagueFixturesPage() {
   );
 
   useEffect(() => {
-    void loadInitialData();
+    void loadFixtureMeta();
+    void loadTeamOptions();
   }, []);
 
   useEffect(() => {
@@ -77,19 +81,11 @@ export function LeagueFixturesPage() {
     void loadFixtures();
   }, [mode, weekStart, round, selectedTeamId]);
 
-  async function loadInitialData() {
-    setIsLoading(true);
+  async function loadFixtureMeta() {
     try {
-      const [fixtureMeta, standings] = await Promise.all([
-        fetchFixtureMeta(DEFAULT_SEASON),
-        fetchStandings(DEFAULT_SEASON),
-      ]);
-      const teamOptions = standingsToTeamOptions(standings);
-
+      const fixtureMeta = await fetchFixtureMeta(DEFAULT_SEASON);
       setMeta(fixtureMeta);
       setRound(1);
-      setTeams(teamOptions);
-      setSelectedTeamId(teamOptions[0]?.teamId ?? null);
 
       if (fixtureMeta.minDate && weekStart < startOfKoreaWeek(fixtureMeta.minDate)) {
         setWeekStart(startOfKoreaWeek(fixtureMeta.minDate));
@@ -98,7 +94,24 @@ export function LeagueFixturesPage() {
         setWeekStart(startOfKoreaWeek(fixtureMeta.maxDate));
       }
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "경기 정보를 불러오지 못했습니다.");
+      setErrorMessage(error instanceof Error ? error.message : "경기 범위를 불러오지 못했습니다.");
+    }
+  }
+
+  async function loadTeamOptions() {
+    setIsLoadingTeams(true);
+    setTeamErrorMessage("");
+    try {
+      const standings = await fetchStandings(DEFAULT_SEASON);
+      const teamOptions = standingsToTeamOptions(standings);
+      setTeams(teamOptions);
+      setSelectedTeamId((current) => current ?? teamOptions[0]?.teamId ?? null);
+    } catch (error) {
+      setTeams([]);
+      setSelectedTeamId(null);
+      setTeamErrorMessage(error instanceof Error ? error.message : "팀 목록을 불러오지 못했습니다.");
+    } finally {
+      setIsLoadingTeams(false);
     }
   }
 
@@ -108,18 +121,28 @@ export function LeagueFixturesPage() {
       return;
     }
 
+    const requestId = fixtureRequestId.current + 1;
+    fixtureRequestId.current = requestId;
     setIsLoading(true);
     setErrorMessage("");
     setFixtures([]);
 
     try {
       const response = await fetchFixtures(query);
+      if (requestId !== fixtureRequestId.current) {
+        return;
+      }
       setFixtures(response.content ?? []);
       setTeamPage(0);
     } catch (error) {
+      if (requestId !== fixtureRequestId.current) {
+        return;
+      }
       setErrorMessage(error instanceof Error ? error.message : "경기 일정을 불러오지 못했습니다.");
     } finally {
-      setIsLoading(false);
+      if (requestId === fixtureRequestId.current) {
+        setIsLoading(false);
+      }
     }
   }
 
@@ -199,7 +222,11 @@ export function LeagueFixturesPage() {
         {mode === "team" ? (
           <label className="team-select-field">
             <span>팀 선택</span>
-            <select value={selectedTeamId ?? ""} onChange={(event) => selectTeam(Number(event.target.value))}>
+            <select
+              value={selectedTeamId ?? ""}
+              onChange={(event) => selectTeam(Number(event.target.value))}
+              disabled={isLoadingTeams || teams.length === 0}
+            >
               {teams.map((team) => (
                 <option value={team.teamId} key={team.teamId}>
                   {team.teamName}
@@ -222,10 +249,13 @@ export function LeagueFixturesPage() {
       ) : null}
 
       {errorMessage ? <div className="notice error">{errorMessage}</div> : null}
+      {mode === "team" && teamErrorMessage ? <div className="notice error">{teamErrorMessage}</div> : null}
 
       <article className="panel fixtures-panel">
         {isLoading ? (
           <div className="empty-state">경기 일정을 불러오는 중입니다.</div>
+        ) : isLoadingTeams && mode === "team" ? (
+          <div className="empty-state">팀 목록을 불러오는 중입니다.</div>
         ) : teams.length === 0 && mode === "team" ? (
           <div className="empty-state">선택 가능한 팀이 없습니다.</div>
         ) : (
