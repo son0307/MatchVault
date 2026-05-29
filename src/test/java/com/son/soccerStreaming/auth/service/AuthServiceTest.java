@@ -13,6 +13,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.BadCredentialsException;
@@ -86,6 +87,89 @@ class AuthServiceTest {
     }
 
     @Test
+    void signupRejectsDuplicateEmailRaceCondition() {
+        when(appUserRepository.existsByEmail("fan@example.com")).thenReturn(false);
+        when(passwordEncoder.encode("password")).thenReturn("encoded-password");
+        when(appUserRepository.save(any())).thenThrow(new DataIntegrityViolationException("duplicate"));
+
+        assertThatThrownBy(() -> authService.signup(
+                new AuthRequestDto.Signup("fan@example.com", "password", "Fan"),
+                new MockHttpServletRequest()
+        ))
+                .isInstanceOf(CustomException.class)
+                .extracting("errorCode")
+                .isEqualTo(ErrorCode.EMAIL_ALREADY_EXISTS);
+    }
+
+    @Test
+    void signupRejectsInvalidEmailFormat() {
+        assertThatThrownBy(() -> authService.signup(
+                new AuthRequestDto.Signup("not-an-email", "password", "Fan"),
+                new MockHttpServletRequest()
+        ))
+                .isInstanceOf(CustomException.class)
+                .extracting("errorCode")
+                .isEqualTo(ErrorCode.INVALID_AUTH_REQUEST);
+    }
+
+    @Test
+    void signupRejectsTooLongEmail() {
+        String longEmail = "a".repeat(109) + "@example.com";
+
+        assertThatThrownBy(() -> authService.signup(
+                new AuthRequestDto.Signup(longEmail, "password", "Fan"),
+                new MockHttpServletRequest()
+        ))
+                .isInstanceOf(CustomException.class)
+                .extracting("errorCode")
+                .isEqualTo(ErrorCode.INVALID_AUTH_REQUEST);
+    }
+
+    @Test
+    void signupRejectsShortPassword() {
+        assertThatThrownBy(() -> authService.signup(
+                new AuthRequestDto.Signup("fan@example.com", "short", "Fan"),
+                new MockHttpServletRequest()
+        ))
+                .isInstanceOf(CustomException.class)
+                .extracting("errorCode")
+                .isEqualTo(ErrorCode.INVALID_AUTH_REQUEST);
+    }
+
+    @Test
+    void signupRejectsTooLongPassword() {
+        assertThatThrownBy(() -> authService.signup(
+                new AuthRequestDto.Signup("fan@example.com", "a".repeat(73), "Fan"),
+                new MockHttpServletRequest()
+        ))
+                .isInstanceOf(CustomException.class)
+                .extracting("errorCode")
+                .isEqualTo(ErrorCode.INVALID_AUTH_REQUEST);
+    }
+
+    @Test
+    void signupRejectsInvalidNickname() {
+        assertThatThrownBy(() -> authService.signup(
+                new AuthRequestDto.Signup("fan@example.com", "password", "Fan!"),
+                new MockHttpServletRequest()
+        ))
+                .isInstanceOf(CustomException.class)
+                .extracting("errorCode")
+                .isEqualTo(ErrorCode.INVALID_AUTH_REQUEST);
+    }
+
+    @Test
+    void signupRejectsTooLongNickname() {
+        assertThatThrownBy(() -> authService.signup(
+                new AuthRequestDto.Signup("fan@example.com", "password", "a".repeat(21)),
+                new MockHttpServletRequest()
+        ))
+                .isInstanceOf(CustomException.class)
+                .extracting("errorCode")
+                .isEqualTo(ErrorCode.INVALID_AUTH_REQUEST);
+    }
+
+    @Test
     void loginReturnsCurrentUser() {
         MockHttpServletRequest servletRequest = new MockHttpServletRequest();
         AppUser user = AppUser.builder()
@@ -111,12 +195,23 @@ class AuthServiceTest {
         when(authenticationManager.authenticate(any())).thenThrow(new BadCredentialsException("bad"));
 
         assertThatThrownBy(() -> authService.login(
-                new AuthRequestDto.Login("fan@example.com", "wrong"),
+                new AuthRequestDto.Login("fan@example.com", "wrongpass"),
                 new MockHttpServletRequest()
         ))
                 .isInstanceOf(CustomException.class)
                 .extracting("errorCode")
                 .isEqualTo(ErrorCode.LOGIN_FAILED);
+    }
+
+    @Test
+    void loginRejectsInvalidEmailFormat() {
+        assertThatThrownBy(() -> authService.login(
+                new AuthRequestDto.Login("not-an-email", "password"),
+                new MockHttpServletRequest()
+        ))
+                .isInstanceOf(CustomException.class)
+                .extracting("errorCode")
+                .isEqualTo(ErrorCode.INVALID_AUTH_REQUEST);
     }
 
     @Test
