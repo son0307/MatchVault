@@ -288,6 +288,13 @@ export type FavoritePlayerSeasonStat = {
   redCards: number | null;
 };
 
+export type CurrentUser = {
+  id: number;
+  email: string;
+  nickname: string | null;
+  role: string;
+};
+
 export class ApiError extends Error {
   status: number;
 
@@ -464,6 +471,43 @@ export async function fetchTeams(): Promise<TeamSummary[]> {
   return response.json();
 }
 
+export async function login(email: string, password: string): Promise<CurrentUser> {
+  return postJson("/api/v1/auth/login", { email, password });
+}
+
+export async function signup(email: string, password: string, nickname: string): Promise<CurrentUser> {
+  return postJson("/api/v1/auth/signup", { email, password, nickname });
+}
+
+export async function logout(): Promise<void> {
+  const response = await fetch("/api/v1/auth/logout", {
+    method: "POST",
+    headers: {
+      Accept: "application/json",
+    },
+    credentials: "same-origin",
+  });
+
+  if (!response.ok) {
+    throw await responseError(response, `로그아웃에 실패했습니다. (${response.status})`);
+  }
+}
+
+export async function fetchCurrentUser(): Promise<CurrentUser> {
+  const response = await fetch("/api/v1/auth/me", {
+    headers: {
+      Accept: "application/json",
+    },
+    credentials: "same-origin",
+  });
+
+  if (!response.ok) {
+    throw await responseError(response, `로그인이 필요합니다. (${response.status})`);
+  }
+
+  return response.json();
+}
+
 export async function fetchFavoriteDashboard(season: number): Promise<FavoriteDashboard> {
   const response = await fetch(`/api/v1/favorites/dashboard?season=${season}`, {
     headers: {
@@ -482,5 +526,32 @@ export async function fetchFavoriteDashboard(season: number): Promise<FavoriteDa
 function appendParam(params: URLSearchParams, key: string, value: string | number | undefined) {
   if (value !== undefined && value !== null && value !== "") {
     params.set(key, String(value));
+  }
+}
+
+async function postJson<T>(url: string, body: unknown): Promise<T> {
+  const response = await fetch(url, {
+    method: "POST",
+    headers: {
+      Accept: "application/json",
+      "Content-Type": "application/json",
+    },
+    credentials: "same-origin",
+    body: JSON.stringify(body),
+  });
+
+  if (!response.ok) {
+    throw await responseError(response, `${url} 요청에 실패했습니다. (${response.status})`);
+  }
+
+  return response.json();
+}
+
+async function responseError(response: Response, fallbackMessage: string) {
+  try {
+    const errorBody = (await response.json()) as { message?: string };
+    return new ApiError(errorBody.message || fallbackMessage, response.status);
+  } catch {
+    return new ApiError(fallbackMessage, response.status);
   }
 }

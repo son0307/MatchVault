@@ -9,7 +9,7 @@ import org.springframework.http.HttpStatus;
 public enum ErrorCode {
 
     // 400 BAD_REQUEST
-    INVALID_AUTH_REQUEST(HttpStatus.BAD_REQUEST, "이메일, 비밀번호, 닉네임을 확인해주세요."),
+    INVALID_AUTH_REQUEST(HttpStatus.BAD_REQUEST, "이메일, 비밀번호, 닉네임을 확인해 주세요. 비밀번호는 8자 이상이어야 합니다."),
     INVALID_ADMIN_OVERRIDE_FIELD(HttpStatus.BAD_REQUEST, "Invalid admin override field."),
 
     // 401 UNAUTHORIZED
