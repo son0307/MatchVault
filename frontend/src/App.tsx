@@ -70,7 +70,6 @@ function LeagueLayout({ children }: { children: ReactNode }) {
   const [authStatus, setAuthStatus] = useState<AuthStatus>("checking");
   const [authError, setAuthError] = useState("");
   const [isLoggingOut, setIsLoggingOut] = useState(false);
-  const authKey = currentUser ? `user-${currentUser.id}` : "guest";
 
   useEffect(() => {
     void loadCurrentUser();
@@ -166,7 +165,7 @@ function LeagueLayout({ children }: { children: ReactNode }) {
         )}
       </nav>
 
-      <div key={authKey}>{children}</div>
+      {children}
     </main>
   );
 }
