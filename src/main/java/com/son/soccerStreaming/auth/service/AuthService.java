@@ -3,12 +3,13 @@ package com.son.soccerStreaming.auth.service;
 import com.son.soccerStreaming.auth.dto.AuthRequestDto;
 import com.son.soccerStreaming.auth.dto.AuthResponseDto;
 import com.son.soccerStreaming.auth.entity.AppUser;
-import com.son.soccerStreaming.global.exception.CustomException;
-import com.son.soccerStreaming.global.exception.ErrorCode;
 import com.son.soccerStreaming.auth.repository.AppUserRepository;
 import com.son.soccerStreaming.auth.security.AuthUserDetails;
+import com.son.soccerStreaming.global.exception.CustomException;
+import com.son.soccerStreaming.global.exception.ErrorCode;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -20,11 +21,22 @@ import org.springframework.security.web.context.HttpSessionSecurityContextReposi
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.regex.Pattern;
+
 @Service
 @RequiredArgsConstructor
 public class AuthService {
 
+    private static final int EMAIL_MAX_LENGTH = 120;
     private static final int PASSWORD_MIN_LENGTH = 8;
+    private static final int PASSWORD_MAX_LENGTH = 20;
+    private static final int NICKNAME_MIN_LENGTH = 2;
+    private static final int NICKNAME_MAX_LENGTH = 20;
+    private static final Pattern EMAIL_PATTERN = Pattern.compile(
+            "^[A-Z0-9._%+-]+@[A-Z0-9.-]+\\.[A-Z]{2,}$",
+            Pattern.CASE_INSENSITIVE
+    );
+    private static final Pattern NICKNAME_PATTERN = Pattern.compile("^[가-힣A-Za-z0-9_]+$");
 
     private final AppUserRepository appUserRepository;
     private final PasswordEncoder passwordEncoder;
@@ -34,18 +46,25 @@ public class AuthService {
     public AuthResponseDto.Me signup(AuthRequestDto.Signup request, HttpServletRequest servletRequest) {
         validateSignupRequest(request);
         String email = normalizeEmail(request.getEmail());
+        String password = request.getPassword();
+        String nickname = request.getNickname().trim();
 
         if (appUserRepository.existsByEmail(email)) {
             throw new CustomException(ErrorCode.EMAIL_ALREADY_EXISTS);
         }
 
-        appUserRepository.save(AppUser.builder()
-                .email(email)
-                .password(passwordEncoder.encode(request.getPassword()))
-                .nickname(request.getNickname().trim())
-                .build());
+        AppUser savedUser;
+        try {
+            savedUser = appUserRepository.saveAndFlush(AppUser.builder()
+                    .email(email)
+                    .password(passwordEncoder.encode(password))
+                    .nickname(nickname)
+                    .build());
+        } catch (DataIntegrityViolationException exception) {
+            throw new CustomException(ErrorCode.EMAIL_ALREADY_EXISTS);
+        }
 
-        return authenticate(email, request.getPassword(), servletRequest);
+        return storeAuthentication(new AuthUserDetails(savedUser), servletRequest);
     }
 
     @Transactional(readOnly = true)
@@ -68,7 +87,20 @@ public class AuthService {
                     new UsernamePasswordAuthenticationToken(email, password)
             );
 
-            // Persist the security context so signup/login immediately affects following same-origin API calls.
+            return storeAuthentication((AuthUserDetails) authentication.getPrincipal(), servletRequest);
+        } catch (BadCredentialsException exception) {
+            throw new CustomException(ErrorCode.LOGIN_FAILED);
+        }
+    }
+
+    private AuthResponseDto.Me storeAuthentication(AuthUserDetails userDetails, HttpServletRequest servletRequest) {
+        Authentication authentication = new UsernamePasswordAuthenticationToken(
+                userDetails,
+                null,
+                userDetails.getAuthorities()
+        );
+
+        try {
             SecurityContext securityContext = SecurityContextHolder.createEmptyContext();
             securityContext.setAuthentication(authentication);
             SecurityContextHolder.setContext(securityContext);
@@ -77,9 +109,10 @@ public class AuthService {
                     securityContext
             );
 
-            return toMe((AuthUserDetails) authentication.getPrincipal());
-        } catch (BadCredentialsException exception) {
-            throw new CustomException(ErrorCode.LOGIN_FAILED);
+            return toMe(userDetails);
+        } catch (RuntimeException exception) {
+            SecurityContextHolder.clearContext();
+            throw exception;
         }
     }
 
@@ -90,13 +123,24 @@ public class AuthService {
                 || isBlank(request.getNickname())) {
             throw new CustomException(ErrorCode.INVALID_AUTH_REQUEST);
         }
-        if (request.getPassword().length() < PASSWORD_MIN_LENGTH) {
+
+        String email = normalizeEmail(request.getEmail());
+        String password = request.getPassword();
+        String nickname = request.getNickname().trim();
+
+        if (!isValidEmail(email)
+                || !isValidPassword(password)
+                || !isValidNickname(nickname)) {
             throw new CustomException(ErrorCode.INVALID_AUTH_REQUEST);
         }
     }
 
     private void validateLoginRequest(AuthRequestDto.Login request) {
         if (request == null || isBlank(request.getEmail()) || isBlank(request.getPassword())) {
+            throw new CustomException(ErrorCode.INVALID_AUTH_REQUEST);
+        }
+        String email = normalizeEmail(request.getEmail());
+        if (!isValidEmail(email)) {
             throw new CustomException(ErrorCode.INVALID_AUTH_REQUEST);
         }
     }
@@ -116,5 +160,21 @@ public class AuthService {
 
     private boolean isBlank(String value) {
         return value == null || value.trim().isEmpty();
+    }
+
+    private boolean isValidEmail(String email) {
+        return email.length() <= EMAIL_MAX_LENGTH
+                && EMAIL_PATTERN.matcher(email).matches();
+    }
+
+    private boolean isValidPassword(String password) {
+        return password.length() >= PASSWORD_MIN_LENGTH
+                && password.length() <= PASSWORD_MAX_LENGTH;
+    }
+
+    private boolean isValidNickname(String nickname) {
+        return nickname.length() >= NICKNAME_MIN_LENGTH
+                && nickname.length() <= NICKNAME_MAX_LENGTH
+                && NICKNAME_PATTERN.matcher(nickname).matches();
     }
 }
