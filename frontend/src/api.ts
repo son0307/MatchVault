@@ -18,6 +18,141 @@ export type FixtureMeta = {
   maxRound: number | null;
 };
 
+export type FixtureEventResponse = {
+  fixtureId: number;
+  events: FixtureEvent[];
+};
+
+export type FixtureEvent = {
+  sequence: number | null;
+  time: {
+    elapsed: number | null;
+    extra: number | null;
+  } | null;
+  team: {
+    id: number;
+    name: string | null;
+    logo: string | null;
+  } | null;
+  player: FixtureEventPlayer | null;
+  assist: FixtureEventPlayer | null;
+  type: string | null;
+  detail: string | null;
+  comments: string | null;
+};
+
+export type FixtureEventPlayer = {
+  id: number;
+  name: string | null;
+};
+
+export type FixtureLineupResponse = {
+  fixtureId: number;
+  homeTeam: FixtureTeamLineup | null;
+  awayTeam: FixtureTeamLineup | null;
+};
+
+export type FixtureTeamLineup = {
+  teamId: number;
+  teamName: string | null;
+  formation: string | null;
+  coachName: string | null;
+  colors: FixtureUniformColors | null;
+  starters: FixtureLineupPlayer[];
+  substitutes: FixtureLineupPlayer[];
+  absences: FixtureLineupAbsence[];
+};
+
+export type FixtureUniformColors = {
+  player: FixtureColorInfo | null;
+  goalkeeper: FixtureColorInfo | null;
+};
+
+export type FixtureColorInfo = {
+  primary: string | null;
+  number: string | null;
+  border: string | null;
+};
+
+export type FixtureLineupPlayer = {
+  playerId: number;
+  playerName: string | null;
+  backNumber: number | null;
+  position: string | null;
+  grid: string | null;
+  starter: boolean;
+};
+
+export type FixtureLineupAbsence = {
+  playerId: number;
+  playerName: string | null;
+  teamId: number;
+  teamName: string | null;
+  absenceType: string | null;
+  reason: string | null;
+};
+
+export type FixtureStatResponse = {
+  fixtureId: number;
+  homeTeamStat: FixtureTeamStat | null;
+  awayTeamStat: FixtureTeamStat | null;
+};
+
+export type FixtureTeamStat = {
+  teamId: number;
+  score: number;
+  shotsOnGoal: number;
+  shotsOffGoal: number;
+  totalShots: number;
+  shotsOnTarget: number;
+  blockedShots: number;
+  shotsInsideBox: number;
+  shotsOutsideBox: number;
+  totalPasses: number;
+  passesAccurate: number;
+  passAccuracy: number;
+  fouls: number;
+  cornerKicks: number;
+  offsides: number;
+  ballPossession: number;
+  goalkeeperSaves: number;
+  yellowCards: number;
+  redCards: number;
+  expectedGoals: number | null;
+};
+
+export type FixturePlayerStatResponse = {
+  fixtureId: number;
+  homeTeam: FixtureTeamPlayerStats | null;
+  awayTeam: FixtureTeamPlayerStats | null;
+};
+
+export type FixtureTeamPlayerStats = {
+  teamId: number;
+  teamName: string | null;
+  players: FixturePlayerStat[];
+};
+
+export type FixturePlayerStat = {
+  playerId: number;
+  playerName: string | null;
+  jerseyNumber: number | null;
+  position: string | null;
+  minutesPlayed: number | null;
+  rating: number | null;
+  captain: boolean | null;
+  substitute: boolean | null;
+  goals: number | null;
+  assists: number | null;
+  shotsTotal: number | null;
+  shotsOnTarget: number | null;
+  passesTotal: number | null;
+  passesKey: number | null;
+  tacklesTotal: number | null;
+  yellowCards: number | null;
+  redCards: number | null;
+};
+
 export type TeamSummary = {
   teamId: number;
   teamName: string | null;
@@ -224,6 +359,21 @@ export async function fetchFixtures(query: FixtureQuery): Promise<CursorResponse
   return response.json();
 }
 
+export async function fetchFixture(fixtureId: number): Promise<FixtureSummary> {
+  const response = await fetch(`/api/v1/fixtures/${fixtureId}`, {
+    headers: {
+      Accept: "application/json",
+    },
+    credentials: "same-origin",
+  });
+
+  if (!response.ok) {
+    throw new ApiError(`경기 정보를 불러오지 못했습니다. (${response.status})`, response.status);
+  }
+
+  return response.json();
+}
+
 export async function fetchFixtureMeta(season: number): Promise<FixtureMeta> {
   const response = await fetch(`/api/v1/fixtures/meta?season=${season}`, {
     headers: {
@@ -234,6 +384,66 @@ export async function fetchFixtureMeta(season: number): Promise<FixtureMeta> {
 
   if (!response.ok) {
     throw new ApiError(`경기 범위를 불러오지 못했습니다. (${response.status})`, response.status);
+  }
+
+  return response.json();
+}
+
+export async function fetchFixtureEvents(fixtureId: number): Promise<FixtureEventResponse> {
+  const response = await fetch(`/api/v1/fixtures/${fixtureId}/events`, {
+    headers: {
+      Accept: "application/json",
+    },
+    credentials: "same-origin",
+  });
+
+  if (!response.ok) {
+    throw new ApiError(`경기 이벤트를 불러오지 못했습니다. (${response.status})`, response.status);
+  }
+
+  return response.json();
+}
+
+export async function fetchFixtureLineups(fixtureId: number): Promise<FixtureLineupResponse> {
+  const response = await fetch(`/api/v1/fixtures/${fixtureId}/lineups`, {
+    headers: {
+      Accept: "application/json",
+    },
+    credentials: "same-origin",
+  });
+
+  if (!response.ok) {
+    throw new ApiError(`라인업을 불러오지 못했습니다. (${response.status})`, response.status);
+  }
+
+  return response.json();
+}
+
+export async function fetchFixtureStats(fixtureId: number): Promise<FixtureStatResponse> {
+  const response = await fetch(`/api/v1/fixtures/${fixtureId}/stats`, {
+    headers: {
+      Accept: "application/json",
+    },
+    credentials: "same-origin",
+  });
+
+  if (!response.ok) {
+    throw new ApiError(`팀 통계를 불러오지 못했습니다. (${response.status})`, response.status);
+  }
+
+  return response.json();
+}
+
+export async function fetchFixturePlayerStats(fixtureId: number): Promise<FixturePlayerStatResponse> {
+  const response = await fetch(`/api/v1/fixtures/${fixtureId}/player-stats`, {
+    headers: {
+      Accept: "application/json",
+    },
+    credentials: "same-origin",
+  });
+
+  if (!response.ok) {
+    throw new ApiError(`선수별 경기 통계를 불러오지 못했습니다. (${response.status})`, response.status);
   }
 
   return response.json();

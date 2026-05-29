@@ -5,6 +5,8 @@ import com.son.soccerStreaming.fixture.dto.FixtureMetaResponseDto;
 import com.son.soccerStreaming.fixture.dto.FixtureResponseDto;
 import com.son.soccerStreaming.fixture.entity.Fixture;
 import com.son.soccerStreaming.fixture.repository.FixtureRepository;
+import com.son.soccerStreaming.global.exception.CustomException;
+import com.son.soccerStreaming.global.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -22,6 +24,14 @@ public class FixtureService {
     private static final ZoneId KOREA_ZONE = ZoneId.of("Asia/Seoul");
 
     private final FixtureRepository fixtureRepository;
+
+    @Transactional(readOnly = true)
+    public FixtureResponseDto.Summary getFixture(Long fixtureId) {
+        Fixture fixture = fixtureRepository.findByFixtureId(fixtureId)
+                .orElseThrow(() -> new CustomException(ErrorCode.FIXTURE_NOT_FOUND));
+
+        return toSummary(fixture);
+    }
 
     @Transactional(readOnly = true)
     public CursorResponse<FixtureResponseDto.Summary> getRecentFixtures(Long cursorId, Integer season, Integer round,

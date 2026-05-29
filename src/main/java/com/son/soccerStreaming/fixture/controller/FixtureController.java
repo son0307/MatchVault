@@ -73,6 +73,14 @@ public class FixtureController {
         return ResponseEntity.ok(fixtureService.getFixtureMeta(season));
     }
 
+    @Operation(summary = "특정 경기 요약 조회", description = "경기 상세 화면 상단에 표시할 기본 경기 정보를 조회합니다.")
+    @GetMapping("/{fixtureId}")
+    public ResponseEntity<FixtureResponseDto.Summary> getFixture(
+            @Parameter(description = "조회할 경기 API fixture ID", example = "1208000")
+            @PathVariable Long fixtureId) {
+        return ResponseEntity.ok(fixtureService.getFixture(fixtureId));
+    }
+
     @Operation(summary = "특정 경기 라인업 조회", description = "선발, 교체, 결장 선수 정보를 팀별로 조회합니다.")
     @GetMapping("/{fixtureId}/lineups")
     public ResponseEntity<FixtureLineupResponseDto.Lineup> getLineup(

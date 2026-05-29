@@ -2,6 +2,7 @@ package com.son.soccerStreaming.fixture.service;
 
 import com.son.soccerStreaming.fixture.entity.Fixture;
 import com.son.soccerStreaming.fixture.repository.FixtureRepository;
+import com.son.soccerStreaming.global.exception.CustomException;
 import com.son.soccerStreaming.team.entity.Team;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -13,8 +14,10 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -26,6 +29,51 @@ class FixtureServiceTest {
 
     @InjectMocks
     private FixtureService fixtureService;
+
+    @Test
+    void getFixtureReturnsSummary() {
+        Team homeTeam = Team.builder()
+                .teamId(47L)
+                .name("Tottenham")
+                .logoUrl("home.png")
+                .build();
+        Team awayTeam = Team.builder()
+                .teamId(49L)
+                .name("Chelsea")
+                .logoUrl("away.png")
+                .build();
+        Fixture fixture = Fixture.builder()
+                .id(1L)
+                .fixtureId(100L)
+                .fixtureDate(LocalDateTime.of(2026, 5, 22, 12, 0))
+                .round(38)
+                .homeTeam(homeTeam)
+                .awayTeam(awayTeam)
+                .homeScore(2)
+                .awayScore(1)
+                .fixtureStatus("FINISHED")
+                .build();
+
+        when(fixtureRepository.findByFixtureId(100L)).thenReturn(Optional.of(fixture));
+
+        var response = fixtureService.getFixture(100L);
+
+        assertThat(response.getFixtureId()).isEqualTo(100L);
+        assertThat(response.getHomeTeamName()).isEqualTo("Tottenham");
+        assertThat(response.getAwayTeamLogoUrl()).isEqualTo("away.png");
+        assertThat(response.getHomeScore()).isEqualTo(2);
+        assertThat(response.getAwayScore()).isEqualTo(1);
+        assertThat(response.getRound()).isEqualTo(38);
+        assertThat(response.getFixtureStatus()).isEqualTo("FINISHED");
+    }
+
+    @Test
+    void getFixtureThrowsWhenFixtureDoesNotExist() {
+        when(fixtureRepository.findByFixtureId(404L)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> fixtureService.getFixture(404L))
+                .isInstanceOf(CustomException.class);
+    }
 
     @Test
     void getRecentFixturesPassesRoundFilterAndReturnsRound() {

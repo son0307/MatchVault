@@ -1,4 +1,5 @@
 import { BrowserRouter, Navigate, NavLink, Route, Routes } from "react-router-dom";
+import { FixtureDetailPage } from "./pages/FixtureDetailPage";
 import { HomePage } from "./pages/HomePage";
 import { LeagueFixturesPage } from "./pages/LeagueFixturesPage";
 import { LeagueHomePage } from "./pages/LeagueHomePage";
@@ -47,7 +48,7 @@ export function App() {
           path="/fixtures/:fixtureId"
           element={
             <LeagueLayout>
-              <FixturePlaceholderPage />
+              <FixtureDetailPage />
             </LeagueLayout>
           }
         />
