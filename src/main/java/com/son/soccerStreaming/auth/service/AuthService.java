@@ -3,12 +3,13 @@ package com.son.soccerStreaming.auth.service;
 import com.son.soccerStreaming.auth.dto.AuthRequestDto;
 import com.son.soccerStreaming.auth.dto.AuthResponseDto;
 import com.son.soccerStreaming.auth.entity.AppUser;
-import com.son.soccerStreaming.global.exception.CustomException;
-import com.son.soccerStreaming.global.exception.ErrorCode;
 import com.son.soccerStreaming.auth.repository.AppUserRepository;
 import com.son.soccerStreaming.auth.security.AuthUserDetails;
+import com.son.soccerStreaming.global.exception.CustomException;
+import com.son.soccerStreaming.global.exception.ErrorCode;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -17,7 +18,6 @@ import org.springframework.security.core.context.SecurityContext;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.context.HttpSessionSecurityContextRepository;
-import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -28,12 +28,15 @@ import java.util.regex.Pattern;
 @RequiredArgsConstructor
 public class AuthService {
 
-    private static final int EMAIL_MAX_LENGTH = 30;
+    private static final int EMAIL_MAX_LENGTH = 120;
     private static final int PASSWORD_MIN_LENGTH = 8;
     private static final int PASSWORD_MAX_BYTES = 72;
     private static final int NICKNAME_MIN_LENGTH = 2;
     private static final int NICKNAME_MAX_LENGTH = 20;
-    private static final Pattern EMAIL_PATTERN = Pattern.compile("^[A-Z0-9._%+-]+@[A-Z0-9.-]+\\.[A-Z]{2,}$", Pattern.CASE_INSENSITIVE);
+    private static final Pattern EMAIL_PATTERN = Pattern.compile(
+            "^[A-Z0-9._%+-]+@[A-Z0-9.-]+\\.[A-Z]{2,}$",
+            Pattern.CASE_INSENSITIVE
+    );
     private static final Pattern NICKNAME_PATTERN = Pattern.compile("^[가-힣A-Za-z0-9_]+$");
 
     private final AppUserRepository appUserRepository;
@@ -123,7 +126,7 @@ public class AuthService {
             throw new CustomException(ErrorCode.INVALID_AUTH_REQUEST);
         }
         String email = normalizeEmail(request.getEmail());
-        if (!isValidEmail(email) || !isValidPassword(request.getPassword())) {
+        if (!isValidEmail(email)) {
             throw new CustomException(ErrorCode.INVALID_AUTH_REQUEST);
         }
     }

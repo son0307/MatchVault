@@ -64,7 +64,7 @@ class AuthServiceTest {
         AuthResponseDto.Me response = authService.signup(request, servletRequest);
 
         ArgumentCaptor<AppUser> userCaptor = ArgumentCaptor.forClass(AppUser.class);
-        verify(appUserRepository).save(userCaptor.capture());
+        verify(appUserRepository).saveAndFlush(userCaptor.capture());
         assertThat(userCaptor.getValue().getEmail()).isEqualTo("user@example.com");
         assertThat(userCaptor.getValue().getPassword()).isEqualTo("encoded-password");
         assertThat(response.getEmail()).isEqualTo("user@example.com");
@@ -90,7 +90,7 @@ class AuthServiceTest {
     void signupRejectsDuplicateEmailRaceCondition() {
         when(appUserRepository.existsByEmail("fan@example.com")).thenReturn(false);
         when(passwordEncoder.encode("password")).thenReturn("encoded-password");
-        when(appUserRepository.save(any())).thenThrow(new DataIntegrityViolationException("duplicate"));
+        when(appUserRepository.saveAndFlush(any())).thenThrow(new DataIntegrityViolationException("duplicate"));
 
         assertThatThrownBy(() -> authService.signup(
                 new AuthRequestDto.Signup("fan@example.com", "password", "Fan"),
@@ -114,7 +114,7 @@ class AuthServiceTest {
 
     @Test
     void signupRejectsTooLongEmail() {
-        String longEmail = "a".repeat(109) + "@example.com";
+        String longEmail = "a".repeat(121) + "@example.com";
 
         assertThatThrownBy(() -> authService.signup(
                 new AuthRequestDto.Signup(longEmail, "password", "Fan"),
@@ -195,7 +195,7 @@ class AuthServiceTest {
         when(authenticationManager.authenticate(any())).thenThrow(new BadCredentialsException("bad"));
 
         assertThatThrownBy(() -> authService.login(
-                new AuthRequestDto.Login("fan@example.com", "wrongpass"),
+                new AuthRequestDto.Login("fan@example.com", "wrong"),
                 new MockHttpServletRequest()
         ))
                 .isInstanceOf(CustomException.class)
