@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { CalendarDays, ChevronLeft, ChevronRight, Star, Trophy } from "lucide-react";
 import { Link } from "react-router-dom";
+import type { AuthStatus } from "../App";
 import {
   ApiError,
   fetchFavoriteDashboard,
@@ -15,7 +16,7 @@ import {
 
 const DEFAULT_SEASON = 2025;
 
-export function LeagueHomePage() {
+export function LeagueHomePage({ authStatus }: { authStatus: AuthStatus }) {
   const [selectedDate, setSelectedDate] = useState(todayKoreaDateKey());
   const [standings, setStandings] = useState<TeamStanding[]>([]);
   const [fixtures, setFixtures] = useState<FixtureSummary[]>([]);
@@ -39,8 +40,25 @@ export function LeagueHomePage() {
 
   useEffect(() => {
     void loadStandings();
-    void loadFavorites();
   }, []);
+
+  useEffect(() => {
+    if (authStatus === "checking") {
+      setIsLoadingFavorites(true);
+      setFavoritesError("");
+      return;
+    }
+
+    if (authStatus === "guest") {
+      setFavorites(null);
+      setFavoritesNeedLogin(true);
+      setFavoritesError("");
+      setIsLoadingFavorites(false);
+      return;
+    }
+
+    void loadFavorites();
+  }, [authStatus]);
 
   useEffect(() => {
     void loadFixtures(selectedDate);

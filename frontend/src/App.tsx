@@ -8,7 +8,16 @@ import { LeagueFixturesPage } from "./pages/LeagueFixturesPage";
 import { LeagueHomePage } from "./pages/LeagueHomePage";
 import { LeagueStandingsPage } from "./pages/LeagueStandingsPage";
 
-type AuthStatus = "checking" | "authenticated" | "guest";
+export type AuthStatus = "checking" | "authenticated" | "guest";
+
+type LeagueAuthState = {
+  authStatus: AuthStatus;
+  currentUser: CurrentUser | null;
+};
+
+type LeagueLayoutProps = {
+  children: ReactNode | ((authState: LeagueAuthState) => ReactNode);
+};
 
 const leagueTabs = [
   { label: "홈", to: "/league/overview", enabled: true },
@@ -31,7 +40,7 @@ export function App() {
           path="/league/overview"
           element={
             <LeagueLayout>
-              <LeagueHomePage />
+              {(authState) => <LeagueHomePage authStatus={authState.authStatus} />}
             </LeagueLayout>
           }
         />
@@ -65,7 +74,7 @@ export function App() {
   );
 }
 
-function LeagueLayout({ children }: { children: ReactNode }) {
+function LeagueLayout({ children }: LeagueLayoutProps) {
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
   const [authStatus, setAuthStatus] = useState<AuthStatus>("checking");
   const [authError, setAuthError] = useState("");
@@ -130,6 +139,8 @@ function LeagueLayout({ children }: { children: ReactNode }) {
     );
   }
 
+  const authState = { authStatus, currentUser };
+
   return (
     <main className="app-shell league-shell">
       <header className="league-hero">
@@ -165,7 +176,7 @@ function LeagueLayout({ children }: { children: ReactNode }) {
         )}
       </nav>
 
-      {children}
+      {typeof children === "function" ? children(authState) : children}
     </main>
   );
 }
