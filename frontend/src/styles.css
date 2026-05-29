@@ -161,6 +161,16 @@ h2 {
   white-space: nowrap;
 }
 
+.auth-checking {
+  display: inline-flex;
+  align-items: center;
+  min-height: 40px;
+  color: #6b786d;
+  font-size: 0.88rem;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
 .auth-status button,
 .auth-submit-button,
 .favorite-login-link {
@@ -1644,6 +1654,10 @@ h2 {
 
   .auth-status span {
     max-width: none;
+  }
+
+  .auth-checking {
+    justify-content: flex-start;
   }
 
   .toolbar {

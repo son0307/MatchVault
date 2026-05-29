@@ -472,11 +472,11 @@ export async function fetchTeams(): Promise<TeamSummary[]> {
 }
 
 export async function login(email: string, password: string): Promise<CurrentUser> {
-  return postJson("/api/v1/auth/login", { email, password });
+  return parseCurrentUser(await postJson("/api/v1/auth/login", { email, password }));
 }
 
 export async function signup(email: string, password: string, nickname: string): Promise<CurrentUser> {
-  return postJson("/api/v1/auth/signup", { email, password, nickname });
+  return parseCurrentUser(await postJson("/api/v1/auth/signup", { email, password, nickname }));
 }
 
 export async function logout(): Promise<void> {
@@ -505,7 +505,7 @@ export async function fetchCurrentUser(): Promise<CurrentUser> {
     throw await responseError(response, `로그인이 필요합니다. (${response.status})`);
   }
 
-  return response.json();
+  return parseCurrentUser(await responseJson(response, "로그인 사용자 정보가 올바르지 않습니다."));
 }
 
 export async function fetchFavoriteDashboard(season: number): Promise<FavoriteDashboard> {
@@ -529,7 +529,7 @@ function appendParam(params: URLSearchParams, key: string, value: string | numbe
   }
 }
 
-async function postJson<T>(url: string, body: unknown): Promise<T> {
+async function postJson(url: string, body: unknown): Promise<unknown> {
   const response = await fetch(url, {
     method: "POST",
     headers: {
@@ -544,7 +544,7 @@ async function postJson<T>(url: string, body: unknown): Promise<T> {
     throw await responseError(response, `${url} 요청에 실패했습니다. (${response.status})`);
   }
 
-  return response.json();
+  return responseJson(response, `${url} 응답이 비어 있습니다.`);
 }
 
 async function responseError(response: Response, fallbackMessage: string) {
@@ -554,4 +554,38 @@ async function responseError(response: Response, fallbackMessage: string) {
   } catch {
     return new ApiError(fallbackMessage, response.status);
   }
+}
+
+async function responseJson(response: Response, emptyMessage: string): Promise<unknown> {
+  if (response.status === 204) {
+    throw new ApiError(emptyMessage, response.status);
+  }
+
+  try {
+    return await response.json();
+  } catch {
+    throw new ApiError(emptyMessage, response.status);
+  }
+}
+
+function parseCurrentUser(value: unknown): CurrentUser {
+  if (
+    !isRecord(value)
+    || typeof value.id !== "number"
+    || typeof value.email !== "string"
+    || typeof value.role !== "string"
+  ) {
+    throw new ApiError("로그인 사용자 정보가 올바르지 않습니다.", 500);
+  }
+
+  return {
+    id: value.id,
+    email: value.email,
+    nickname: typeof value.nickname === "string" ? value.nickname : null,
+    role: value.role,
+  };
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
 }

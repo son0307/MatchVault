@@ -8,6 +8,8 @@ import { LeagueFixturesPage } from "./pages/LeagueFixturesPage";
 import { LeagueHomePage } from "./pages/LeagueHomePage";
 import { LeagueStandingsPage } from "./pages/LeagueStandingsPage";
 
+type AuthStatus = "checking" | "authenticated" | "guest";
+
 const leagueTabs = [
   { label: "홈", to: "/league/overview", enabled: true },
   { label: "순위", to: "/league/standings", enabled: true },
@@ -65,6 +67,7 @@ export function App() {
 
 function LeagueLayout({ children }: { children: ReactNode }) {
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
+  const [authStatus, setAuthStatus] = useState<AuthStatus>("checking");
   const [authError, setAuthError] = useState("");
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const authKey = currentUser ? `user-${currentUser.id}` : "guest";
@@ -75,12 +78,17 @@ function LeagueLayout({ children }: { children: ReactNode }) {
 
   async function loadCurrentUser() {
     try {
-      setCurrentUser(await fetchCurrentUser());
+      const user = await fetchCurrentUser();
+      setCurrentUser(user);
+      setAuthStatus("authenticated");
       setAuthError("");
     } catch (error) {
       setCurrentUser(null);
-      if (!(error instanceof ApiError && error.status === 401)) {
-        setAuthError(error instanceof Error ? error.message : "로그인 상태를 확인하지 못했습니다.");
+      setAuthStatus("guest");
+      if (error instanceof ApiError && error.status === 401) {
+        setAuthError("");
+      } else {
+        setAuthError("로그인 상태를 확인하지 못했습니다. 리그 정보는 계속 볼 수 있습니다.");
       }
     }
   }
@@ -91,11 +99,36 @@ function LeagueLayout({ children }: { children: ReactNode }) {
     try {
       await logout();
       setCurrentUser(null);
+      setAuthStatus("guest");
     } catch (error) {
-      setAuthError(error instanceof Error ? error.message : "로그아웃에 실패했습니다.");
+      setAuthStatus(currentUser ? "authenticated" : "guest");
+      setAuthError(error instanceof Error ? error.message : "로그아웃에 실패했습니다. 다시 시도해 주세요.");
     } finally {
       setIsLoggingOut(false);
     }
+  }
+
+  function renderAuthAction() {
+    if (authStatus === "checking") {
+      return <span className="auth-checking">로그인 확인 중</span>;
+    }
+
+    if (authStatus === "authenticated" && currentUser) {
+      return (
+        <div className="auth-status">
+          <span>{currentUser.nickname || currentUser.email}</span>
+          <button type="button" onClick={handleLogout} disabled={isLoggingOut}>
+            {isLoggingOut ? "로그아웃 중" : "로그아웃"}
+          </button>
+        </div>
+      );
+    }
+
+    return (
+      <NavLink className="home-link" to="/login">
+        로그인
+      </NavLink>
+    );
   }
 
   return (
@@ -109,22 +142,11 @@ function LeagueLayout({ children }: { children: ReactNode }) {
           <NavLink className="home-link" to="/dashboard">
             기존 대시보드
           </NavLink>
-          {currentUser ? (
-            <div className="auth-status">
-              <span>{currentUser.nickname || currentUser.email}</span>
-              <button type="button" onClick={handleLogout} disabled={isLoggingOut}>
-                로그아웃
-              </button>
-            </div>
-          ) : (
-            <NavLink className="home-link" to="/login">
-              로그인
-            </NavLink>
-          )}
+          {renderAuthAction()}
         </div>
       </header>
 
-      {authError ? <div className="notice error">{authError}</div> : null}
+      {authError ? <div className="notice error auth-error">{authError}</div> : null}
 
       <nav className="league-tabs" aria-label="리그 메뉴">
         {leagueTabs.map((tab) =>
