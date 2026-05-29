@@ -21,7 +21,6 @@ import org.springframework.security.web.context.HttpSessionSecurityContextReposi
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.nio.charset.StandardCharsets;
 import java.util.regex.Pattern;
 
 @Service
@@ -30,7 +29,7 @@ public class AuthService {
 
     private static final int EMAIL_MAX_LENGTH = 120;
     private static final int PASSWORD_MIN_LENGTH = 8;
-    private static final int PASSWORD_MAX_BYTES = 72;
+    private static final int PASSWORD_MAX_LENGTH = 20;
     private static final int NICKNAME_MIN_LENGTH = 2;
     private static final int NICKNAME_MAX_LENGTH = 20;
     private static final Pattern EMAIL_PATTERN = Pattern.compile(
@@ -54,8 +53,9 @@ public class AuthService {
             throw new CustomException(ErrorCode.EMAIL_ALREADY_EXISTS);
         }
 
+        AppUser savedUser;
         try {
-            appUserRepository.saveAndFlush(AppUser.builder()
+            savedUser = appUserRepository.saveAndFlush(AppUser.builder()
                     .email(email)
                     .password(passwordEncoder.encode(password))
                     .nickname(nickname)
@@ -64,7 +64,7 @@ public class AuthService {
             throw new CustomException(ErrorCode.EMAIL_ALREADY_EXISTS);
         }
 
-        return authenticate(email, password, servletRequest);
+        return storeAuthentication(new AuthUserDetails(savedUser), servletRequest);
     }
 
     @Transactional(readOnly = true)
@@ -87,7 +87,20 @@ public class AuthService {
                     new UsernamePasswordAuthenticationToken(email, password)
             );
 
-            // Persist the security context so signup/login immediately affects following same-origin API calls.
+            return storeAuthentication((AuthUserDetails) authentication.getPrincipal(), servletRequest);
+        } catch (BadCredentialsException exception) {
+            throw new CustomException(ErrorCode.LOGIN_FAILED);
+        }
+    }
+
+    private AuthResponseDto.Me storeAuthentication(AuthUserDetails userDetails, HttpServletRequest servletRequest) {
+        Authentication authentication = new UsernamePasswordAuthenticationToken(
+                userDetails,
+                null,
+                userDetails.getAuthorities()
+        );
+
+        try {
             SecurityContext securityContext = SecurityContextHolder.createEmptyContext();
             securityContext.setAuthentication(authentication);
             SecurityContextHolder.setContext(securityContext);
@@ -96,9 +109,10 @@ public class AuthService {
                     securityContext
             );
 
-            return toMe((AuthUserDetails) authentication.getPrincipal());
-        } catch (BadCredentialsException exception) {
-            throw new CustomException(ErrorCode.LOGIN_FAILED);
+            return toMe(userDetails);
+        } catch (RuntimeException exception) {
+            SecurityContextHolder.clearContext();
+            throw exception;
         }
     }
 
@@ -154,12 +168,8 @@ public class AuthService {
     }
 
     private boolean isValidPassword(String password) {
-        return isValidPasswordLength(password)
-                && password.length() >= PASSWORD_MIN_LENGTH;
-    }
-
-    private boolean isValidPasswordLength(String password) {
-        return password.getBytes(StandardCharsets.UTF_8).length <= PASSWORD_MAX_BYTES;
+        return password.length() >= PASSWORD_MIN_LENGTH
+                && password.length() <= PASSWORD_MAX_LENGTH;
     }
 
     private boolean isValidNickname(String nickname) {

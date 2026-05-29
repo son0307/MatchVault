@@ -52,14 +52,10 @@ class AuthServiceTest {
                 .password("encoded-password")
                 .nickname("Fan")
                 .build();
-        Authentication authentication = new UsernamePasswordAuthenticationToken(
-                new AuthUserDetails(savedUser),
-                null
-        );
 
         when(appUserRepository.existsByEmail("user@example.com")).thenReturn(false);
         when(passwordEncoder.encode("password")).thenReturn("encoded-password");
-        when(authenticationManager.authenticate(any())).thenReturn(authentication);
+        when(appUserRepository.saveAndFlush(any())).thenReturn(savedUser);
 
         AuthResponseDto.Me response = authService.signup(request, servletRequest);
 
@@ -139,7 +135,7 @@ class AuthServiceTest {
     @Test
     void signupRejectsTooLongPassword() {
         assertThatThrownBy(() -> authService.signup(
-                new AuthRequestDto.Signup("fan@example.com", "a".repeat(73), "Fan"),
+                new AuthRequestDto.Signup("fan@example.com", "a".repeat(21), "Fan"),
                 new MockHttpServletRequest()
         ))
                 .isInstanceOf(CustomException.class)
