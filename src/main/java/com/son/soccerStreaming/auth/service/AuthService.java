@@ -24,6 +24,8 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class AuthService {
 
+    private static final int PASSWORD_MIN_LENGTH = 8;
+
     private final AppUserRepository appUserRepository;
     private final PasswordEncoder passwordEncoder;
     private final AuthenticationManager authenticationManager;
@@ -86,6 +88,9 @@ public class AuthService {
                 || isBlank(request.getEmail())
                 || isBlank(request.getPassword())
                 || isBlank(request.getNickname())) {
+            throw new CustomException(ErrorCode.INVALID_AUTH_REQUEST);
+        }
+        if (request.getPassword().length() < PASSWORD_MIN_LENGTH) {
             throw new CustomException(ErrorCode.INVALID_AUTH_REQUEST);
         }
     }
