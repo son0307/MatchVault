@@ -22,4 +22,26 @@ public class AuthRequestDto {
         private String email;
         private String password;
     }
+
+    @Getter
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class UpdateNickname {
+        private String nickname;
+    }
+
+    @Getter
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class ChangePassword {
+        private String currentPassword;
+        private String newPassword;
+    }
+
+    @Getter
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class DeleteAccount {
+        private String currentPassword;
+    }
 }

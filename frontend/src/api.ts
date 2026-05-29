@@ -2,6 +2,8 @@ export type FixtureSummary = {
   fixtureId: number;
   fixtureDate: string | null;
   round: number | null;
+  homeTeamId: number | null;
+  awayTeamId: number | null;
   homeTeamName: string | null;
   awayTeamName: string | null;
   homeTeamLogoUrl: string | null;
@@ -508,6 +510,18 @@ export async function fetchCurrentUser(): Promise<CurrentUser> {
   return parseCurrentUser(await responseJson(response, "로그인 사용자 정보가 올바르지 않습니다."));
 }
 
+export async function updateNickname(nickname: string): Promise<CurrentUser> {
+  return parseCurrentUser(await patchJson("/api/v1/auth/me/nickname", { nickname }));
+}
+
+export async function changePassword(currentPassword: string, newPassword: string): Promise<void> {
+  await patchJson("/api/v1/auth/me/password", { currentPassword, newPassword }, true);
+}
+
+export async function deleteAccount(currentPassword: string): Promise<void> {
+  await deleteJson("/api/v1/auth/me", { currentPassword });
+}
+
 export async function fetchFavoriteDashboard(season: number): Promise<FavoriteDashboard> {
   const response = await fetch(`/api/v1/favorites/dashboard?season=${season}`, {
     headers: {
@@ -521,6 +535,22 @@ export async function fetchFavoriteDashboard(season: number): Promise<FavoriteDa
   }
 
   return response.json();
+}
+
+export async function addFavoriteTeam(teamId: number, season: number): Promise<FavoriteDashboard> {
+  return postJson(`/api/v1/favorites/teams/${teamId}?season=${season}`, {}) as Promise<FavoriteDashboard>;
+}
+
+export async function removeFavoriteTeam(teamId: number, season: number): Promise<FavoriteDashboard> {
+  return deleteJson(`/api/v1/favorites/teams/${teamId}?season=${season}`) as Promise<FavoriteDashboard>;
+}
+
+export async function addFavoritePlayer(playerId: number, season: number): Promise<FavoriteDashboard> {
+  return postJson(`/api/v1/favorites/players/${playerId}?season=${season}`, {}) as Promise<FavoriteDashboard>;
+}
+
+export async function removeFavoritePlayer(playerId: number, season: number): Promise<FavoriteDashboard> {
+  return deleteJson(`/api/v1/favorites/players/${playerId}?season=${season}`) as Promise<FavoriteDashboard>;
 }
 
 function appendParam(params: URLSearchParams, key: string, value: string | number | undefined) {
@@ -542,6 +572,50 @@ async function postJson(url: string, body: unknown): Promise<unknown> {
 
   if (!response.ok) {
     throw await responseError(response, `${url} 요청에 실패했습니다. (${response.status})`);
+  }
+
+  return responseJson(response, `${url} 응답이 비어 있습니다.`);
+}
+
+async function patchJson(url: string, body: unknown, allowEmpty = false): Promise<unknown> {
+  const response = await fetch(url, {
+    method: "PATCH",
+    headers: {
+      Accept: "application/json",
+      "Content-Type": "application/json",
+    },
+    credentials: "same-origin",
+    body: JSON.stringify(body),
+  });
+
+  if (!response.ok) {
+    throw await responseError(response, `${url} 요청에 실패했습니다. (${response.status})`);
+  }
+
+  if (allowEmpty && response.status === 204) {
+    return null;
+  }
+
+  return responseJson(response, `${url} 응답이 비어 있습니다.`);
+}
+
+async function deleteJson(url: string, body?: unknown): Promise<unknown> {
+  const response = await fetch(url, {
+    method: "DELETE",
+    headers: {
+      Accept: "application/json",
+      ...(body === undefined ? {} : { "Content-Type": "application/json" }),
+    },
+    credentials: "same-origin",
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
+
+  if (!response.ok) {
+    throw await responseError(response, `${url} 요청에 실패했습니다. (${response.status})`);
+  }
+
+  if (response.status === 204) {
+    return null;
   }
 
   return responseJson(response, `${url} 응답이 비어 있습니다.`);

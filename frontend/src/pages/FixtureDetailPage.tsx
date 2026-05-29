@@ -1,12 +1,21 @@
 import { useEffect, useMemo, useState } from "react";
 import type { CSSProperties, Dispatch, SetStateAction } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Star } from "lucide-react";
+import { Link, useNavigate, useParams } from "react-router-dom";
+import type { AuthStatus } from "../App";
 import {
+  addFavoritePlayer,
+  addFavoriteTeam,
+  ApiError,
   fetchFixture,
   fetchFixtureEvents,
+  fetchFavoriteDashboard,
   fetchFixtureLineups,
   fetchFixturePlayerStats,
   fetchFixtureStats,
+  removeFavoritePlayer,
+  removeFavoriteTeam,
+  type FavoriteDashboard,
   type FixtureColorInfo,
   type FixtureEvent,
   type FixtureEventResponse,
@@ -28,6 +37,15 @@ type LoadState<T> = {
   isLoading: boolean;
 };
 type Side = "home" | "away";
+type FavoriteTarget = "team" | "player";
+type FavoriteControls = {
+  authStatus: AuthStatus;
+  favoriteTeamIds: Set<number>;
+  favoritePlayerIds: Set<number>;
+  pendingFavoriteKey: string;
+  onToggleTeam: (teamId: number) => void;
+  onTogglePlayer: (playerId: number) => void;
+};
 
 const detailTabs: Array<{ label: string; value: DetailTab }> = [
   { label: "이벤트", value: "events" },
@@ -41,7 +59,8 @@ const initialLoadState = <T,>(): LoadState<T> => ({
   isLoading: true,
 });
 
-export function FixtureDetailPage() {
+export function FixtureDetailPage({ authStatus, season }: { authStatus: AuthStatus; season: number }) {
+  const navigate = useNavigate();
   const { fixtureId } = useParams();
   const numericFixtureId = Number(fixtureId);
   const [activeTab, setActiveTab] = useState<DetailTab>("events");
@@ -50,6 +69,9 @@ export function FixtureDetailPage() {
   const [lineupsState, setLineupsState] = useState<LoadState<FixtureLineupResponse>>(initialLoadState);
   const [statsState, setStatsState] = useState<LoadState<FixtureStatResponse>>(initialLoadState);
   const [playerStatsState, setPlayerStatsState] = useState<LoadState<FixturePlayerStatResponse>>(initialLoadState);
+  const [favorites, setFavorites] = useState<FavoriteDashboard | null>(null);
+  const [favoritesError, setFavoritesError] = useState("");
+  const [pendingFavoriteKey, setPendingFavoriteKey] = useState("");
 
   useEffect(() => {
     if (!Number.isFinite(numericFixtureId) || numericFixtureId <= 0) {
@@ -99,6 +121,49 @@ export function FixtureDetailPage() {
     };
   }, [numericFixtureId]);
 
+  useEffect(() => {
+    if (authStatus !== "authenticated") {
+      setFavorites(null);
+      setFavoritesError("");
+      return;
+    }
+
+    let isCurrent = true;
+    fetchFavoriteDashboard(season)
+      .then((data) => {
+        if (isCurrent) {
+          setFavorites(data);
+          setFavoritesError("");
+        }
+      })
+      .catch((error) => {
+        if (isCurrent && !(error instanceof ApiError && error.status === 401)) {
+          setFavoritesError(error instanceof Error ? error.message : "즐겨찾기 상태를 불러오지 못했습니다.");
+        }
+      });
+
+    return () => {
+      isCurrent = false;
+    };
+  }, [authStatus, season]);
+
+  const favoriteTeamIds = useMemo(
+    () => new Set((favorites?.teams ?? []).map((team) => team.teamId)),
+    [favorites],
+  );
+  const favoritePlayerIds = useMemo(
+    () => new Set((favorites?.players ?? []).map((player) => player.playerId)),
+    [favorites],
+  );
+  const favoriteControls: FavoriteControls = {
+    authStatus,
+    favoriteTeamIds,
+    favoritePlayerIds,
+    pendingFavoriteKey,
+    onToggleTeam: handleToggleTeam,
+    onTogglePlayer: handleTogglePlayer,
+  };
+
   if (fixtureState.isLoading) {
     return (
       <section className="league-content">
@@ -123,10 +188,59 @@ export function FixtureDetailPage() {
   }
 
   const fixture = fixtureState.data;
+  const homeTeamId =
+    fixture.homeTeamId
+    ?? lineupsState.data?.homeTeam?.teamId
+    ?? statsState.data?.homeTeamStat?.teamId
+    ?? null;
+  const awayTeamId =
+    fixture.awayTeamId
+    ?? lineupsState.data?.awayTeam?.teamId
+    ?? statsState.data?.awayTeamStat?.teamId
+    ?? null;
+
+  async function handleToggleTeam(teamId: number) {
+    await handleToggleFavorite("team", teamId, favoriteTeamIds.has(teamId));
+  }
+
+  async function handleTogglePlayer(playerId: number) {
+    await handleToggleFavorite("player", playerId, favoritePlayerIds.has(playerId));
+  }
+
+  async function handleToggleFavorite(target: FavoriteTarget, id: number, isFavorite: boolean) {
+    if (authStatus !== "authenticated") {
+      navigate("/login");
+      return;
+    }
+
+    const key = `${target}-${id}`;
+    setPendingFavoriteKey(key);
+    setFavoritesError("");
+    try {
+      const nextFavorites = target === "team"
+        ? isFavorite
+          ? await removeFavoriteTeam(id, season)
+          : await addFavoriteTeam(id, season)
+        : isFavorite
+          ? await removeFavoritePlayer(id, season)
+          : await addFavoritePlayer(id, season);
+      setFavorites(nextFavorites);
+    } catch (error) {
+      setFavoritesError(error instanceof Error ? error.message : "즐겨찾기 변경에 실패했습니다.");
+    } finally {
+      setPendingFavoriteKey("");
+    }
+  }
 
   return (
     <section className="league-content fixture-detail-page">
-      <FixtureDetailHero fixture={fixture} />
+      <FixtureDetailHero
+        awayTeamId={awayTeamId}
+        favoriteControls={favoriteControls}
+        fixture={fixture}
+        homeTeamId={homeTeamId}
+      />
+      {favoritesError ? <div className="notice error">{favoritesError}</div> : null}
 
       <nav className="detail-tabs" aria-label="경기 상세 메뉴">
         {detailTabs.map((tab) => (
@@ -142,9 +256,14 @@ export function FixtureDetailPage() {
       </nav>
 
       {activeTab === "events" ? <EventsPanel state={eventsState} fixture={fixture} /> : null}
-      {activeTab === "lineups" ? <LineupsPanel state={lineupsState} /> : null}
+      {activeTab === "lineups" ? <LineupsPanel favoriteControls={favoriteControls} state={lineupsState} /> : null}
       {activeTab === "stats" ? (
-        <StatsPanel fixture={fixture} playerStatsState={playerStatsState} statsState={statsState} />
+        <StatsPanel
+          favoriteControls={favoriteControls}
+          fixture={fixture}
+          playerStatsState={playerStatsState}
+          statsState={statsState}
+        />
       ) : null}
     </section>
   );
@@ -172,12 +291,30 @@ async function loadSection<T>(
   }
 }
 
-function FixtureDetailHero({ fixture }: { fixture: FixtureSummary }) {
+function FixtureDetailHero({
+  awayTeamId,
+  favoriteControls,
+  fixture,
+  homeTeamId,
+}: {
+  awayTeamId: number | null;
+  favoriteControls: FavoriteControls;
+  fixture: FixtureSummary;
+  homeTeamId: number | null;
+}) {
   return (
     <article className="panel fixture-detail-hero">
       <div className="detail-team home">
         {fixture.homeTeamLogoUrl ? <img src={fixture.homeTeamLogoUrl} alt="" className="team-logo large" /> : null}
         <strong>{fixture.homeTeamName ?? "-"}</strong>
+        {homeTeamId ? (
+          <FavoriteToggleButton
+            isFavorite={favoriteControls.favoriteTeamIds.has(homeTeamId)}
+            isPending={favoriteControls.pendingFavoriteKey === `team-${homeTeamId}`}
+            label={`${fixture.homeTeamName ?? "홈 팀"} 즐겨찾기`}
+            onClick={() => favoriteControls.onToggleTeam(homeTeamId)}
+          />
+        ) : null}
       </div>
       <div className="detail-scoreboard">
         <p>
@@ -190,8 +327,41 @@ function FixtureDetailHero({ fixture }: { fixture: FixtureSummary }) {
       <div className="detail-team away">
         {fixture.awayTeamLogoUrl ? <img src={fixture.awayTeamLogoUrl} alt="" className="team-logo large" /> : null}
         <strong>{fixture.awayTeamName ?? "-"}</strong>
+        {awayTeamId ? (
+          <FavoriteToggleButton
+            isFavorite={favoriteControls.favoriteTeamIds.has(awayTeamId)}
+            isPending={favoriteControls.pendingFavoriteKey === `team-${awayTeamId}`}
+            label={`${fixture.awayTeamName ?? "원정 팀"} 즐겨찾기`}
+            onClick={() => favoriteControls.onToggleTeam(awayTeamId)}
+          />
+        ) : null}
       </div>
     </article>
+  );
+}
+
+function FavoriteToggleButton({
+  isFavorite,
+  isPending,
+  label,
+  onClick,
+}: {
+  isFavorite: boolean;
+  isPending: boolean;
+  label: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      aria-label={label}
+      className={`favorite-toggle-button${isFavorite ? " active" : ""}`}
+      disabled={isPending}
+      onClick={onClick}
+      title={label}
+      type="button"
+    >
+      <Star size={16} aria-hidden="true" fill={isFavorite ? "currentColor" : "none"} />
+    </button>
   );
 }
 
@@ -269,7 +439,13 @@ function eventMarkup(event: FixtureEvent) {
   );
 }
 
-function LineupsPanel({ state }: { state: LoadState<FixtureLineupResponse> }) {
+function LineupsPanel({
+  favoriteControls,
+  state,
+}: {
+  favoriteControls: FavoriteControls;
+  state: LoadState<FixtureLineupResponse>;
+}) {
   if (state.isLoading) {
     return <SectionLoading label="라인업을 불러오는 중입니다." />;
   }
@@ -288,8 +464,8 @@ function LineupsPanel({ state }: { state: LoadState<FixtureLineupResponse> }) {
         <FootballPitch homeTeam={state.data.homeTeam} awayTeam={state.data.awayTeam} />
       </article>
       <div className="lineup-detail-grid">
-        <LineupTeamCard side="home" team={state.data.homeTeam} />
-        <LineupTeamCard side="away" team={state.data.awayTeam} />
+        <LineupTeamCard favoriteControls={favoriteControls} side="home" team={state.data.homeTeam} />
+        <LineupTeamCard favoriteControls={favoriteControls} side="away" team={state.data.awayTeam} />
       </div>
     </>
   );
@@ -349,7 +525,15 @@ function PitchPlayer({ player }: { player: PositionedPlayer }) {
   );
 }
 
-function LineupTeamCard({ side, team }: { side: Side; team: FixtureTeamLineup | null }) {
+function LineupTeamCard({
+  favoriteControls,
+  side,
+  team,
+}: {
+  favoriteControls: FavoriteControls;
+  side: Side;
+  team: FixtureTeamLineup | null;
+}) {
   if (!team) {
     return (
       <article className="panel lineup-team-card">
@@ -366,14 +550,22 @@ function LineupTeamCard({ side, team }: { side: Side; team: FixtureTeamLineup | 
           <p className="muted">포메이션 {team.formation ?? "-"} · 감독 {team.coachName ?? "-"}</p>
         </div>
       </div>
-      <LineupList title="선발" players={team.starters ?? []} />
-      <LineupList title="교체" players={team.substitutes ?? []} />
+      <LineupList favoriteControls={favoriteControls} title="선발" players={team.starters ?? []} />
+      <LineupList favoriteControls={favoriteControls} title="교체" players={team.substitutes ?? []} />
       <AbsenceList team={team} />
     </article>
   );
 }
 
-function LineupList({ title, players }: { title: string; players: FixtureLineupPlayer[] }) {
+function LineupList({
+  favoriteControls,
+  title,
+  players,
+}: {
+  favoriteControls: FavoriteControls;
+  title: string;
+  players: FixtureLineupPlayer[];
+}) {
   const sortedPlayers = sortLineupPlayers(players);
 
   return (
@@ -386,6 +578,12 @@ function LineupList({ title, players }: { title: string; players: FixtureLineupP
               <span>{player.backNumber ?? "-"}</span>
               <strong>{player.playerName ?? "-"}</strong>
               <em>{player.position ?? "-"}</em>
+              <FavoriteToggleButton
+                isFavorite={favoriteControls.favoritePlayerIds.has(player.playerId)}
+                isPending={favoriteControls.pendingFavoriteKey === `player-${player.playerId}`}
+                label={`${player.playerName ?? "선수"} 즐겨찾기`}
+                onClick={() => favoriteControls.onTogglePlayer(player.playerId)}
+              />
             </div>
           ))
         ) : (
@@ -418,10 +616,12 @@ function AbsenceList({ team }: { team: FixtureTeamLineup }) {
 }
 
 function StatsPanel({
+  favoriteControls,
   fixture,
   statsState,
   playerStatsState,
 }: {
+  favoriteControls: FavoriteControls;
   fixture: FixtureSummary;
   statsState: LoadState<FixtureStatResponse>;
   playerStatsState: LoadState<FixturePlayerStatResponse>;
@@ -429,7 +629,7 @@ function StatsPanel({
   return (
     <div className="detail-stats-stack">
       <TeamStatsPanel fixture={fixture} state={statsState} />
-      <PlayerStatsPanel state={playerStatsState} />
+      <PlayerStatsPanel favoriteControls={favoriteControls} state={playerStatsState} />
     </div>
   );
 }
@@ -487,7 +687,13 @@ function StatCompareRow({ row }: { row: TeamStatRow }) {
   );
 }
 
-function PlayerStatsPanel({ state }: { state: LoadState<FixturePlayerStatResponse> }) {
+function PlayerStatsPanel({
+  favoriteControls,
+  state,
+}: {
+  favoriteControls: FavoriteControls;
+  state: LoadState<FixturePlayerStatResponse>;
+}) {
   if (state.isLoading) {
     return <SectionLoading label="선수별 경기 통계를 불러오는 중입니다." />;
   }
@@ -508,14 +714,20 @@ function PlayerStatsPanel({ state }: { state: LoadState<FixturePlayerStatRespons
       </div>
       <div className="player-stat-team-grid">
         {groups.map((group) => (
-          <PlayerStatTable group={group} key={group.teamId} />
+          <PlayerStatTable favoriteControls={favoriteControls} group={group} key={group.teamId} />
         ))}
       </div>
     </article>
   );
 }
 
-function PlayerStatTable({ group }: { group: FixtureTeamPlayerStats }) {
+function PlayerStatTable({
+  favoriteControls,
+  group,
+}: {
+  favoriteControls: FavoriteControls;
+  group: FixtureTeamPlayerStats;
+}) {
   const players = (group.players ?? []).slice().sort((a, b) => {
     const minuteOrder = zeroMinuteRank(a.minutesPlayed) - zeroMinuteRank(b.minutesPlayed);
     if (minuteOrder !== 0) {
@@ -545,14 +757,17 @@ function PlayerStatTable({ group }: { group: FixtureTeamPlayerStats }) {
               <th>패스</th>
               <th>태클</th>
               <th>카드</th>
+              <th>즐겨찾기</th>
             </tr>
           </thead>
           <tbody>
             {players.length ? (
-              players.map((player) => <PlayerStatRow key={player.playerId} player={player} />)
+              players.map((player) => (
+                <PlayerStatRow favoriteControls={favoriteControls} key={player.playerId} player={player} />
+              ))
             ) : (
               <tr>
-                <td colSpan={10}>선수 통계가 없습니다.</td>
+                <td colSpan={11}>선수 통계가 없습니다.</td>
               </tr>
             )}
           </tbody>
@@ -562,7 +777,13 @@ function PlayerStatTable({ group }: { group: FixtureTeamPlayerStats }) {
   );
 }
 
-function PlayerStatRow({ player }: { player: FixturePlayerStat }) {
+function PlayerStatRow({
+  favoriteControls,
+  player,
+}: {
+  favoriteControls: FavoriteControls;
+  player: FixturePlayerStat;
+}) {
   return (
     <tr>
       <td>
@@ -583,6 +804,14 @@ function PlayerStatRow({ player }: { player: FixturePlayerStat }) {
       <td>{numberText(player.tacklesTotal)}</td>
       <td>
         {numberText(player.yellowCards)}Y / {numberText(player.redCards)}R
+      </td>
+      <td>
+        <FavoriteToggleButton
+          isFavorite={favoriteControls.favoritePlayerIds.has(player.playerId)}
+          isPending={favoriteControls.pendingFavoriteKey === `player-${player.playerId}`}
+          label={`${player.playerName ?? "선수"} 즐겨찾기`}
+          onClick={() => favoriteControls.onTogglePlayer(player.playerId)}
+        />
       </td>
     </tr>
   );

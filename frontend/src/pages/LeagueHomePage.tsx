@@ -14,9 +14,7 @@ import {
   type TeamStanding,
 } from "../api";
 
-const DEFAULT_SEASON = 2025;
-
-export function LeagueHomePage({ authStatus }: { authStatus: AuthStatus }) {
+export function LeagueHomePage({ authStatus, season }: { authStatus: AuthStatus; season: number }) {
   const [selectedDate, setSelectedDate] = useState(todayKoreaDateKey());
   const [standings, setStandings] = useState<TeamStanding[]>([]);
   const [fixtures, setFixtures] = useState<FixtureSummary[]>([]);
@@ -40,7 +38,7 @@ export function LeagueHomePage({ authStatus }: { authStatus: AuthStatus }) {
 
   useEffect(() => {
     void loadStandings();
-  }, []);
+  }, [season]);
 
   useEffect(() => {
     if (authStatus === "checking") {
@@ -58,17 +56,17 @@ export function LeagueHomePage({ authStatus }: { authStatus: AuthStatus }) {
     }
 
     void loadFavorites();
-  }, [authStatus]);
+  }, [authStatus, season]);
 
   useEffect(() => {
     void loadFixtures(selectedDate);
-  }, [selectedDate]);
+  }, [selectedDate, season]);
 
   async function loadStandings() {
     setIsLoadingStandings(true);
     setStandingsError("");
     try {
-      setStandings(await fetchStandings(DEFAULT_SEASON));
+      setStandings(await fetchStandings(season));
     } catch (error) {
       setStandings([]);
       setStandingsError(error instanceof Error ? error.message : "팀 랭킹을 불러오지 못했습니다.");
@@ -81,7 +79,7 @@ export function LeagueHomePage({ authStatus }: { authStatus: AuthStatus }) {
     setIsLoadingFixtures(true);
     setFixturesError("");
     try {
-      const response = await fetchFixturesByDate(DEFAULT_SEASON, dateKey);
+      const response = await fetchFixturesByDate(season, dateKey);
       setFixtures(response.content ?? []);
     } catch (error) {
       setFixtures([]);
@@ -96,7 +94,7 @@ export function LeagueHomePage({ authStatus }: { authStatus: AuthStatus }) {
     setFavoritesError("");
     setFavoritesNeedLogin(false);
     try {
-      setFavorites(await fetchFavoriteDashboard(DEFAULT_SEASON));
+      setFavorites(await fetchFavoriteDashboard(season));
     } catch (error) {
       setFavorites(null);
       if (error instanceof ApiError && error.status === 401) {
@@ -156,7 +154,7 @@ export function LeagueHomePage({ authStatus }: { authStatus: AuthStatus }) {
           {isLoadingFavorites ? (
             <div className="empty-state">즐겨찾기를 확인하는 중입니다.</div>
           ) : favoritesNeedLogin ? (
-            <FavoriteLoginState />
+            <FavoriteLoginStateWithLink />
           ) : (
             <FavoritesPreview favorites={favorites} />
           )}
@@ -233,6 +231,18 @@ function FavoriteLoginState() {
     <div className="favorite-empty">
       <strong>로그인 후 즐겨찾기를 확인할 수 있습니다.</strong>
       <p>좋아하는 팀과 선수를 저장하면 최근 경기, 다음 경기, 시즌 기록이 이곳에 표시됩니다.</p>
+    </div>
+  );
+}
+
+function FavoriteLoginStateWithLink() {
+  return (
+    <div className="favorite-empty">
+      <strong>로그인 후 즐겨찾기를 확인할 수 있습니다.</strong>
+      <p>좋아하는 팀과 선수를 저장하면 최근 경기, 다음 경기, 시즌 기록을 한곳에서 확인할 수 있습니다.</p>
+      <Link className="favorite-login-link" to="/login">
+        로그인
+      </Link>
     </div>
   );
 }

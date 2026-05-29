@@ -59,6 +59,8 @@ class FixtureServiceTest {
         var response = fixtureService.getFixture(100L);
 
         assertThat(response.getFixtureId()).isEqualTo(100L);
+        assertThat(response.getHomeTeamId()).isEqualTo(47L);
+        assertThat(response.getAwayTeamId()).isEqualTo(49L);
         assertThat(response.getHomeTeamName()).isEqualTo("Tottenham");
         assertThat(response.getAwayTeamLogoUrl()).isEqualTo("away.png");
         assertThat(response.getHomeScore()).isEqualTo(2);

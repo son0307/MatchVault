@@ -31,7 +31,7 @@ public class SecurityConfig {
                 .httpBasic(AbstractHttpConfigurer::disable)
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/admin", "/admin/**", "/admin.html", "/api/v1/admin/**").hasRole("ADMIN")
-                        .requestMatchers("/api/v1/auth/me", "/api/v1/favorites/**").authenticated()
+                        .requestMatchers("/api/v1/auth/me", "/api/v1/auth/me/**", "/api/v1/favorites/**").authenticated()
                         .anyRequest().permitAll()
                 )
                 .exceptionHandling(exception -> exception

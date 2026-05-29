@@ -10,7 +10,6 @@ import {
   type TeamStanding,
 } from "../api";
 
-const DEFAULT_SEASON = 2025;
 const TEAM_PAGE_SIZE = 10;
 const TEAM_FETCH_SIZE = 100;
 
@@ -28,7 +27,7 @@ const fixtureModes: Array<{ label: string; value: FixtureMode }> = [
   { label: "팀별", value: "team" },
 ];
 
-export function LeagueFixturesPage() {
+export function LeagueFixturesPage({ season }: { season: number }) {
   const [mode, setMode] = useState<FixtureMode>("date");
   const [meta, setMeta] = useState<FixtureMeta | null>(null);
   const [weekStart, setWeekStart] = useState(startOfKoreaWeek(todayKoreaDateKey()));
@@ -70,7 +69,7 @@ export function LeagueFixturesPage() {
   useEffect(() => {
     void loadFixtureMeta();
     void loadTeamOptions();
-  }, []);
+  }, [season]);
 
   useEffect(() => {
     if (mode === "team" && !selectedTeamId) {
@@ -79,11 +78,11 @@ export function LeagueFixturesPage() {
       return;
     }
     void loadFixtures();
-  }, [mode, weekStart, round, selectedTeamId]);
+  }, [mode, weekStart, weekEnd, round, selectedTeamId, season]);
 
   async function loadFixtureMeta() {
     try {
-      const fixtureMeta = await fetchFixtureMeta(DEFAULT_SEASON);
+      const fixtureMeta = await fetchFixtureMeta(season);
       setMeta(fixtureMeta);
       setRound(1);
 
@@ -102,7 +101,7 @@ export function LeagueFixturesPage() {
     setIsLoadingTeams(true);
     setTeamErrorMessage("");
     try {
-      const standings = await fetchStandings(DEFAULT_SEASON);
+      const standings = await fetchStandings(season);
       const teamOptions = standingsToTeamOptions(standings);
       setTeams(teamOptions);
       setSelectedTeamId((current) => current ?? teamOptions[0]?.teamId ?? null);
@@ -116,7 +115,7 @@ export function LeagueFixturesPage() {
   }
 
   async function loadFixtures() {
-    const query = queryForMode(mode, weekStart, weekEnd, round, selectedTeamId);
+    const query = queryForMode(mode, weekStart, weekEnd, round, selectedTeamId, season);
     if (!query) {
       return;
     }
@@ -402,15 +401,16 @@ function queryForMode(
   weekEnd: string,
   round: number,
   selectedTeamId: number | null,
+  season: number,
 ) {
   if (mode === "date") {
-    return { season: DEFAULT_SEASON, dateFrom: weekStart, dateTo: weekEnd, size: 100 };
+    return { season, dateFrom: weekStart, dateTo: weekEnd, size: 100 };
   }
   if (mode === "round") {
-    return { season: DEFAULT_SEASON, round, size: 100 };
+    return { season, round, size: 100 };
   }
   if (selectedTeamId) {
-    return { season: DEFAULT_SEASON, teamId: selectedTeamId, size: TEAM_FETCH_SIZE };
+    return { season, teamId: selectedTeamId, size: TEAM_FETCH_SIZE };
   }
   return null;
 }

@@ -2,12 +2,15 @@ package com.son.soccerStreaming.favorite.service;
 
 import com.son.soccerStreaming.auth.entity.AppUser;
 import com.son.soccerStreaming.auth.repository.AppUserRepository;
+import com.son.soccerStreaming.favorite.entity.FavoritePlayer;
 import com.son.soccerStreaming.favorite.entity.FavoriteTeam;
 import com.son.soccerStreaming.favorite.repository.FavoritePlayerRepository;
 import com.son.soccerStreaming.favorite.repository.FavoriteTeamRepository;
 import com.son.soccerStreaming.fixture.entity.Fixture;
 import com.son.soccerStreaming.fixture.repository.FixtureRepository;
 import com.son.soccerStreaming.fixture.repository.PlayerFixtureStatRepository;
+import com.son.soccerStreaming.player.entity.Player;
+import com.son.soccerStreaming.player.entity.PlayerTeamSeasonStat;
 import com.son.soccerStreaming.player.repository.PlayerRepository;
 import com.son.soccerStreaming.player.repository.PlayerTeamSeasonStatRepository;
 import com.son.soccerStreaming.team.entity.Team;
@@ -113,5 +116,81 @@ class FavoriteServiceTest {
         assertThat(teamCard.getLiveFixture().getHomeScore()).isEqualTo(1);
         assertThat(teamCard.getLiveFixture().getAwayScore()).isEqualTo(2);
         assertThat(teamCard.getLiveFixture().getElapsed()).isEqualTo(63);
+    }
+
+    @Test
+    void getDashboardUsesRequestedSeasonForFavoritePlayerStats() {
+        AppUser user = AppUser.builder()
+                .email("fan@example.com")
+                .password("password")
+                .nickname("Fan")
+                .build();
+        Player player = Player.builder()
+                .playerId(7L)
+                .name("Son")
+                .position("F")
+                .photoUrl("son.png")
+                .build();
+        Team team = Team.builder()
+                .id(1L)
+                .teamId(47L)
+                .name("Tottenham")
+                .logoUrl("tottenham.png")
+                .build();
+        FavoritePlayer favorite = FavoritePlayer.of(user, player);
+        PlayerTeamSeasonStat seasonStat = PlayerTeamSeasonStat.builder()
+                .player(player)
+                .team(team)
+                .leagueId(39L)
+                .season(2024)
+                .appearances(30)
+                .minutes(2400)
+                .rating(7.4)
+                .goals(17)
+                .assists(10)
+                .yellowCards(1)
+                .redCards(0)
+                .build();
+
+        when(favoriteTeamRepository.findAllByUserIdOrderByCreatedAtDesc(1L)).thenReturn(List.of());
+        when(favoritePlayerRepository.findAllByUserIdOrderByCreatedAtDesc(1L)).thenReturn(List.of(favorite));
+        when(playerFixtureStatRepository.findTop5ByPlayerPlayerIdOrderByFixtureFixtureDateDesc(7L)).thenReturn(List.of());
+        when(playerTeamSeasonStatRepository.findAllByPlayerPlayerIdAndSeason(7L, 2024))
+                .thenReturn(List.of(seasonStat));
+
+        var response = favoriteService.getDashboard(1L, 2024);
+
+        assertThat(response.getPlayers()).hasSize(1);
+        var playerCard = response.getPlayers().get(0);
+        assertThat(playerCard.getSeasonStat().getSeason()).isEqualTo(2024);
+        assertThat(playerCard.getSeasonStat().getGoals()).isEqualTo(17);
+        assertThat(playerCard.getSeasonStat().getAssists()).isEqualTo(10);
+        assertThat(playerCard.getSeasonStat().getRating()).isEqualTo(7.4);
+    }
+
+    @Test
+    void getDashboardReturnsEmptyPlayerSeasonStatWhenRequestedSeasonHasNoRecord() {
+        AppUser user = AppUser.builder()
+                .email("fan@example.com")
+                .password("password")
+                .nickname("Fan")
+                .build();
+        Player player = Player.builder()
+                .playerId(7L)
+                .name("Son")
+                .position("F")
+                .build();
+        FavoritePlayer favorite = FavoritePlayer.of(user, player);
+
+        when(favoriteTeamRepository.findAllByUserIdOrderByCreatedAtDesc(1L)).thenReturn(List.of());
+        when(favoritePlayerRepository.findAllByUserIdOrderByCreatedAtDesc(1L)).thenReturn(List.of(favorite));
+        when(playerFixtureStatRepository.findTop5ByPlayerPlayerIdOrderByFixtureFixtureDateDesc(7L)).thenReturn(List.of());
+        when(playerTeamSeasonStatRepository.findAllByPlayerPlayerIdAndSeason(7L, 2023))
+                .thenReturn(List.of());
+
+        var response = favoriteService.getDashboard(1L, 2023);
+
+        assertThat(response.getPlayers()).hasSize(1);
+        assertThat(response.getPlayers().get(0).getSeasonStat()).isNull();
     }
 }

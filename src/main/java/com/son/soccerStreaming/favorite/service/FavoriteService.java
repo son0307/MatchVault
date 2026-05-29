@@ -88,7 +88,7 @@ public class FavoriteService {
         List<FavoriteDashboardResponseDto.PlayerCard> players = favoritePlayerRepository
                 .findAllByUserIdOrderByCreatedAtDesc(userId)
                 .stream()
-                .map(favorite -> toPlayerCard(favorite.getPlayer()))
+                .map(favorite -> toPlayerCard(favorite.getPlayer(), season))
                 .toList();
 
         return FavoriteDashboardResponseDto.builder()
@@ -165,15 +165,14 @@ public class FavoriteService {
                 .build();
     }
 
-    private FavoriteDashboardResponseDto.PlayerCard toPlayerCard(Player player) {
+    private FavoriteDashboardResponseDto.PlayerCard toPlayerCard(Player player, Integer season) {
         PlayerFixtureStat recentMatch = playerFixtureStatRepository
                 .findTop5ByPlayerPlayerIdOrderByFixtureFixtureDateDesc(player.getPlayerId())
                 .stream()
                 .findFirst()
                 .orElse(null);
-        PlayerTeamSeasonStat seasonStat = playerTeamSeasonStatRepository
-                .findTopByPlayerPlayerIdOrderBySeasonDesc(player.getPlayerId())
-                .orElse(null);
+        List<PlayerTeamSeasonStat> seasonStats = playerTeamSeasonStatRepository
+                .findAllByPlayerPlayerIdAndSeason(player.getPlayerId(), season);
 
         return FavoriteDashboardResponseDto.PlayerCard.builder()
                 .playerId(player.getPlayerId())
@@ -181,7 +180,7 @@ public class FavoriteService {
                 .photoUrl(player.getPhotoUrl())
                 .position(player.getPosition())
                 .recentMatch(recentMatch != null ? toRecentPlayerMatch(recentMatch) : null)
-                .seasonStat(seasonStat != null ? toPlayerSeasonStat(seasonStat) : null)
+                .seasonStat(seasonStats.isEmpty() ? null : toPlayerSeasonStat(season, seasonStats))
                 .build();
     }
 
@@ -204,19 +203,39 @@ public class FavoriteService {
                 .build();
     }
 
-    private FavoriteDashboardResponseDto.PlayerSeasonStat toPlayerSeasonStat(PlayerTeamSeasonStat stat) {
+    private FavoriteDashboardResponseDto.PlayerSeasonStat toPlayerSeasonStat(Integer season, List<PlayerTeamSeasonStat> stats) {
+        PlayerTeamSeasonStat primaryStat = stats.stream()
+                .max((left, right) -> Integer.compare(valueOf(left.getAppearances()), valueOf(right.getAppearances())))
+                .orElse(null);
+        int weightedRatingFixtures = stats.stream()
+                .filter(item -> item.getRating() != null && valueOf(item.getAppearances()) > 0)
+                .mapToInt(item -> valueOf(item.getAppearances()))
+                .sum();
+        double weightedRating = stats.stream()
+                .filter(item -> item.getRating() != null && valueOf(item.getAppearances()) > 0)
+                .mapToDouble(item -> item.getRating() * valueOf(item.getAppearances()))
+                .sum();
+
         return FavoriteDashboardResponseDto.PlayerSeasonStat.builder()
-                .season(stat.getSeason())
-                .teamName(stat.getTeam().getName())
-                .teamLogoUrl(stat.getTeam().getLogoUrl())
-                .appearances(stat.getAppearances())
-                .minutes(stat.getMinutes())
-                .rating(stat.getRating())
-                .goals(stat.getGoals())
-                .assists(stat.getAssists())
-                .yellowCards(stat.getYellowCards())
-                .redCards(stat.getRedCards())
+                .season(season)
+                .teamName(primaryStat != null ? primaryStat.getTeam().getName() : null)
+                .teamLogoUrl(primaryStat != null ? primaryStat.getTeam().getLogoUrl() : null)
+                .appearances(stats.stream().mapToInt(item -> valueOf(item.getAppearances())).sum())
+                .minutes(stats.stream().mapToInt(item -> valueOf(item.getMinutes())).sum())
+                .rating(weightedRatingFixtures > 0 ? roundToOneDecimal(weightedRating / weightedRatingFixtures) : null)
+                .goals(stats.stream().mapToInt(item -> valueOf(item.getGoals())).sum())
+                .assists(stats.stream().mapToInt(item -> valueOf(item.getAssists())).sum())
+                .yellowCards(stats.stream().mapToInt(item -> valueOf(item.getYellowCards())).sum())
+                .redCards(stats.stream().mapToInt(item -> valueOf(item.getRedCards())).sum())
                 .build();
+    }
+
+    private double roundToOneDecimal(double value) {
+        return Math.round(value * 10) / 10.0;
+    }
+
+    private int valueOf(Integer value) {
+        return value == null ? 0 : value;
     }
 
     private String resultOf(Fixture fixture, Team team) {
