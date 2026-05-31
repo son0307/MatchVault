@@ -8,8 +8,8 @@ export type FixtureSummary = {
   awayTeamName: string | null;
   homeTeamLogoUrl: string | null;
   awayTeamLogoUrl: string | null;
-  homeScore: number;
-  awayScore: number;
+  homeScore: number | null;
+  awayScore: number | null;
   fixtureStatus: string | null;
 };
 
@@ -436,6 +436,11 @@ type CacheEntry<T> = {
 const memoryCache = new Map<string, CacheEntry<unknown>>();
 const pendingRequests = new Map<string, Promise<unknown>>();
 
+export function clearApiMemoryCache() {
+  memoryCache.clear();
+  pendingRequests.clear();
+}
+
 export async function fetchHomeSummary(season: number): Promise<HomeSummary> {
   const response = await fetch(`/api/v1/home/summary?season=${season}`, {
     headers: {
@@ -458,18 +463,6 @@ export async function fetchStandings(season: number): Promise<TeamStanding[]> {
     DETAIL_CACHE_TTL_MS,
   );
 
-  const response = await fetch(`/api/v1/teams/standings?season=${season}`, {
-    headers: {
-      Accept: "application/json",
-    },
-    credentials: "same-origin",
-  });
-
-  if (!response.ok) {
-    throw new ApiError(`순위 정보를 불러오지 못했습니다. (${response.status})`, response.status);
-  }
-
-  return response.json();
 }
 
 export async function fetchFixturesByDate(
@@ -496,18 +489,6 @@ export async function fetchFixtures(query: FixtureQuery): Promise<CursorResponse
     SHORT_CACHE_TTL_MS,
   );
 
-  const response = await fetch(`/api/v1/fixtures?${params.toString()}`, {
-    headers: {
-      Accept: "application/json",
-    },
-    credentials: "same-origin",
-  });
-
-  if (!response.ok) {
-    throw new ApiError(`경기 일정을 불러오지 못했습니다. (${response.status})`, response.status);
-  }
-
-  return response.json();
 }
 
 export async function fetchFixture(fixtureId: number): Promise<FixtureSummary> {
@@ -517,18 +498,6 @@ export async function fetchFixture(fixtureId: number): Promise<FixtureSummary> {
     DETAIL_CACHE_TTL_MS,
   );
 
-  const response = await fetch(`/api/v1/fixtures/${fixtureId}`, {
-    headers: {
-      Accept: "application/json",
-    },
-    credentials: "same-origin",
-  });
-
-  if (!response.ok) {
-    throw new ApiError(`경기 정보를 불러오지 못했습니다. (${response.status})`, response.status);
-  }
-
-  return response.json();
 }
 
 export async function fetchFixtureMeta(season: number): Promise<FixtureMeta> {
@@ -538,18 +507,6 @@ export async function fetchFixtureMeta(season: number): Promise<FixtureMeta> {
     DETAIL_CACHE_TTL_MS,
   );
 
-  const response = await fetch(`/api/v1/fixtures/meta?season=${season}`, {
-    headers: {
-      Accept: "application/json",
-    },
-    credentials: "same-origin",
-  });
-
-  if (!response.ok) {
-    throw new ApiError(`경기 범위를 불러오지 못했습니다. (${response.status})`, response.status);
-  }
-
-  return response.json();
 }
 
 export async function fetchFixtureEvents(fixtureId: number): Promise<FixtureEventResponse> {
@@ -559,18 +516,6 @@ export async function fetchFixtureEvents(fixtureId: number): Promise<FixtureEven
     DETAIL_CACHE_TTL_MS,
   );
 
-  const response = await fetch(`/api/v1/fixtures/${fixtureId}/events`, {
-    headers: {
-      Accept: "application/json",
-    },
-    credentials: "same-origin",
-  });
-
-  if (!response.ok) {
-    throw new ApiError(`경기 이벤트를 불러오지 못했습니다. (${response.status})`, response.status);
-  }
-
-  return response.json();
 }
 
 export async function fetchFixtureLineups(fixtureId: number): Promise<FixtureLineupResponse> {
@@ -580,18 +525,6 @@ export async function fetchFixtureLineups(fixtureId: number): Promise<FixtureLin
     DETAIL_CACHE_TTL_MS,
   );
 
-  const response = await fetch(`/api/v1/fixtures/${fixtureId}/lineups`, {
-    headers: {
-      Accept: "application/json",
-    },
-    credentials: "same-origin",
-  });
-
-  if (!response.ok) {
-    throw new ApiError(`라인업을 불러오지 못했습니다. (${response.status})`, response.status);
-  }
-
-  return response.json();
 }
 
 export async function fetchFixtureStats(fixtureId: number): Promise<FixtureStatResponse> {
@@ -627,18 +560,6 @@ export async function fetchFixturePlayerStats(fixtureId: number): Promise<Fixtur
 export async function fetchTeams(): Promise<TeamSummary[]> {
   return cachedGetJson<TeamSummary[]>("/api/v1/teams", "팀 목록을 불러오지 못했습니다.", DETAIL_CACHE_TTL_MS);
 
-  const response = await fetch("/api/v1/teams", {
-    headers: {
-      Accept: "application/json",
-    },
-    credentials: "same-origin",
-  });
-
-  if (!response.ok) {
-    throw new ApiError(`팀 목록을 불러오지 못했습니다. (${response.status})`, response.status);
-  }
-
-  return response.json();
 }
 
 export async function fetchTeamDetails(teamId: number): Promise<TeamDetails> {
@@ -648,18 +569,6 @@ export async function fetchTeamDetails(teamId: number): Promise<TeamDetails> {
     DETAIL_CACHE_TTL_MS,
   );
 
-  const response = await fetch(`/api/v1/teams/${teamId}`, {
-    headers: {
-      Accept: "application/json",
-    },
-    credentials: "same-origin",
-  });
-
-  if (!response.ok) {
-    throw new ApiError(`팀 정보를 불러오지 못했습니다. (${response.status})`, response.status);
-  }
-
-  return response.json();
 }
 
 export async function fetchTeamPlayers(teamId: number, season: number): Promise<PlayerSummary[]> {
@@ -669,18 +578,6 @@ export async function fetchTeamPlayers(teamId: number, season: number): Promise<
     DETAIL_CACHE_TTL_MS,
   );
 
-  const response = await fetch(`/api/v1/teams/${teamId}/players?season=${season}`, {
-    headers: {
-      Accept: "application/json",
-    },
-    credentials: "same-origin",
-  });
-
-  if (!response.ok) {
-    throw new ApiError(`팀 선수 목록을 불러오지 못했습니다. (${response.status})`, response.status);
-  }
-
-  return response.json();
 }
 
 export async function fetchTeamPlayerRankings(teamId: number, season: number): Promise<TeamPlayerRankings> {
@@ -690,26 +587,18 @@ export async function fetchTeamPlayerRankings(teamId: number, season: number): P
     DETAIL_CACHE_TTL_MS,
   );
 
-  const response = await fetch(`/api/v1/teams/${teamId}/player-rankings?season=${season}`, {
-    headers: {
-      Accept: "application/json",
-    },
-    credentials: "same-origin",
-  });
-
-  if (!response.ok) {
-    throw new ApiError(`팀 선수 통계를 불러오지 못했습니다. (${response.status})`, response.status);
-  }
-
-  return response.json();
 }
 
 export async function login(email: string, password: string): Promise<CurrentUser> {
-  return parseCurrentUser(await postJson("/api/v1/auth/login", { email, password }));
+  const user = parseCurrentUser(await postJson("/api/v1/auth/login", { email, password }));
+  clearApiMemoryCache();
+  return user;
 }
 
 export async function signup(email: string, password: string, nickname: string): Promise<CurrentUser> {
-  return parseCurrentUser(await postJson("/api/v1/auth/signup", { email, password, nickname }));
+  const user = parseCurrentUser(await postJson("/api/v1/auth/signup", { email, password, nickname }));
+  clearApiMemoryCache();
+  return user;
 }
 
 export async function logout(): Promise<void> {
@@ -724,6 +613,7 @@ export async function logout(): Promise<void> {
   if (!response.ok) {
     throw await responseError(response, `로그아웃에 실패했습니다. (${response.status})`);
   }
+  clearApiMemoryCache();
 }
 
 export async function fetchCurrentUser(): Promise<CurrentUser> {
@@ -779,18 +669,6 @@ export async function fetchPlayerPanel(playerId: number): Promise<PlayerPanel> {
     DETAIL_CACHE_TTL_MS,
   );
 
-  const response = await fetch(`/api/v1/players/${playerId}/panel`, {
-    headers: {
-      Accept: "application/json",
-    },
-    credentials: "same-origin",
-  });
-
-  if (!response.ok) {
-    throw new ApiError(`선수 정보를 불러오지 못했습니다. (${response.status})`, response.status);
-  }
-
-  return response.json();
 }
 
 async function cachedGetJson<T>(url: string, fallbackMessage: string, ttlMs: number): Promise<T> {
@@ -849,7 +727,9 @@ async function requestFavoriteDashboard(url: string, method: "POST" | "DELETE"):
     throw await responseError(response, `즐겨찾기 요청에 실패했습니다. (${response.status})`);
   }
 
-  return response.json();
+  const dashboard = await response.json();
+  clearApiMemoryCache();
+  return dashboard;
 }
 
 function appendParam(params: URLSearchParams, key: string, value: string | number | undefined) {

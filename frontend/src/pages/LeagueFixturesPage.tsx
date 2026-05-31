@@ -529,7 +529,13 @@ function formatTime(value: string | null) {
 }
 
 function scoreText(fixture: FixtureSummary) {
-  return fixture.fixtureStatus === "SCHEDULED" ? "vs" : `${fixture.homeScore}:${fixture.awayScore}`;
+  if (fixture.fixtureStatus === "SCHEDULED") {
+    return "vs";
+  }
+  if (fixture.homeScore === null || fixture.homeScore === undefined || fixture.awayScore === null || fixture.awayScore === undefined) {
+    return "-";
+  }
+  return `${fixture.homeScore}:${fixture.awayScore}`;
 }
 
 function valueOf(value: number | null | undefined) {

@@ -79,7 +79,7 @@ export function App() {
           path="/players/:playerId"
           element={
             <LeagueLayout onSeasonChange={setSeason} season={season}>
-              <PlayerDetailPage season={season} />
+              {(state) => <PlayerDetailPage authStatus={state.authStatus} season={state.season} />}
             </LeagueLayout>
           }
         />
@@ -87,7 +87,7 @@ export function App() {
           path="/teams/:teamId"
           element={
             <LeagueLayout onSeasonChange={setSeason} season={season}>
-              <TeamDetailPage season={season} />
+              {(state) => <TeamDetailPage authStatus={state.authStatus} season={state.season} />}
             </LeagueLayout>
           }
         />

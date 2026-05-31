@@ -392,6 +392,9 @@ function scoreText(fixture: FixtureSummary) {
   if (fixture.fixtureStatus === "SCHEDULED") {
     return "vs";
   }
+  if (fixture.homeScore === null || fixture.homeScore === undefined || fixture.awayScore === null || fixture.awayScore === undefined) {
+    return "-";
+  }
   return `${fixture.homeScore}:${fixture.awayScore}`;
 }
 

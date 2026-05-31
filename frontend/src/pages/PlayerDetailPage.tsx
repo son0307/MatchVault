@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Activity, CalendarDays, ChevronDown, ChevronLeft, ChevronRight, Shirt, Star, UserRound } from "lucide-react";
 import { Link, useParams } from "react-router-dom";
 import {
@@ -12,6 +12,7 @@ import {
   type PlayerProfile,
   type PlayerSeasonSummary,
 } from "../api";
+import type { AuthStatus } from "../App";
 
 type LoadState = {
   data: PlayerPanel | null;
@@ -21,9 +22,10 @@ type LoadState = {
 
 const MATCHES_PER_PAGE = 5;
 
-export function PlayerDetailPage({ season }: { season: number }) {
+export function PlayerDetailPage({ authStatus, season }: { authStatus: AuthStatus; season: number }) {
   const { playerId } = useParams();
   const numericPlayerId = Number(playerId);
+  const loadRequestId = useRef(0);
   const [state, setState] = useState<LoadState>({
     data: null,
     error: "",
@@ -43,17 +45,20 @@ export function PlayerDetailPage({ season }: { season: number }) {
       return;
     }
 
+    const requestId = loadRequestId.current + 1;
+    loadRequestId.current = requestId;
     let isCurrent = true;
+    const isLatest = () => isCurrent && loadRequestId.current === requestId;
     setState({ data: null, error: "", isLoading: true });
 
     fetchPlayerPanel(numericPlayerId)
       .then((data) => {
-        if (isCurrent) {
+        if (isLatest()) {
           setState({ data, error: "", isLoading: false });
         }
       })
       .catch((error) => {
-        if (isCurrent) {
+        if (isLatest()) {
           setState({
             data: null,
             error: error instanceof Error ? error.message : "선수 정보를 불러오지 못했습니다.",
@@ -72,6 +77,11 @@ export function PlayerDetailPage({ season }: { season: number }) {
       setIsFavorite(false);
       return;
     }
+    if (authStatus !== "authenticated") {
+      setIsFavorite(false);
+      setFavoriteError("");
+      return;
+    }
 
     let isCurrent = true;
     setFavoriteError("");
@@ -86,7 +96,7 @@ export function PlayerDetailPage({ season }: { season: number }) {
         if (isCurrent) {
           setIsFavorite(false);
           if (!(error instanceof ApiError && error.status === 401)) {
-            setFavoriteError(error instanceof Error ? error.message : "즐겨찾기 상태를 확인하지 못했습니다.");
+            setFavoriteError("즐겨찾기 상태를 확인하지 못했습니다.");
           }
         }
       });
@@ -94,10 +104,14 @@ export function PlayerDetailPage({ season }: { season: number }) {
     return () => {
       isCurrent = false;
     };
-  }, [numericPlayerId, season]);
+  }, [authStatus, numericPlayerId, season]);
 
   async function toggleFavorite() {
     if (!Number.isFinite(numericPlayerId) || numericPlayerId <= 0) {
+      return;
+    }
+    if (authStatus !== "authenticated") {
+      setFavoriteError("로그인이 필요합니다.");
       return;
     }
 
@@ -112,7 +126,7 @@ export function PlayerDetailPage({ season }: { season: number }) {
       if (error instanceof ApiError && error.status === 401) {
         setFavoriteError("로그인이 필요합니다.");
       } else {
-        setFavoriteError(error instanceof Error ? error.message : "즐겨찾기 변경에 실패했습니다.");
+        setFavoriteError("즐겨찾기 변경에 실패했습니다.");
       }
     } finally {
       setIsFavoriteLoading(false);
@@ -132,7 +146,7 @@ export function PlayerDetailPage({ season }: { season: number }) {
       <section className="league-content player-detail-page">
         <article className="panel placeholder-panel">
           <p className="eyebrow">Player Detail</p>
-          <h2>선수 정보를 불러오지 못했습니다</h2>
+          <h2>선수 정보를 불러오지 못했습니다.</h2>
           <p className="muted">{state.error || "잠시 후 다시 시도해 주세요."}</p>
           <Link className="primary-link fixture-back-link" to="/league/overview">
             리그 홈으로

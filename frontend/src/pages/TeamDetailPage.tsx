@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { Dispatch, SetStateAction } from "react";
 import { CalendarDays, Clock, Goal, Star, Users } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
@@ -17,6 +17,7 @@ import {
   type TeamDetails,
   type TeamPlayerRanking,
 } from "../api";
+import type { AuthStatus } from "../App";
 
 type LoadState<T> = {
   data: T | null;
@@ -27,9 +28,10 @@ type LoadState<T> = {
 const FIXTURE_FETCH_SIZE = 100;
 const TEAM_FIXTURE_PAGE_SIZE = 10;
 
-export function TeamDetailPage({ season }: { season: number }) {
+export function TeamDetailPage({ authStatus, season }: { authStatus: AuthStatus; season: number }) {
   const { teamId } = useParams();
   const numericTeamId = Number(teamId);
+  const loadRequestId = useRef(0);
   const [teamState, setTeamState] = useState<LoadState<TeamDetails>>({
     data: null,
     error: "",
@@ -65,7 +67,10 @@ export function TeamDetailPage({ season }: { season: number }) {
       return;
     }
 
+    const requestId = loadRequestId.current + 1;
+    loadRequestId.current = requestId;
     let isCurrent = true;
+    const isLatest = () => isCurrent && loadRequestId.current === requestId;
     setTeamState({ data: null, error: "", isLoading: true });
     setPlayersState({ data: null, error: "", isLoading: true });
     setFixturesState({ data: null, error: "", isLoading: true });
@@ -73,12 +78,12 @@ export function TeamDetailPage({ season }: { season: number }) {
 
     fetchTeamDetails(numericTeamId)
       .then((data) => {
-        if (isCurrent) {
+        if (isLatest()) {
           setTeamState({ data, error: "", isLoading: false });
         }
       })
       .catch((error) => {
-        if (isCurrent) {
+        if (isLatest()) {
           setTeamState({
             data: null,
             error: error instanceof Error ? error.message : "팀 정보를 불러오지 못했습니다.",
@@ -91,12 +96,12 @@ export function TeamDetailPage({ season }: { season: number }) {
 
     fetchTeamPlayers(numericTeamId, season)
       .then((players) => {
-        if (isCurrent) {
+        if (isLatest()) {
           setPlayersState({ data: players, error: "", isLoading: false });
         }
       })
       .catch((error) => {
-        if (isCurrent) {
+        if (isLatest()) {
           setPlayersState({
             data: null,
             error: error instanceof Error ? error.message : "팀 선수 목록을 불러오지 못했습니다.",
@@ -107,12 +112,12 @@ export function TeamDetailPage({ season }: { season: number }) {
 
     fetchTeamPlayerRankings(numericTeamId, season)
       .then((response) => {
-        if (isCurrent) {
+        if (isLatest()) {
           setRankState({ data: response.rows ?? [], error: "", isLoading: false });
         }
       })
       .catch((error) => {
-        if (isCurrent) {
+        if (isLatest()) {
           setRankState({
             data: null,
             error: error instanceof Error ? error.message : "팀 선수 통계를 불러오지 못했습니다.",
@@ -123,12 +128,12 @@ export function TeamDetailPage({ season }: { season: number }) {
 
     fetchFixtures({ season, teamId: numericTeamId, size: FIXTURE_FETCH_SIZE })
       .then((response) => {
-        if (isCurrent) {
+        if (isLatest()) {
           setFixturesState({ data: response.content ?? [], error: "", isLoading: false });
         }
       })
       .catch((error) => {
-        if (isCurrent) {
+        if (isLatest()) {
           setFixturesState({
             data: null,
             error: error instanceof Error ? error.message : "팀 경기 일정을 불러오지 못했습니다.",
@@ -147,6 +152,11 @@ export function TeamDetailPage({ season }: { season: number }) {
       setIsFavorite(false);
       return;
     }
+    if (authStatus !== "authenticated") {
+      setIsFavorite(false);
+      setFavoriteError("");
+      return;
+    }
 
     let isCurrent = true;
     setFavoriteError("");
@@ -161,7 +171,7 @@ export function TeamDetailPage({ season }: { season: number }) {
         if (isCurrent) {
           setIsFavorite(false);
           if (!(error instanceof ApiError && error.status === 401)) {
-            setFavoriteError(error instanceof Error ? error.message : "즐겨찾기 상태를 확인하지 못했습니다.");
+            setFavoriteError("즐겨찾기 상태를 확인하지 못했습니다.");
           }
         }
       });
@@ -169,10 +179,14 @@ export function TeamDetailPage({ season }: { season: number }) {
     return () => {
       isCurrent = false;
     };
-  }, [numericTeamId, season]);
+  }, [authStatus, numericTeamId, season]);
 
   async function toggleFavorite() {
     if (!Number.isFinite(numericTeamId) || numericTeamId <= 0) {
+      return;
+    }
+    if (authStatus !== "authenticated") {
+      setFavoriteError("로그인이 필요합니다.");
       return;
     }
 
@@ -187,7 +201,7 @@ export function TeamDetailPage({ season }: { season: number }) {
       if (error instanceof ApiError && error.status === 401) {
         setFavoriteError("로그인이 필요합니다.");
       } else {
-        setFavoriteError(error instanceof Error ? error.message : "즐겨찾기 변경에 실패했습니다.");
+        setFavoriteError("즐겨찾기 변경에 실패했습니다.");
       }
     } finally {
       setIsFavoriteLoading(false);
@@ -207,7 +221,7 @@ export function TeamDetailPage({ season }: { season: number }) {
       <section className="league-content team-detail-page">
         <article className="panel placeholder-panel">
           <p className="eyebrow">Team Detail</p>
-          <h2>팀 정보를 불러오지 못했습니다</h2>
+          <h2>팀 정보를 불러오지 못했습니다.</h2>
           <p className="muted">{teamState.error || "잠시 후 다시 시도해 주세요."}</p>
           <Link className="primary-link fixture-back-link" to="/league/standings">
             순위표로
@@ -459,14 +473,14 @@ function TeamPlayerRanksPanel({ rankState }: { rankState: LoadState<TeamPlayerRa
 function topRank(rows: TeamPlayerRanking[], field: "goals" | "assists" | "rating" | "minutes") {
   return rows
     .slice()
-    .sort((a, b) => b[field] - a[field] || (a.playerName ?? "").localeCompare(b.playerName ?? ""))
+    .sort((a, b) => b[field] - a[field] || compareNullableStringLast(a.playerName, b.playerName))
     .slice(0, 5);
 }
 
 function comparePlayers(left: PlayerSummary, right: PlayerSummary) {
   return positionRank(left.position) - positionRank(right.position)
     || compareNullableNumber(left.backNumber, right.backNumber)
-    || (left.playerName ?? "").localeCompare(right.playerName ?? "");
+    || compareNullableStringLast(left.playerName, right.playerName);
 }
 
 function positionRank(position: string | null) {
@@ -497,6 +511,19 @@ function compareNullableNumber(left: number | null | undefined, right: number | 
     return -1;
   }
   return left - right;
+}
+
+function compareNullableStringLast(left: string | null | undefined, right: string | null | undefined) {
+  if (left && right) {
+    return left.localeCompare(right);
+  }
+  if (left) {
+    return -1;
+  }
+  if (right) {
+    return 1;
+  }
+  return 0;
 }
 
 function groupFixturesByDate(fixtures: FixtureSummary[]) {
@@ -566,7 +593,13 @@ function formatTime(value: string | null) {
 }
 
 function scoreText(fixture: FixtureSummary) {
-  return fixture.fixtureStatus === "SCHEDULED" ? "vs" : `${fixture.homeScore}:${fixture.awayScore}`;
+  if (fixture.fixtureStatus === "SCHEDULED") {
+    return "vs";
+  }
+  if (fixture.homeScore === null || fixture.homeScore === undefined || fixture.awayScore === null || fixture.awayScore === undefined) {
+    return "-";
+  }
+  return `${fixture.homeScore}:${fixture.awayScore}`;
 }
 
 function ratingText(value: number) {
