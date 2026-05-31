@@ -186,6 +186,21 @@ export type PlayerSummary = {
   photoUrl: string | null;
 };
 
+export type TeamPlayerRankings = {
+  rows: TeamPlayerRanking[];
+};
+
+export type TeamPlayerRanking = {
+  playerId: number;
+  playerName: string | null;
+  photoUrl: string | null;
+  position: string | null;
+  goals: number;
+  assists: number;
+  rating: number;
+  minutes: number;
+};
+
 export type FixtureQuery = {
   season?: number;
   round?: number;
@@ -410,6 +425,17 @@ export class ApiError extends Error {
   }
 }
 
+const SHORT_CACHE_TTL_MS = 60_000;
+const DETAIL_CACHE_TTL_MS = 5 * 60_000;
+
+type CacheEntry<T> = {
+  expiresAt: number;
+  value: T;
+};
+
+const memoryCache = new Map<string, CacheEntry<unknown>>();
+const pendingRequests = new Map<string, Promise<unknown>>();
+
 export async function fetchHomeSummary(season: number): Promise<HomeSummary> {
   const response = await fetch(`/api/v1/home/summary?season=${season}`, {
     headers: {
@@ -426,6 +452,12 @@ export async function fetchHomeSummary(season: number): Promise<HomeSummary> {
 }
 
 export async function fetchStandings(season: number): Promise<TeamStanding[]> {
+  return cachedGetJson<TeamStanding[]>(
+    `/api/v1/teams/standings?season=${season}`,
+    "순위 정보를 불러오지 못했습니다.",
+    DETAIL_CACHE_TTL_MS,
+  );
+
   const response = await fetch(`/api/v1/teams/standings?season=${season}`, {
     headers: {
       Accept: "application/json",
@@ -458,6 +490,12 @@ export async function fetchFixtures(query: FixtureQuery): Promise<CursorResponse
   appendParam(params, "cursorId", query.cursorId ?? undefined);
   appendParam(params, "size", query.size);
 
+  return cachedGetJson<CursorResponse<FixtureSummary>>(
+    `/api/v1/fixtures?${params.toString()}`,
+    "경기 일정을 불러오지 못했습니다.",
+    SHORT_CACHE_TTL_MS,
+  );
+
   const response = await fetch(`/api/v1/fixtures?${params.toString()}`, {
     headers: {
       Accept: "application/json",
@@ -473,6 +511,12 @@ export async function fetchFixtures(query: FixtureQuery): Promise<CursorResponse
 }
 
 export async function fetchFixture(fixtureId: number): Promise<FixtureSummary> {
+  return cachedGetJson<FixtureSummary>(
+    `/api/v1/fixtures/${fixtureId}`,
+    "경기 정보를 불러오지 못했습니다.",
+    DETAIL_CACHE_TTL_MS,
+  );
+
   const response = await fetch(`/api/v1/fixtures/${fixtureId}`, {
     headers: {
       Accept: "application/json",
@@ -488,6 +532,12 @@ export async function fetchFixture(fixtureId: number): Promise<FixtureSummary> {
 }
 
 export async function fetchFixtureMeta(season: number): Promise<FixtureMeta> {
+  return cachedGetJson<FixtureMeta>(
+    `/api/v1/fixtures/meta?season=${season}`,
+    "경기 범위를 불러오지 못했습니다.",
+    DETAIL_CACHE_TTL_MS,
+  );
+
   const response = await fetch(`/api/v1/fixtures/meta?season=${season}`, {
     headers: {
       Accept: "application/json",
@@ -503,6 +553,12 @@ export async function fetchFixtureMeta(season: number): Promise<FixtureMeta> {
 }
 
 export async function fetchFixtureEvents(fixtureId: number): Promise<FixtureEventResponse> {
+  return cachedGetJson<FixtureEventResponse>(
+    `/api/v1/fixtures/${fixtureId}/events`,
+    "경기 이벤트를 불러오지 못했습니다.",
+    DETAIL_CACHE_TTL_MS,
+  );
+
   const response = await fetch(`/api/v1/fixtures/${fixtureId}/events`, {
     headers: {
       Accept: "application/json",
@@ -518,6 +574,12 @@ export async function fetchFixtureEvents(fixtureId: number): Promise<FixtureEven
 }
 
 export async function fetchFixtureLineups(fixtureId: number): Promise<FixtureLineupResponse> {
+  return cachedGetJson<FixtureLineupResponse>(
+    `/api/v1/fixtures/${fixtureId}/lineups`,
+    "라인업을 불러오지 못했습니다.",
+    DETAIL_CACHE_TTL_MS,
+  );
+
   const response = await fetch(`/api/v1/fixtures/${fixtureId}/lineups`, {
     headers: {
       Accept: "application/json",
@@ -563,6 +625,8 @@ export async function fetchFixturePlayerStats(fixtureId: number): Promise<Fixtur
 }
 
 export async function fetchTeams(): Promise<TeamSummary[]> {
+  return cachedGetJson<TeamSummary[]>("/api/v1/teams", "팀 목록을 불러오지 못했습니다.", DETAIL_CACHE_TTL_MS);
+
   const response = await fetch("/api/v1/teams", {
     headers: {
       Accept: "application/json",
@@ -578,6 +642,12 @@ export async function fetchTeams(): Promise<TeamSummary[]> {
 }
 
 export async function fetchTeamDetails(teamId: number): Promise<TeamDetails> {
+  return cachedGetJson<TeamDetails>(
+    `/api/v1/teams/${teamId}`,
+    "팀 정보를 불러오지 못했습니다.",
+    DETAIL_CACHE_TTL_MS,
+  );
+
   const response = await fetch(`/api/v1/teams/${teamId}`, {
     headers: {
       Accept: "application/json",
@@ -593,6 +663,12 @@ export async function fetchTeamDetails(teamId: number): Promise<TeamDetails> {
 }
 
 export async function fetchTeamPlayers(teamId: number, season: number): Promise<PlayerSummary[]> {
+  return cachedGetJson<PlayerSummary[]>(
+    `/api/v1/teams/${teamId}/players?season=${season}`,
+    "팀 선수 목록을 불러오지 못했습니다.",
+    DETAIL_CACHE_TTL_MS,
+  );
+
   const response = await fetch(`/api/v1/teams/${teamId}/players?season=${season}`, {
     headers: {
       Accept: "application/json",
@@ -602,6 +678,27 @@ export async function fetchTeamPlayers(teamId: number, season: number): Promise<
 
   if (!response.ok) {
     throw new ApiError(`팀 선수 목록을 불러오지 못했습니다. (${response.status})`, response.status);
+  }
+
+  return response.json();
+}
+
+export async function fetchTeamPlayerRankings(teamId: number, season: number): Promise<TeamPlayerRankings> {
+  return cachedGetJson<TeamPlayerRankings>(
+    `/api/v1/teams/${teamId}/player-rankings?season=${season}`,
+    "팀 선수 통계를 불러오지 못했습니다.",
+    DETAIL_CACHE_TTL_MS,
+  );
+
+  const response = await fetch(`/api/v1/teams/${teamId}/player-rankings?season=${season}`, {
+    headers: {
+      Accept: "application/json",
+    },
+    credentials: "same-origin",
+  });
+
+  if (!response.ok) {
+    throw new ApiError(`팀 선수 통계를 불러오지 못했습니다. (${response.status})`, response.status);
   }
 
   return response.json();
@@ -676,6 +773,12 @@ export async function removeFavoritePlayer(playerId: number, season: number): Pr
 }
 
 export async function fetchPlayerPanel(playerId: number): Promise<PlayerPanel> {
+  return cachedGetJson<PlayerPanel>(
+    `/api/v1/players/${playerId}/panel`,
+    "선수 정보를 불러오지 못했습니다.",
+    DETAIL_CACHE_TTL_MS,
+  );
+
   const response = await fetch(`/api/v1/players/${playerId}/panel`, {
     headers: {
       Accept: "application/json",
@@ -685,6 +788,49 @@ export async function fetchPlayerPanel(playerId: number): Promise<PlayerPanel> {
 
   if (!response.ok) {
     throw new ApiError(`선수 정보를 불러오지 못했습니다. (${response.status})`, response.status);
+  }
+
+  return response.json();
+}
+
+async function cachedGetJson<T>(url: string, fallbackMessage: string, ttlMs: number): Promise<T> {
+  const now = Date.now();
+  const cached = memoryCache.get(url) as CacheEntry<T> | undefined;
+  if (cached && cached.expiresAt > now) {
+    return cached.value;
+  }
+
+  const pending = pendingRequests.get(url) as Promise<T> | undefined;
+  if (pending) {
+    return pending;
+  }
+
+  const request = fetchJson<T>(url, fallbackMessage)
+    .then((value) => {
+      memoryCache.set(url, {
+        expiresAt: Date.now() + ttlMs,
+        value,
+      });
+      return value;
+    })
+    .finally(() => {
+      pendingRequests.delete(url);
+    });
+
+  pendingRequests.set(url, request);
+  return request;
+}
+
+async function fetchJson<T>(url: string, fallbackMessage: string): Promise<T> {
+  const response = await fetch(url, {
+    headers: {
+      Accept: "application/json",
+    },
+    credentials: "same-origin",
+  });
+
+  if (!response.ok) {
+    throw new ApiError(`${fallbackMessage} (${response.status})`, response.status);
   }
 
   return response.json();

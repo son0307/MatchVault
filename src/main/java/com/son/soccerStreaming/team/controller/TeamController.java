@@ -60,4 +60,15 @@ public class TeamController {
     ) {
         return teamService.getPlayersByTeam(teamId, season);
     }
+
+    @Operation(summary = "팀 선수 통계 순위 조회", description = "특정 팀의 시즌별 선수 통계 순위를 조회합니다.")
+    @GetMapping("/{teamId}/player-rankings")
+    public TeamResponseDto.PlayerRankings getTeamPlayerRankings(
+            @Parameter(description = "조회할 팀 API ID", example = "47")
+            @PathVariable Long teamId,
+            @Parameter(description = "조회할 시즌", example = "2025")
+            @RequestParam(defaultValue = "2025") Integer season
+    ) {
+        return teamService.getPlayerRankings(teamId, season);
+    }
 }

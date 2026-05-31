@@ -8,6 +8,7 @@ import com.son.soccerStreaming.player.entity.PlayerTeamSeasonStat;
 import com.son.soccerStreaming.team.entity.Team;
 import com.son.soccerStreaming.global.exception.CustomException;
 import com.son.soccerStreaming.global.exception.ErrorCode;
+import com.son.soccerStreaming.global.util.DateTimeUtils;
 import com.son.soccerStreaming.fixture.repository.PlayerFixtureStatRepository;
 import com.son.soccerStreaming.player.repository.PlayerRepository;
 import com.son.soccerStreaming.player.repository.PlayerTeamSeasonStatRepository;
@@ -182,7 +183,7 @@ public class PlayerService {
 
         return PlayerResponseDto.MatchStat.builder()
                 .fixtureId(fixture.getFixtureId())
-                .fixtureDate(fixture.getFixtureDate())
+                .fixtureDate(DateTimeUtils.utcToKorea(fixture.getFixtureDate()))
                 .season(fixture.getSeason())
                 .round(fixture.getRound())
                 .teamId(team.getTeamId())

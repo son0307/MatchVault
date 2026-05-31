@@ -3,6 +3,8 @@ package com.son.soccerStreaming.team.dto;
 import lombok.Builder;
 import lombok.Getter;
 
+import java.util.List;
+
 public class TeamResponseDto {
 
     @Getter
@@ -36,5 +38,24 @@ public class TeamResponseDto {
         private Integer capacity;
         private String surface;
         private String venueImageUrl;
+    }
+
+    @Getter
+    @Builder
+    public static class PlayerRankings {
+        private List<PlayerRanking> rows;
+    }
+
+    @Getter
+    @Builder
+    public static class PlayerRanking {
+        private Long playerId;
+        private String playerName;
+        private String photoUrl;
+        private String position;
+        private int goals;
+        private int assists;
+        private double rating;
+        private int minutes;
     }
 }

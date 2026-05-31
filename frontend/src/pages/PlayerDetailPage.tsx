@@ -439,7 +439,7 @@ function matchTime(match: PlayerMatchStat) {
     return Number.MAX_SAFE_INTEGER;
   }
 
-  const date = new Date(hasExplicitTimeZone(match.fixtureDate) ? match.fixtureDate : `${match.fixtureDate}Z`);
+  const date = new Date(hasExplicitTimeZone(match.fixtureDate) ? match.fixtureDate : `${match.fixtureDate}+09:00`);
   return Number.isNaN(date.getTime()) ? Number.MAX_SAFE_INTEGER : date.getTime();
 }
 
@@ -602,7 +602,7 @@ function formatDate(value: string | null) {
     return "-";
   }
 
-  const date = new Date(hasExplicitTimeZone(value) ? value : `${value}Z`);
+  const date = new Date(hasExplicitTimeZone(value) ? value : `${value}+09:00`);
   if (Number.isNaN(date.getTime())) {
     return value.slice(0, 10) || "-";
   }

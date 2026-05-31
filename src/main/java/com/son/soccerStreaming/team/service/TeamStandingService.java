@@ -45,7 +45,7 @@ public class TeamStandingService {
         return projections.stream()
                 .sorted(Comparator.comparing(StandingProjection::getRank, Comparator.nullsLast(Comparator.naturalOrder())))
                 .map(standing -> toResponse(standing, recentForms.get(standing.getTeamId())))
-                .toList();
+                .collect(Collectors.toCollection(ArrayList::new));
     }
 
     private TeamStandingResponseDto toResponse(StandingProjection standing, RecentFormProjection recentForm) {

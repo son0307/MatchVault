@@ -375,7 +375,7 @@ function formatTime(value: string | null) {
     return "-";
   }
 
-  const date = new Date(/Z$|[+-]\d\d:\d\d$/.test(value) ? value : `${value}Z`);
+  const date = new Date(/Z$|[+-]\d\d:\d\d$/.test(value) ? value : `${value}+09:00`);
   if (Number.isNaN(date.getTime())) {
     return value.slice(11, 16) || "-";
   }

@@ -882,7 +882,7 @@ function formatDate(value: string | null) {
     return "날짜 미정";
   }
 
-  const date = new Date(hasExplicitTimeZone(value) ? value : `${value}Z`);
+  const date = new Date(hasExplicitTimeZone(value) ? value : `${value}+09:00`);
   if (Number.isNaN(date.getTime())) {
     return "날짜 미정";
   }

@@ -8,31 +8,20 @@ import {
   addFavoriteTeam,
   fetchFavoriteDashboard,
   fetchFixtures,
-  fetchPlayerPanel,
   fetchTeamDetails,
+  fetchTeamPlayerRankings,
   fetchTeamPlayers,
   removeFavoriteTeam,
   type FixtureSummary,
-  type PlayerPanel,
   type PlayerSummary,
   type TeamDetails,
+  type TeamPlayerRanking,
 } from "../api";
 
 type LoadState<T> = {
   data: T | null;
   error: string;
   isLoading: boolean;
-};
-
-type PlayerRankRow = {
-  playerId: number;
-  playerName: string | null;
-  photoUrl: string | null;
-  position: string | null;
-  goals: number;
-  assists: number;
-  rating: number;
-  minutes: number;
 };
 
 const FIXTURE_FETCH_SIZE = 100;
@@ -56,9 +45,11 @@ export function TeamDetailPage({ season }: { season: number }) {
     error: "",
     isLoading: true,
   });
-  const [rankRows, setRankRows] = useState<PlayerRankRow[]>([]);
-  const [rankError, setRankError] = useState("");
-  const [isLoadingRanks, setIsLoadingRanks] = useState(false);
+  const [rankState, setRankState] = useState<LoadState<TeamPlayerRanking[]>>({
+    data: null,
+    error: "",
+    isLoading: true,
+  });
   const [fixturePage, setFixturePage] = useState(0);
   const [isFavorite, setIsFavorite] = useState(false);
   const [isFavoriteLoading, setIsFavoriteLoading] = useState(false);
@@ -70,6 +61,7 @@ export function TeamDetailPage({ season }: { season: number }) {
       setTeamState({ data: null, error, isLoading: false });
       setPlayersState({ data: null, error, isLoading: false });
       setFixturesState({ data: null, error, isLoading: false });
+      setRankState({ data: null, error, isLoading: false });
       return;
     }
 
@@ -77,8 +69,7 @@ export function TeamDetailPage({ season }: { season: number }) {
     setTeamState({ data: null, error: "", isLoading: true });
     setPlayersState({ data: null, error: "", isLoading: true });
     setFixturesState({ data: null, error: "", isLoading: true });
-    setRankRows([]);
-    setRankError("");
+    setRankState({ data: null, error: "", isLoading: true });
 
     fetchTeamDetails(numericTeamId)
       .then((data) => {
@@ -102,7 +93,6 @@ export function TeamDetailPage({ season }: { season: number }) {
       .then((players) => {
         if (isCurrent) {
           setPlayersState({ data: players, error: "", isLoading: false });
-          void loadPlayerRanks(players, numericTeamId, isCurrent);
         }
       })
       .catch((error) => {
@@ -112,7 +102,22 @@ export function TeamDetailPage({ season }: { season: number }) {
             error: error instanceof Error ? error.message : "팀 선수 목록을 불러오지 못했습니다.",
             isLoading: false,
           });
-          setIsLoadingRanks(false);
+        }
+      });
+
+    fetchTeamPlayerRankings(numericTeamId, season)
+      .then((response) => {
+        if (isCurrent) {
+          setRankState({ data: response.rows ?? [], error: "", isLoading: false });
+        }
+      })
+      .catch((error) => {
+        if (isCurrent) {
+          setRankState({
+            data: null,
+            error: error instanceof Error ? error.message : "팀 선수 통계를 불러오지 못했습니다.",
+            isLoading: false,
+          });
         }
       });
 
@@ -131,40 +136,6 @@ export function TeamDetailPage({ season }: { season: number }) {
           });
         }
       });
-
-    async function loadPlayerRanks(players: PlayerSummary[], targetTeamId: number, isStillCurrent: boolean) {
-      setIsLoadingRanks(true);
-      setRankError("");
-
-      try {
-        const panels = await Promise.allSettled(players.map((player) => fetchPlayerPanel(player.playerId)));
-        if (!isStillCurrent) {
-          return;
-        }
-
-        const rows = panels
-          .map((result, index) =>
-            result.status === "fulfilled"
-              ? toRankRow(players[index], result.value, targetTeamId, season)
-              : toFallbackRankRow(players[index]),
-          )
-          .filter((row): row is PlayerRankRow => Boolean(row));
-
-        setRankRows(rows);
-        if (panels.some((result) => result.status === "rejected")) {
-          setRankError("일부 선수 통계를 불러오지 못했습니다.");
-        }
-      } catch (error) {
-        if (isStillCurrent) {
-          setRankRows([]);
-          setRankError(error instanceof Error ? error.message : "선수 통계를 불러오지 못했습니다.");
-        }
-      } finally {
-        if (isStillCurrent) {
-          setIsLoadingRanks(false);
-        }
-      }
-    }
 
     return () => {
       isCurrent = false;
@@ -257,7 +228,7 @@ export function TeamDetailPage({ season }: { season: number }) {
       />
       <TeamFixturePanel fixturePage={fixturePage} fixturesState={fixturesState} setFixturePage={setFixturePage} />
       <TeamPlayersPanel playersState={playersState} />
-      <TeamPlayerRanksPanel error={rankError} isLoading={isLoadingRanks} rows={rankRows} />
+      <TeamPlayerRanksPanel rankState={rankState} />
     </section>
   );
 }
@@ -437,25 +408,20 @@ function TeamPlayersPanel({ playersState }: { playersState: LoadState<PlayerSumm
   );
 }
 
-function TeamPlayerRanksPanel({
-  rows,
-  isLoading,
-  error,
-}: {
-  rows: PlayerRankRow[];
-  isLoading: boolean;
-  error: string;
-}) {
+function TeamPlayerRanksPanel({ rankState }: { rankState: LoadState<TeamPlayerRanking[]> }) {
+  const rows = rankState.data ?? [];
+  const isLoading = rankState.isLoading;
+  const error = rankState.error;
   const rankGroups = [
-    { label: "득점 순위", icon: Goal, rows: topRank(rows, "goals"), value: (row: PlayerRankRow) => `${row.goals}골` },
-    { label: "도움 순위", icon: Star, rows: topRank(rows, "assists"), value: (row: PlayerRankRow) => `${row.assists}도움` },
-    { label: "평점 순위", icon: Star, rows: topRank(rows, "rating"), value: (row: PlayerRankRow) => ratingText(row.rating) },
-    { label: "출전 시간 순위", icon: Clock, rows: topRank(rows, "minutes"), value: (row: PlayerRankRow) => `${row.minutes}분` },
+    { label: "득점 순위", icon: Goal, rows: topRank(rows, "goals"), value: (row: TeamPlayerRanking) => `${row.goals}골` },
+    { label: "도움 순위", icon: Star, rows: topRank(rows, "assists"), value: (row: TeamPlayerRanking) => `${row.assists}도움` },
+    { label: "평점 순위", icon: Star, rows: topRank(rows, "rating"), value: (row: TeamPlayerRanking) => ratingText(row.rating) },
+    { label: "출전 시간 순위", icon: Clock, rows: topRank(rows, "minutes"), value: (row: TeamPlayerRanking) => `${row.minutes}분` },
   ] satisfies Array<{
     label: string;
     icon: LucideIcon;
-    rows: PlayerRankRow[];
-    value: (row: PlayerRankRow) => string;
+    rows: TeamPlayerRanking[];
+    value: (row: TeamPlayerRanking) => string;
   }>;
 
   return (
@@ -465,8 +431,8 @@ function TeamPlayerRanksPanel({
         <h2>선수 통계</h2>
       </div>
       {isLoading ? <div className="empty-state">선수 통계를 불러오는 중입니다.</div> : null}
-      {error ? <div className="section-error">{error}</div> : null}
-      {!isLoading && rows.length ? (
+      {rankState.error ? <div className="section-error">{rankState.error}</div> : null}
+      {!rankState.isLoading && !rankState.error && rows.length ? (
         <div className="team-rank-grid">
           {rankGroups.map((group) => (
             <section className="team-rank-card" key={group.label}>
@@ -490,35 +456,7 @@ function TeamPlayerRanksPanel({
   );
 }
 
-function toRankRow(player: PlayerSummary, panel: PlayerPanel, teamId: number, season: number): PlayerRankRow {
-  const teamStats = panel.seasons
-    ?.filter((seasonSummary) => seasonSummary.season === season)
-    .flatMap((season) => season.teams ?? [])
-    .find((team) => team.teamId === teamId);
-
-  return {
-    ...toFallbackRankRow(player),
-    goals: teamStats?.goals ?? 0,
-    assists: teamStats?.assists ?? 0,
-    rating: teamStats?.averageRating ?? 0,
-    minutes: teamStats?.minutesPlayed ?? 0,
-  };
-}
-
-function toFallbackRankRow(player: PlayerSummary): PlayerRankRow {
-  return {
-    playerId: player.playerId,
-    playerName: player.playerName,
-    photoUrl: player.photoUrl,
-    position: player.position,
-    goals: 0,
-    assists: 0,
-    rating: 0,
-    minutes: 0,
-  };
-}
-
-function topRank(rows: PlayerRankRow[], field: "goals" | "assists" | "rating" | "minutes") {
+function topRank(rows: TeamPlayerRanking[], field: "goals" | "assists" | "rating" | "minutes") {
   return rows
     .slice()
     .sort((a, b) => b[field] - a[field] || (a.playerName ?? "").localeCompare(b.playerName ?? ""))
@@ -586,7 +524,7 @@ function parseFixtureDate(value: string | null) {
   if (!value) {
     return null;
   }
-  const text = /Z$|[+-]\d\d:\d\d$/.test(value) ? value : `${value}Z`;
+  const text = /Z$|[+-]\d\d:\d\d$/.test(value) ? value : `${value}+09:00`;
   const date = new Date(text);
   return Number.isNaN(date.getTime()) ? null : date;
 }

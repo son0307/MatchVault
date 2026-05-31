@@ -510,7 +510,7 @@ function parseFixtureDate(value: string | null) {
   if (!value) {
     return null;
   }
-  const text = /Z$|[+-]\d\d:\d\d$/.test(value) ? value : `${value}Z`;
+  const text = /Z$|[+-]\d\d:\d\d$/.test(value) ? value : `${value}+09:00`;
   const date = new Date(text);
   return Number.isNaN(date.getTime()) ? null : date;
 }
