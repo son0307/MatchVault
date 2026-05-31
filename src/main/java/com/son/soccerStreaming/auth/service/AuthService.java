@@ -92,6 +92,9 @@ public class AuthService {
             HttpServletRequest servletRequest
     ) {
         Long userId = authenticatedUserId(userDetails);
+        if (request == null || isBlank(request.getNickname())) {
+            throw new CustomException(ErrorCode.INVALID_AUTH_REQUEST);
+        }
         validateNickname(request.getNickname());
         AppUser user = findUser(userId);
         user.updateNickname(request.getNickname().trim());
@@ -198,6 +201,9 @@ public class AuthService {
     }
 
     private void validatePassword(String password) {
+        if (isBlank(password)) {
+            throw new CustomException(ErrorCode.INVALID_AUTH_REQUEST);
+        }
         String trimmed = password.trim();
         if (trimmed.length() < PASSWORD_MIN_LENGTH || trimmed.length() > PASSWORD_MAX_LENGTH) {
             throw new CustomException(ErrorCode.INVALID_AUTH_REQUEST);
@@ -205,6 +211,9 @@ public class AuthService {
     }
 
     private void validateNickname(String nickname) {
+        if (isBlank(nickname)) {
+            throw new CustomException(ErrorCode.INVALID_AUTH_REQUEST);
+        }
         int length = nickname.trim().length();
         if (length < NICKNAME_MIN_LENGTH || length > NICKNAME_MAX_LENGTH) {
             throw new CustomException(ErrorCode.INVALID_AUTH_REQUEST);

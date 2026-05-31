@@ -150,7 +150,14 @@ export function LeagueHomePage({ authStatus, season }: { authStatus: AuthStatus;
               <h2>즐겨찾기</h2>
             </div>
           </div>
-          {favoritesError ? <div className="section-error">{favoritesError}</div> : null}
+          {favoritesError ? (
+            <div className="section-error inline-retry">
+              <span>{favoritesError}</span>
+              <button type="button" onClick={() => void loadFavorites()}>
+                다시 불러오기
+              </button>
+            </div>
+          ) : null}
           {isLoadingFavorites ? (
             <div className="empty-state">즐겨찾기를 확인하는 중입니다.</div>
           ) : favoritesNeedLogin ? (
@@ -274,7 +281,7 @@ function FavoritesPreview({ favorites }: { favorites: FavoriteDashboard | null }
         <h3>선수</h3>
         <div className="favorite-mini-list">
           {players.map((player) => (
-            <FavoritePlayerItem player={player} key={player.playerId} />
+            <FavoritePlayerItemV2 player={player} key={player.playerId} />
           ))}
         </div>
       </section>
@@ -324,6 +331,35 @@ function FavoritePlayerItem({ player }: { player: FavoritePlayerCard }) {
       <p className="favorite-line">
         시즌 {numberText(player.seasonStat?.goals)}골 {numberText(player.seasonStat?.assists)}도움 · 평점 {numberText(player.seasonStat?.rating)}
       </p>
+    </article>
+  );
+}
+
+function FavoritePlayerItemV2({ player }: { player: FavoritePlayerCard }) {
+  const seasonStat = player.seasonStat;
+
+  return (
+    <article className="favorite-mini-card">
+      <div className="favorite-mini-head">
+        {player.photoUrl ? (
+          <img src={player.photoUrl} alt="" className="player-thumb" />
+        ) : (
+          <span className="player-thumb placeholder" aria-hidden="true" />
+        )}
+        <div>
+          <strong>{player.playerName ?? "-"}</strong>
+          <p>{player.position ?? "Player"} · {seasonStat?.teamName ?? "-"}</p>
+        </div>
+      </div>
+      {seasonStat ? (
+        <>
+          <p className="favorite-line">
+            시즌 {numberText(seasonStat.goals)}골 {numberText(seasonStat.assists)}도움 · 평점 {numberText(seasonStat.rating)}
+          </p>
+        </>
+      ) : (
+        <p className="favorite-line muted">해당 선수는 이번 시즌에 EPL 기록이 없습니다.</p>
+      )}
     </article>
   );
 }

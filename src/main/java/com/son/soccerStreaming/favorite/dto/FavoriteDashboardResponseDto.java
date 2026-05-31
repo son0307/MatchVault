@@ -94,6 +94,8 @@ public class FavoriteDashboardResponseDto {
         private Integer season;
         private String teamName;
         private String teamLogoUrl;
+        private Integer teamCount;
+        private Boolean aggregated;
         private Integer appearances;
         private Integer minutes;
         private Double rating;

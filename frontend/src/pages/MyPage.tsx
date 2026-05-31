@@ -24,7 +24,7 @@ export function MyPage({ authState, season }: { authState: LeagueAuthState; seas
   const [favoritesError, setFavoritesError] = useState("");
   const [pendingFavoriteKey, setPendingFavoriteKey] = useState("");
 
-  const [nickname, setNickname] = useState(authState.currentUser?.nickname ?? "");
+  const [nickname, setNickname] = useState("");
   const [nicknameMessage, setNicknameMessage] = useState("");
   const [nicknameError, setNicknameError] = useState("");
   const [isSavingNickname, setIsSavingNickname] = useState(false);
@@ -40,11 +40,21 @@ export function MyPage({ authState, season }: { authState: LeagueAuthState; seas
   const [isDeletingAccount, setIsDeletingAccount] = useState(false);
 
   useEffect(() => {
+    if (authState.authStatus !== "authenticated") {
+      setNickname("");
+      setFavorites(null);
+      setFavoritesError("");
+      setIsLoadingFavorites(false);
+      return;
+    }
     setNickname(authState.currentUser?.nickname ?? "");
-  }, [authState.currentUser?.nickname]);
+  }, [authState.authStatus, authState.currentUser?.nickname]);
 
   useEffect(() => {
     if (authState.authStatus !== "authenticated") {
+      setFavorites(null);
+      setFavoritesError("");
+      setIsLoadingFavorites(false);
       return;
     }
     void loadFavorites();
@@ -265,7 +275,14 @@ export function MyPage({ authState, season }: { authState: LeagueAuthState; seas
             <h2>즐겨찾기 관리</h2>
           </div>
         </div>
-        {favoritesError ? <div className="section-error">{favoritesError}</div> : null}
+        {favoritesError ? (
+          <div className="section-error inline-retry">
+            <span>{favoritesError}</span>
+            <button type="button" onClick={() => void loadFavorites()}>
+              다시 불러오기
+            </button>
+          </div>
+        ) : null}
         {isLoadingFavorites ? (
           <div className="empty-state">즐겨찾기를 불러오는 중입니다.</div>
         ) : hasFavorites ? (
@@ -377,36 +394,59 @@ function FavoritePlayerManageList({
       {players.length ? (
         <div className="favorite-manage-list">
           {players.map((player) => (
-            <article className="favorite-manage-card" key={player.playerId}>
-              <div className="favorite-mini-head">
-                {player.photoUrl ? <img src={player.photoUrl} alt="" className="player-thumb" /> : <span className="player-thumb placeholder" />}
-                <div>
-                  <strong>{player.playerName ?? "-"}</strong>
-                  <p>{player.position ?? "Player"} · {player.seasonStat?.teamName ?? "-"}</p>
-                </div>
-              </div>
-              {player.seasonStat ? (
-                <p className="favorite-line">
-                  시즌 {numberText(player.seasonStat.goals)}골 {numberText(player.seasonStat.assists)}도움 · 평점 {numberText(player.seasonStat.rating)}
-                </p>
-              ) : (
-                <p className="favorite-line muted">해당 선수는 이번 시즌에 EPL 기록이 없습니다.</p>
-              )}
-              <button
-                className="favorite-remove-button"
-                disabled={pendingFavoriteKey === `player-${player.playerId}`}
-                onClick={() => onRemove(player.playerId)}
-                type="button"
-              >
-                삭제
-              </button>
-            </article>
+            <FavoritePlayerManageCard
+              key={player.playerId}
+              onRemove={onRemove}
+              pendingFavoriteKey={pendingFavoriteKey}
+              player={player}
+            />
           ))}
         </div>
       ) : (
         <div className="empty-state compact">즐겨찾기한 선수가 없습니다.</div>
       )}
     </section>
+  );
+}
+
+function FavoritePlayerManageCard({
+  player,
+  pendingFavoriteKey,
+  onRemove,
+}: {
+  player: FavoritePlayerCard;
+  pendingFavoriteKey: string;
+  onRemove: (playerId: number) => void;
+}) {
+  const seasonStat = player.seasonStat;
+
+  return (
+    <article className="favorite-manage-card">
+      <div className="favorite-mini-head">
+        {player.photoUrl ? <img src={player.photoUrl} alt="" className="player-thumb" /> : <span className="player-thumb placeholder" />}
+        <div>
+          <strong>{player.playerName ?? "-"}</strong>
+          <p>{player.position ?? "Player"} · {seasonStat?.teamName ?? "-"}</p>
+        </div>
+      </div>
+      {seasonStat ? (
+        <>
+          <p className="favorite-line">
+            시즌 {numberText(seasonStat.goals)}골 {numberText(seasonStat.assists)}도움 · 평점 {numberText(seasonStat.rating)}
+          </p>
+        </>
+      ) : (
+        <p className="favorite-line muted">해당 선수는 이번 시즌에 EPL 기록이 없습니다.</p>
+      )}
+      <button
+        className="favorite-remove-button"
+        disabled={pendingFavoriteKey === `player-${player.playerId}`}
+        onClick={() => onRemove(player.playerId)}
+        type="button"
+      >
+        삭제
+      </button>
+    </article>
   );
 }
 

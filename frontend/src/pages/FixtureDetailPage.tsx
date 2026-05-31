@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties, Dispatch, SetStateAction } from "react";
 import { Star } from "lucide-react";
 import { Link, useNavigate, useParams } from "react-router-dom";
@@ -72,6 +72,13 @@ export function FixtureDetailPage({ authStatus, season }: { authStatus: AuthStat
   const [favorites, setFavorites] = useState<FavoriteDashboard | null>(null);
   const [favoritesError, setFavoritesError] = useState("");
   const [pendingFavoriteKey, setPendingFavoriteKey] = useState("");
+  const favoritesLoadIdRef = useRef(0);
+  const favoriteMutationIdRef = useRef(0);
+  const currentSeasonRef = useRef(season);
+
+  useEffect(() => {
+    currentSeasonRef.current = season;
+  }, [season]);
 
   useEffect(() => {
     if (!Number.isFinite(numericFixtureId) || numericFixtureId <= 0) {
@@ -128,22 +135,23 @@ export function FixtureDetailPage({ authStatus, season }: { authStatus: AuthStat
       return;
     }
 
-    let isCurrent = true;
+    const requestId = favoritesLoadIdRef.current + 1;
+    favoritesLoadIdRef.current = requestId;
     fetchFavoriteDashboard(season)
       .then((data) => {
-        if (isCurrent) {
+        if (requestId === favoritesLoadIdRef.current) {
           setFavorites(data);
           setFavoritesError("");
         }
       })
       .catch((error) => {
-        if (isCurrent && !(error instanceof ApiError && error.status === 401)) {
+        if (requestId === favoritesLoadIdRef.current && !(error instanceof ApiError && error.status === 401)) {
           setFavoritesError(error instanceof Error ? error.message : "즐겨찾기 상태를 불러오지 못했습니다.");
         }
       });
 
     return () => {
-      isCurrent = false;
+      favoritesLoadIdRef.current += 1;
     };
   }, [authStatus, season]);
 
@@ -212,8 +220,14 @@ export function FixtureDetailPage({ authStatus, season }: { authStatus: AuthStat
       navigate("/login");
       return;
     }
+    if (pendingFavoriteKey) {
+      return;
+    }
 
     const key = `${target}-${id}`;
+    const requestId = favoriteMutationIdRef.current + 1;
+    const requestSeason = season;
+    favoriteMutationIdRef.current = requestId;
     setPendingFavoriteKey(key);
     setFavoritesError("");
     try {
@@ -224,11 +238,34 @@ export function FixtureDetailPage({ authStatus, season }: { authStatus: AuthStat
         : isFavorite
           ? await removeFavoritePlayer(id, season)
           : await addFavoritePlayer(id, season);
-      setFavorites(nextFavorites);
+      if (requestId === favoriteMutationIdRef.current && requestSeason === currentSeasonRef.current) {
+        setFavorites(nextFavorites);
+      }
     } catch (error) {
       setFavoritesError(error instanceof Error ? error.message : "즐겨찾기 변경에 실패했습니다.");
     } finally {
-      setPendingFavoriteKey("");
+      if (requestId === favoriteMutationIdRef.current) {
+        setPendingFavoriteKey("");
+      }
+    }
+  }
+
+  async function reloadFavorites() {
+    if (authStatus !== "authenticated") {
+      return;
+    }
+    const requestId = favoritesLoadIdRef.current + 1;
+    favoritesLoadIdRef.current = requestId;
+    setFavoritesError("");
+    try {
+      const nextFavorites = await fetchFavoriteDashboard(season);
+      if (requestId === favoritesLoadIdRef.current) {
+        setFavorites(nextFavorites);
+      }
+    } catch (error) {
+      if (requestId === favoritesLoadIdRef.current && !(error instanceof ApiError && error.status === 401)) {
+        setFavoritesError(error instanceof Error ? error.message : "즐겨찾기 상태를 불러오지 못했습니다.");
+      }
     }
   }
 
@@ -240,7 +277,14 @@ export function FixtureDetailPage({ authStatus, season }: { authStatus: AuthStat
         fixture={fixture}
         homeTeamId={homeTeamId}
       />
-      {favoritesError ? <div className="notice error">{favoritesError}</div> : null}
+      {favoritesError ? (
+        <div className="notice error inline-retry">
+          <span>{favoritesError}</span>
+          <button type="button" onClick={() => void reloadFavorites()}>
+            다시 불러오기
+          </button>
+        </div>
+      ) : null}
 
       <nav className="detail-tabs" aria-label="경기 상세 메뉴">
         {detailTabs.map((tab) => (

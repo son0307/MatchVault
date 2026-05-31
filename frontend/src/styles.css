@@ -452,6 +452,25 @@ h2 {
   color: #b71c1c;
 }
 
+.inline-retry {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.inline-retry button {
+  flex: 0 0 auto;
+  min-height: 32px;
+  border: 1px solid currentColor;
+  border-radius: 6px;
+  padding: 0 10px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font-weight: 900;
+}
+
 .summary-grid {
   display: grid;
   grid-template-columns: minmax(0, 1.25fr) minmax(320px, 0.75fr);
@@ -1788,6 +1807,12 @@ h2 {
   font-size: 0.78rem;
 }
 
+.player-stat-table th:last-child,
+.player-stat-table td:last-child {
+  width: 64px;
+  min-width: 64px;
+}
+
 .fixture-back-link {
   margin-top: 14px;
 }
@@ -1919,6 +1944,25 @@ h2 {
 
   .pitch-player strong {
     max-width: 56px;
+  }
+
+  .favorite-toggle-button {
+    width: 30px;
+    height: 30px;
+  }
+
+  .lineup-list-row {
+    grid-template-columns: 30px minmax(0, 1fr) minmax(42px, max-content) 30px;
+    gap: 7px;
+    padding: 8px 12px;
+  }
+
+  .lineup-list-row em {
+    font-size: 0.78rem;
+  }
+
+  .player-stat-table {
+    min-width: 760px;
   }
 
   .event-timeline-row {

@@ -67,6 +67,8 @@ class AuthServiceTest {
         when(appUserRepository.existsByEmail("user@example.com")).thenReturn(false);
         when(passwordEncoder.encode("password")).thenReturn("encoded-password");
         when(appUserRepository.saveAndFlush(any())).thenReturn(savedUser);
+        when(authenticationManager.authenticate(any()))
+                .thenReturn(new UsernamePasswordAuthenticationToken(new AuthUserDetails(savedUser), null));
 
         AuthResponseDto.Me response = authService.signup(request, servletRequest);
 

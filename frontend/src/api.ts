@@ -281,6 +281,8 @@ export type FavoritePlayerSeasonStat = {
   season: number | null;
   teamName: string | null;
   teamLogoUrl: string | null;
+  teamCount: number | null;
+  aggregated: boolean | null;
   appearances: number | null;
   minutes: number | null;
   rating: number | null;
@@ -307,7 +309,7 @@ export class ApiError extends Error {
 }
 
 export async function fetchHomeSummary(season: number): Promise<HomeSummary> {
-  const response = await fetch(`/api/v1/home/summary?season=${season}`, {
+  const response = await fetch(`/api/v1/home/summary?season=${normalizeSeason(season)}`, {
     headers: {
       Accept: "application/json",
     },
@@ -322,7 +324,7 @@ export async function fetchHomeSummary(season: number): Promise<HomeSummary> {
 }
 
 export async function fetchStandings(season: number): Promise<TeamStanding[]> {
-  const response = await fetch(`/api/v1/teams/standings?season=${season}`, {
+  const response = await fetch(`/api/v1/teams/standings?season=${normalizeSeason(season)}`, {
     headers: {
       Accept: "application/json",
     },
@@ -384,7 +386,7 @@ export async function fetchFixture(fixtureId: number): Promise<FixtureSummary> {
 }
 
 export async function fetchFixtureMeta(season: number): Promise<FixtureMeta> {
-  const response = await fetch(`/api/v1/fixtures/meta?season=${season}`, {
+  const response = await fetch(`/api/v1/fixtures/meta?season=${normalizeSeason(season)}`, {
     headers: {
       Accept: "application/json",
     },
@@ -523,7 +525,7 @@ export async function deleteAccount(currentPassword: string): Promise<void> {
 }
 
 export async function fetchFavoriteDashboard(season: number): Promise<FavoriteDashboard> {
-  const response = await fetch(`/api/v1/favorites/dashboard?season=${season}`, {
+  const response = await fetch(`/api/v1/favorites/dashboard?season=${normalizeSeason(season)}`, {
     headers: {
       Accept: "application/json",
     },
@@ -538,25 +540,29 @@ export async function fetchFavoriteDashboard(season: number): Promise<FavoriteDa
 }
 
 export async function addFavoriteTeam(teamId: number, season: number): Promise<FavoriteDashboard> {
-  return postJson(`/api/v1/favorites/teams/${teamId}?season=${season}`, {}) as Promise<FavoriteDashboard>;
+  return postJson(`/api/v1/favorites/teams/${teamId}?season=${normalizeSeason(season)}`, {}) as Promise<FavoriteDashboard>;
 }
 
 export async function removeFavoriteTeam(teamId: number, season: number): Promise<FavoriteDashboard> {
-  return deleteJson(`/api/v1/favorites/teams/${teamId}?season=${season}`) as Promise<FavoriteDashboard>;
+  return deleteJson(`/api/v1/favorites/teams/${teamId}?season=${normalizeSeason(season)}`) as Promise<FavoriteDashboard>;
 }
 
 export async function addFavoritePlayer(playerId: number, season: number): Promise<FavoriteDashboard> {
-  return postJson(`/api/v1/favorites/players/${playerId}?season=${season}`, {}) as Promise<FavoriteDashboard>;
+  return postJson(`/api/v1/favorites/players/${playerId}?season=${normalizeSeason(season)}`, {}) as Promise<FavoriteDashboard>;
 }
 
 export async function removeFavoritePlayer(playerId: number, season: number): Promise<FavoriteDashboard> {
-  return deleteJson(`/api/v1/favorites/players/${playerId}?season=${season}`) as Promise<FavoriteDashboard>;
+  return deleteJson(`/api/v1/favorites/players/${playerId}?season=${normalizeSeason(season)}`) as Promise<FavoriteDashboard>;
 }
 
 function appendParam(params: URLSearchParams, key: string, value: string | number | undefined) {
   if (value !== undefined && value !== null && value !== "") {
-    params.set(key, String(value));
+    params.set(key, String(key === "season" && typeof value === "number" ? normalizeSeason(value) : value));
   }
+}
+
+function normalizeSeason(value: number) {
+  return Number.isInteger(value) && value >= 2000 && value <= 2100 ? value : 2025;
 }
 
 async function postJson(url: string, body: unknown): Promise<unknown> {

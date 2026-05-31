@@ -207,6 +207,10 @@ public class FavoriteService {
         PlayerTeamSeasonStat primaryStat = stats.stream()
                 .max((left, right) -> Integer.compare(valueOf(left.getAppearances()), valueOf(right.getAppearances())))
                 .orElse(null);
+        long teamCount = stats.stream()
+                .map(stat -> stat.getTeam().getTeamId())
+                .distinct()
+                .count();
         int weightedRatingFixtures = stats.stream()
                 .filter(item -> item.getRating() != null && valueOf(item.getAppearances()) > 0)
                 .mapToInt(item -> valueOf(item.getAppearances()))
@@ -218,8 +222,10 @@ public class FavoriteService {
 
         return FavoriteDashboardResponseDto.PlayerSeasonStat.builder()
                 .season(season)
-                .teamName(primaryStat != null ? primaryStat.getTeam().getName() : null)
+                .teamName(teamDisplayName(primaryStat, teamCount))
                 .teamLogoUrl(primaryStat != null ? primaryStat.getTeam().getLogoUrl() : null)
+                .teamCount((int) teamCount)
+                .aggregated(teamCount > 1)
                 .appearances(stats.stream().mapToInt(item -> valueOf(item.getAppearances())).sum())
                 .minutes(stats.stream().mapToInt(item -> valueOf(item.getMinutes())).sum())
                 .rating(weightedRatingFixtures > 0 ? roundToOneDecimal(weightedRating / weightedRatingFixtures) : null)
@@ -228,6 +234,16 @@ public class FavoriteService {
                 .yellowCards(stats.stream().mapToInt(item -> valueOf(item.getYellowCards())).sum())
                 .redCards(stats.stream().mapToInt(item -> valueOf(item.getRedCards())).sum())
                 .build();
+    }
+
+    private String teamDisplayName(PlayerTeamSeasonStat primaryStat, long teamCount) {
+        if (primaryStat == null) {
+            return null;
+        }
+        if (teamCount <= 1) {
+            return primaryStat.getTeam().getName();
+        }
+        return primaryStat.getTeam().getName() + " 외 " + (teamCount - 1) + "팀";
     }
 
     private double roundToOneDecimal(double value) {
