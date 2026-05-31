@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
 import { KeyRound, Star, Trash2, UserRound } from "lucide-react";
 import type { LeagueAuthState } from "../App";
@@ -23,6 +23,7 @@ export function MyPage({ authState, season }: { authState: LeagueAuthState; seas
   const [isLoadingFavorites, setIsLoadingFavorites] = useState(false);
   const [favoritesError, setFavoritesError] = useState("");
   const [pendingFavoriteKey, setPendingFavoriteKey] = useState("");
+  const favoritesRequestIdRef = useRef(0);
 
   const [nickname, setNickname] = useState("");
   const [nicknameMessage, setNicknameMessage] = useState("");
@@ -52,6 +53,7 @@ export function MyPage({ authState, season }: { authState: LeagueAuthState; seas
 
   useEffect(() => {
     if (authState.authStatus !== "authenticated") {
+      favoritesRequestIdRef.current += 1;
       setFavorites(null);
       setFavoritesError("");
       setIsLoadingFavorites(false);
@@ -78,15 +80,25 @@ export function MyPage({ authState, season }: { authState: LeagueAuthState; seas
   }
 
   async function loadFavorites() {
+    const requestId = favoritesRequestIdRef.current + 1;
+    favoritesRequestIdRef.current = requestId;
     setIsLoadingFavorites(true);
     setFavoritesError("");
     try {
-      setFavorites(await fetchFavoriteDashboard(season));
+      const nextFavorites = await fetchFavoriteDashboard(season);
+      if (requestId === favoritesRequestIdRef.current) {
+        setFavorites(nextFavorites);
+      }
     } catch (error) {
+      if (requestId !== favoritesRequestIdRef.current) {
+        return;
+      }
       setFavorites(null);
       setFavoritesError(error instanceof Error ? error.message : "즐겨찾기를 불러오지 못했습니다.");
     } finally {
-      setIsLoadingFavorites(false);
+      if (requestId === favoritesRequestIdRef.current) {
+        setIsLoadingFavorites(false);
+      }
     }
   }
 
@@ -164,28 +176,54 @@ export function MyPage({ authState, season }: { authState: LeagueAuthState; seas
   }
 
   async function handleRemoveTeam(teamId: number) {
+    if (!Number.isFinite(teamId) || teamId <= 0) {
+      return;
+    }
     const key = `team-${teamId}`;
+    const requestId = favoritesRequestIdRef.current + 1;
+    favoritesRequestIdRef.current = requestId;
     setPendingFavoriteKey(key);
     setFavoritesError("");
     try {
-      setFavorites(await removeFavoriteTeam(teamId, season));
+      const nextFavorites = await removeFavoriteTeam(teamId, season);
+      if (requestId === favoritesRequestIdRef.current) {
+        setFavorites(nextFavorites);
+      }
     } catch (error) {
+      if (requestId !== favoritesRequestIdRef.current) {
+        return;
+      }
       setFavoritesError(error instanceof Error ? error.message : "팀 즐겨찾기 삭제에 실패했습니다.");
     } finally {
-      setPendingFavoriteKey("");
+      if (requestId === favoritesRequestIdRef.current) {
+        setPendingFavoriteKey("");
+      }
     }
   }
 
   async function handleRemovePlayer(playerId: number) {
+    if (!Number.isFinite(playerId) || playerId <= 0) {
+      return;
+    }
     const key = `player-${playerId}`;
+    const requestId = favoritesRequestIdRef.current + 1;
+    favoritesRequestIdRef.current = requestId;
     setPendingFavoriteKey(key);
     setFavoritesError("");
     try {
-      setFavorites(await removeFavoritePlayer(playerId, season));
+      const nextFavorites = await removeFavoritePlayer(playerId, season);
+      if (requestId === favoritesRequestIdRef.current) {
+        setFavorites(nextFavorites);
+      }
     } catch (error) {
+      if (requestId !== favoritesRequestIdRef.current) {
+        return;
+      }
       setFavoritesError(error instanceof Error ? error.message : "선수 즐겨찾기 삭제에 실패했습니다.");
     } finally {
-      setPendingFavoriteKey("");
+      if (requestId === favoritesRequestIdRef.current) {
+        setPendingFavoriteKey("");
+      }
     }
   }
 

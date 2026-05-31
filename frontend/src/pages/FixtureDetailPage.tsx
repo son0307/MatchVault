@@ -130,6 +130,7 @@ export function FixtureDetailPage({ authStatus, season }: { authStatus: AuthStat
 
   useEffect(() => {
     if (authStatus !== "authenticated") {
+      favoritesLoadIdRef.current += 1;
       setFavorites(null);
       setFavoritesError("");
       return;
@@ -208,14 +209,23 @@ export function FixtureDetailPage({ authStatus, season }: { authStatus: AuthStat
     ?? null;
 
   async function handleToggleTeam(teamId: number) {
+    if (!Number.isFinite(teamId) || teamId <= 0) {
+      return;
+    }
     await handleToggleFavorite("team", teamId, favoriteTeamIds.has(teamId));
   }
 
   async function handleTogglePlayer(playerId: number) {
+    if (!Number.isFinite(playerId) || playerId <= 0) {
+      return;
+    }
     await handleToggleFavorite("player", playerId, favoritePlayerIds.has(playerId));
   }
 
   async function handleToggleFavorite(target: FavoriteTarget, id: number, isFavorite: boolean) {
+    if (!Number.isFinite(id) || id <= 0) {
+      return;
+    }
     if (authStatus !== "authenticated") {
       navigate("/login");
       return;
@@ -242,6 +252,9 @@ export function FixtureDetailPage({ authStatus, season }: { authStatus: AuthStat
         setFavorites(nextFavorites);
       }
     } catch (error) {
+      if (requestId !== favoriteMutationIdRef.current) {
+        return;
+      }
       setFavoritesError(error instanceof Error ? error.message : "즐겨찾기 변경에 실패했습니다.");
     } finally {
       if (requestId === favoriteMutationIdRef.current) {

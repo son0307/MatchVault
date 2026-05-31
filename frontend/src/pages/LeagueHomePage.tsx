@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { CalendarDays, ChevronLeft, ChevronRight, Star, Trophy } from "lucide-react";
 import { Link } from "react-router-dom";
 import type { AuthStatus } from "../App";
@@ -26,6 +26,9 @@ export function LeagueHomePage({ authStatus, season }: { authStatus: AuthStatus;
   const [standingsError, setStandingsError] = useState("");
   const [fixturesError, setFixturesError] = useState("");
   const [favoritesError, setFavoritesError] = useState("");
+  const standingsRequestIdRef = useRef(0);
+  const fixturesRequestIdRef = useRef(0);
+  const favoritesRequestIdRef = useRef(0);
 
   const rankingRows = useMemo(
     () =>
@@ -42,12 +45,14 @@ export function LeagueHomePage({ authStatus, season }: { authStatus: AuthStatus;
 
   useEffect(() => {
     if (authStatus === "checking") {
+      favoritesRequestIdRef.current += 1;
       setIsLoadingFavorites(true);
       setFavoritesError("");
       return;
     }
 
     if (authStatus === "guest") {
+      favoritesRequestIdRef.current += 1;
       setFavorites(null);
       setFavoritesNeedLogin(true);
       setFavoritesError("");
@@ -63,39 +68,66 @@ export function LeagueHomePage({ authStatus, season }: { authStatus: AuthStatus;
   }, [selectedDate, season]);
 
   async function loadStandings() {
+    const requestId = standingsRequestIdRef.current + 1;
+    standingsRequestIdRef.current = requestId;
     setIsLoadingStandings(true);
     setStandingsError("");
     try {
-      setStandings(await fetchStandings(season));
+      const nextStandings = await fetchStandings(season);
+      if (requestId === standingsRequestIdRef.current) {
+        setStandings(nextStandings);
+      }
     } catch (error) {
+      if (requestId !== standingsRequestIdRef.current) {
+        return;
+      }
       setStandings([]);
       setStandingsError(error instanceof Error ? error.message : "팀 랭킹을 불러오지 못했습니다.");
     } finally {
-      setIsLoadingStandings(false);
+      if (requestId === standingsRequestIdRef.current) {
+        setIsLoadingStandings(false);
+      }
     }
   }
 
   async function loadFixtures(dateKey: string) {
+    const requestId = fixturesRequestIdRef.current + 1;
+    fixturesRequestIdRef.current = requestId;
     setIsLoadingFixtures(true);
     setFixturesError("");
     try {
       const response = await fetchFixturesByDate(season, dateKey);
-      setFixtures(response.content ?? []);
+      if (requestId === fixturesRequestIdRef.current) {
+        setFixtures(response.content ?? []);
+      }
     } catch (error) {
+      if (requestId !== fixturesRequestIdRef.current) {
+        return;
+      }
       setFixtures([]);
       setFixturesError(error instanceof Error ? error.message : "경기 일정을 불러오지 못했습니다.");
     } finally {
-      setIsLoadingFixtures(false);
+      if (requestId === fixturesRequestIdRef.current) {
+        setIsLoadingFixtures(false);
+      }
     }
   }
 
   async function loadFavorites() {
+    const requestId = favoritesRequestIdRef.current + 1;
+    favoritesRequestIdRef.current = requestId;
     setIsLoadingFavorites(true);
     setFavoritesError("");
     setFavoritesNeedLogin(false);
     try {
-      setFavorites(await fetchFavoriteDashboard(season));
+      const nextFavorites = await fetchFavoriteDashboard(season);
+      if (requestId === favoritesRequestIdRef.current) {
+        setFavorites(nextFavorites);
+      }
     } catch (error) {
+      if (requestId !== favoritesRequestIdRef.current) {
+        return;
+      }
       setFavorites(null);
       if (error instanceof ApiError && error.status === 401) {
         setFavoritesNeedLogin(true);
@@ -103,7 +135,9 @@ export function LeagueHomePage({ authStatus, season }: { authStatus: AuthStatus;
         setFavoritesError(error instanceof Error ? error.message : "즐겨찾기를 불러오지 못했습니다.");
       }
     } finally {
-      setIsLoadingFavorites(false);
+      if (requestId === favoritesRequestIdRef.current) {
+        setIsLoadingFavorites(false);
+      }
     }
   }
 
