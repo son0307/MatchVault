@@ -65,6 +65,8 @@ public class HomeService {
                 .fixtureId(fixture.getFixtureId())
                 .fixtureDate(fixture.getFixtureDate())
                 .round(fixture.getRound())
+                .homeTeamId(fixture.getHomeTeam().getTeamId())
+                .awayTeamId(fixture.getAwayTeam().getTeamId())
                 .homeTeamName(fixture.getHomeTeam().getName())
                 .awayTeamName(fixture.getAwayTeam().getName())
                 .homeScore(valueOf(fixture.getHomeScore()))

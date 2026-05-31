@@ -126,7 +126,7 @@ export function FixtureDetailPage() {
 
   return (
     <section className="league-content fixture-detail-page">
-      <FixtureDetailHero fixture={fixture} />
+      <FixtureDetailHero fixture={fixture} lineups={lineupsState.data} />
 
       <nav className="detail-tabs" aria-label="경기 상세 메뉴">
         {detailTabs.map((tab) => (
@@ -172,12 +172,27 @@ async function loadSection<T>(
   }
 }
 
-function FixtureDetailHero({ fixture }: { fixture: FixtureSummary }) {
+function FixtureDetailHero({
+  fixture,
+  lineups,
+}: {
+  fixture: FixtureSummary;
+  lineups: FixtureLineupResponse | null;
+}) {
+  const homeTeamId = fixture.homeTeamId ?? lineups?.homeTeam?.teamId ?? null;
+  const awayTeamId = fixture.awayTeamId ?? lineups?.awayTeam?.teamId ?? null;
+
   return (
     <article className="panel fixture-detail-hero">
       <div className="detail-team home">
         {fixture.homeTeamLogoUrl ? <img src={fixture.homeTeamLogoUrl} alt="" className="team-logo large" /> : null}
-        <strong>{fixture.homeTeamName ?? "-"}</strong>
+        {homeTeamId ? (
+          <Link className="team-name-link" to={`/teams/${homeTeamId}`}>
+            {fixture.homeTeamName ?? "-"}
+          </Link>
+        ) : (
+          <strong>{fixture.homeTeamName ?? "-"}</strong>
+        )}
       </div>
       <div className="detail-scoreboard">
         <p>
@@ -189,7 +204,13 @@ function FixtureDetailHero({ fixture }: { fixture: FixtureSummary }) {
       </div>
       <div className="detail-team away">
         {fixture.awayTeamLogoUrl ? <img src={fixture.awayTeamLogoUrl} alt="" className="team-logo large" /> : null}
-        <strong>{fixture.awayTeamName ?? "-"}</strong>
+        {awayTeamId ? (
+          <Link className="team-name-link" to={`/teams/${awayTeamId}`}>
+            {fixture.awayTeamName ?? "-"}
+          </Link>
+        ) : (
+          <strong>{fixture.awayTeamName ?? "-"}</strong>
+        )}
       </div>
     </article>
   );
@@ -248,10 +269,10 @@ function eventMarkup(event: FixtureEvent) {
   if (isSubstitution) {
     return (
       <p>
-        <span className="event-out">OUT</span> {event.player?.name ?? "-"}
+        <span className="event-out">OUT</span> <EventPlayerLink player={event.player} />
         {event.assist?.name ? (
           <>
-            <span className="event-in">IN</span> {event.assist.name}
+            <span className="event-in">IN</span> <EventPlayerLink player={event.assist} />
           </>
         ) : null}
       </p>
@@ -261,11 +282,27 @@ function eventMarkup(event: FixtureEvent) {
   return (
     <>
       <p>
-        {event.player?.name ?? "-"}
+        <EventPlayerLink player={event.player} />
         {event.detail ? <span className="muted"> · {event.detail}</span> : null}
       </p>
-      {isGoal && event.assist?.name ? <p className="muted">도움: {event.assist.name}</p> : null}
+      {isGoal && event.assist?.name ? (
+        <p className="muted">
+          도움: <EventPlayerLink player={event.assist} />
+        </p>
+      ) : null}
     </>
+  );
+}
+
+function EventPlayerLink({ player }: { player: { id: number; name: string | null } | null }) {
+  if (!player?.id) {
+    return <>{player?.name ?? "-"}</>;
+  }
+
+  return (
+    <Link className="event-player-link" to={`/players/${player.id}`}>
+      {player.name ?? "-"}
+    </Link>
   );
 }
 
@@ -342,10 +379,15 @@ function PitchPlayer({ player }: { player: PositionedPlayer }) {
   } as CSSProperties;
 
   return (
-    <div className="pitch-player" style={style} title={player.player.playerName ?? undefined}>
+    <Link
+      className="pitch-player player-name-link"
+      style={style}
+      title={player.player.playerName ?? undefined}
+      to={`/players/${player.player.playerId}`}
+    >
       <span>{player.player.backNumber ?? "-"}</span>
       <strong>{shortName(player.player.playerName)}</strong>
-    </div>
+    </Link>
   );
 }
 
@@ -384,7 +426,9 @@ function LineupList({ title, players }: { title: string; players: FixtureLineupP
           sortedPlayers.map((player) => (
             <div className="lineup-list-row" key={`${title}-${player.playerId}`}>
               <span>{player.backNumber ?? "-"}</span>
-              <strong>{player.playerName ?? "-"}</strong>
+              <Link className="lineup-player-link" to={`/players/${player.playerId}`}>
+                {player.playerName ?? "-"}
+              </Link>
               <em>{player.position ?? "-"}</em>
             </div>
           ))
@@ -405,7 +449,9 @@ function AbsenceList({ team }: { team: FixtureTeamLineup }) {
           team.absences.map((absence) => (
             <div className="lineup-list-row" key={`absence-${absence.playerId}`}>
               <span>-</span>
-              <strong>{absence.playerName ?? "-"}</strong>
+              <Link className="lineup-player-link" to={`/players/${absence.playerId}`}>
+                {absence.playerName ?? "-"}
+              </Link>
               <em>{absence.reason ?? absence.absenceType ?? "-"}</em>
             </div>
           ))
@@ -566,10 +612,10 @@ function PlayerStatRow({ player }: { player: FixturePlayerStat }) {
   return (
     <tr>
       <td>
-        <strong>
+        <Link className="player-stat-link" to={`/players/${player.playerId}`}>
           {player.jerseyNumber ? `${player.jerseyNumber}. ` : ""}
           {player.playerName ?? "-"}
-        </strong>
+        </Link>
       </td>
       <td>{player.position ?? "-"}</td>
       <td>{numberText(player.minutesPlayed)}</td>

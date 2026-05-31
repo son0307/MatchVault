@@ -14,9 +14,7 @@ import {
   type TeamStanding,
 } from "../api";
 
-const DEFAULT_SEASON = 2025;
-
-export function LeagueHomePage({ authStatus }: { authStatus: AuthStatus }) {
+export function LeagueHomePage({ authStatus, season }: { authStatus: AuthStatus; season: number }) {
   const [selectedDate, setSelectedDate] = useState(todayKoreaDateKey());
   const [standings, setStandings] = useState<TeamStanding[]>([]);
   const [fixtures, setFixtures] = useState<FixtureSummary[]>([]);
@@ -40,7 +38,7 @@ export function LeagueHomePage({ authStatus }: { authStatus: AuthStatus }) {
 
   useEffect(() => {
     void loadStandings();
-  }, []);
+  }, [season]);
 
   useEffect(() => {
     if (authStatus === "checking") {
@@ -58,17 +56,17 @@ export function LeagueHomePage({ authStatus }: { authStatus: AuthStatus }) {
     }
 
     void loadFavorites();
-  }, [authStatus]);
+  }, [authStatus, season]);
 
   useEffect(() => {
     void loadFixtures(selectedDate);
-  }, [selectedDate]);
+  }, [selectedDate, season]);
 
   async function loadStandings() {
     setIsLoadingStandings(true);
     setStandingsError("");
     try {
-      setStandings(await fetchStandings(DEFAULT_SEASON));
+      setStandings(await fetchStandings(season));
     } catch (error) {
       setStandings([]);
       setStandingsError(error instanceof Error ? error.message : "팀 랭킹을 불러오지 못했습니다.");
@@ -81,7 +79,7 @@ export function LeagueHomePage({ authStatus }: { authStatus: AuthStatus }) {
     setIsLoadingFixtures(true);
     setFixturesError("");
     try {
-      const response = await fetchFixturesByDate(DEFAULT_SEASON, dateKey);
+      const response = await fetchFixturesByDate(season, dateKey);
       setFixtures(response.content ?? []);
     } catch (error) {
       setFixtures([]);
@@ -96,7 +94,7 @@ export function LeagueHomePage({ authStatus }: { authStatus: AuthStatus }) {
     setFavoritesError("");
     setFavoritesNeedLogin(false);
     try {
-      setFavorites(await fetchFavoriteDashboard(DEFAULT_SEASON));
+      setFavorites(await fetchFavoriteDashboard(season));
     } catch (error) {
       setFavorites(null);
       if (error instanceof ApiError && error.status === 401) {
@@ -198,7 +196,13 @@ function CompactRanking({ standings }: { standings: TeamStanding[] }) {
           ) : (
             <span className="team-logo placeholder" aria-hidden="true" />
           )}
-          <strong>{standing.team?.name ?? "-"}</strong>
+          {standing.team?.id ? (
+            <Link className="team-name-link" to={`/teams/${standing.team.id}`}>
+              {standing.team.name ?? "-"}
+            </Link>
+          ) : (
+            <strong>{standing.team?.name ?? "-"}</strong>
+          )}
           <b>{standing.points ?? 0}</b>
         </div>
       ))}
@@ -282,7 +286,9 @@ function FavoriteTeamItem({ team }: { team: FavoriteTeamCard }) {
           <span className="team-logo placeholder" aria-hidden="true" />
         )}
         <div>
-          <strong>{team.teamName ?? "-"}</strong>
+          <Link className="team-name-link" to={`/teams/${team.teamId}`}>
+            {team.teamName ?? "-"}
+          </Link>
           <p>{numberText(team.rank)}위 · {numberText(team.points)}점 · 최근 {team.form ?? "-"}</p>
         </div>
       </div>
@@ -307,7 +313,9 @@ function FavoritePlayerItem({ player }: { player: FavoritePlayerCard }) {
           <span className="player-thumb placeholder" aria-hidden="true" />
         )}
         <div>
-          <strong>{player.playerName ?? "-"}</strong>
+          <Link className="favorite-player-link" to={`/players/${player.playerId}`}>
+            {player.playerName ?? "-"}
+          </Link>
           <p>{player.position ?? "Player"} · {player.seasonStat?.teamName ?? "-"}</p>
         </div>
       </div>

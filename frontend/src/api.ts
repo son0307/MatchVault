@@ -2,6 +2,8 @@ export type FixtureSummary = {
   fixtureId: number;
   fixtureDate: string | null;
   round: number | null;
+  homeTeamId: number | null;
+  awayTeamId: number | null;
   homeTeamName: string | null;
   awayTeamName: string | null;
   homeTeamLogoUrl: string | null;
@@ -160,6 +162,30 @@ export type TeamSummary = {
   logoUrl: string | null;
 };
 
+export type TeamDetails = TeamSummary & {
+  country: string | null;
+  founded: number | null;
+  venue: TeamVenue | null;
+};
+
+export type TeamVenue = {
+  venueId: number | null;
+  venueName: string | null;
+  venueAddress: string | null;
+  venueCity: string | null;
+  capacity: number | null;
+  surface: string | null;
+  venueImageUrl: string | null;
+};
+
+export type PlayerSummary = {
+  playerId: number;
+  playerName: string | null;
+  backNumber: number | null;
+  position: string | null;
+  photoUrl: string | null;
+};
+
 export type FixtureQuery = {
   season?: number;
   round?: number;
@@ -286,6 +312,86 @@ export type FavoritePlayerSeasonStat = {
   assists: number | null;
   yellowCards: number | null;
   redCards: number | null;
+};
+
+export type PlayerPanel = {
+  profile: PlayerProfile | null;
+  seasons: PlayerSeasonSummary[];
+  matches: PlayerMatchStat[];
+};
+
+export type PlayerProfile = {
+  playerId: number;
+  playerName: string | null;
+  firstname: string | null;
+  lastname: string | null;
+  backNumber: number | null;
+  age: number | null;
+  birthDate: string | null;
+  birthPlace: string | null;
+  birthCountry: string | null;
+  nationality: string | null;
+  height: string | null;
+  weight: string | null;
+  position: string | null;
+  photoUrl: string | null;
+  teamId: number | null;
+  teamName: string | null;
+  teamLogoUrl: string | null;
+};
+
+export type PlayerSeasonSummary = {
+  season: number | null;
+  totalFixtures: number;
+  minutesPlayed: number;
+  averageRating: number;
+  goals: number;
+  assists: number;
+  shots: number;
+  shotsOnTarget: number;
+  keyPasses: number;
+  yellowCards: number;
+  redCards: number;
+  teams: PlayerTeamSeasonSummary[];
+};
+
+export type PlayerTeamSeasonSummary = {
+  teamId: number;
+  teamName: string | null;
+  teamLogoUrl: string | null;
+  totalFixtures: number;
+  minutesPlayed: number;
+  averageRating: number;
+  goals: number;
+  assists: number;
+  shots: number;
+  shotsOnTarget: number;
+  keyPasses: number;
+  yellowCards: number;
+  redCards: number;
+};
+
+export type PlayerMatchStat = {
+  fixtureId: number;
+  fixtureDate: string | null;
+  season: number | null;
+  round: number | null;
+  teamId: number | null;
+  teamName: string | null;
+  opponentTeamId: number | null;
+  opponentTeamName: string | null;
+  teamScore: number | null;
+  opponentScore: number | null;
+  homeTeamId: number | null;
+  homeTeamName: string | null;
+  awayTeamId: number | null;
+  awayTeamName: string | null;
+  homeScore: number | null;
+  awayScore: number | null;
+  minutesPlayed: number | null;
+  rating: number | null;
+  goals: number | null;
+  assists: number | null;
 };
 
 export type CurrentUser = {
@@ -471,6 +577,36 @@ export async function fetchTeams(): Promise<TeamSummary[]> {
   return response.json();
 }
 
+export async function fetchTeamDetails(teamId: number): Promise<TeamDetails> {
+  const response = await fetch(`/api/v1/teams/${teamId}`, {
+    headers: {
+      Accept: "application/json",
+    },
+    credentials: "same-origin",
+  });
+
+  if (!response.ok) {
+    throw new ApiError(`팀 정보를 불러오지 못했습니다. (${response.status})`, response.status);
+  }
+
+  return response.json();
+}
+
+export async function fetchTeamPlayers(teamId: number, season: number): Promise<PlayerSummary[]> {
+  const response = await fetch(`/api/v1/teams/${teamId}/players?season=${season}`, {
+    headers: {
+      Accept: "application/json",
+    },
+    credentials: "same-origin",
+  });
+
+  if (!response.ok) {
+    throw new ApiError(`팀 선수 목록을 불러오지 못했습니다. (${response.status})`, response.status);
+  }
+
+  return response.json();
+}
+
 export async function login(email: string, password: string): Promise<CurrentUser> {
   return parseCurrentUser(await postJson("/api/v1/auth/login", { email, password }));
 }
@@ -518,6 +654,53 @@ export async function fetchFavoriteDashboard(season: number): Promise<FavoriteDa
 
   if (!response.ok) {
     throw new ApiError(`즐겨찾기를 불러오지 못했습니다. (${response.status})`, response.status);
+  }
+
+  return response.json();
+}
+
+export async function addFavoriteTeam(teamId: number, season: number): Promise<FavoriteDashboard> {
+  return requestFavoriteDashboard(`/api/v1/favorites/teams/${teamId}?season=${season}`, "POST");
+}
+
+export async function removeFavoriteTeam(teamId: number, season: number): Promise<FavoriteDashboard> {
+  return requestFavoriteDashboard(`/api/v1/favorites/teams/${teamId}?season=${season}`, "DELETE");
+}
+
+export async function addFavoritePlayer(playerId: number, season: number): Promise<FavoriteDashboard> {
+  return requestFavoriteDashboard(`/api/v1/favorites/players/${playerId}?season=${season}`, "POST");
+}
+
+export async function removeFavoritePlayer(playerId: number, season: number): Promise<FavoriteDashboard> {
+  return requestFavoriteDashboard(`/api/v1/favorites/players/${playerId}?season=${season}`, "DELETE");
+}
+
+export async function fetchPlayerPanel(playerId: number): Promise<PlayerPanel> {
+  const response = await fetch(`/api/v1/players/${playerId}/panel`, {
+    headers: {
+      Accept: "application/json",
+    },
+    credentials: "same-origin",
+  });
+
+  if (!response.ok) {
+    throw new ApiError(`선수 정보를 불러오지 못했습니다. (${response.status})`, response.status);
+  }
+
+  return response.json();
+}
+
+async function requestFavoriteDashboard(url: string, method: "POST" | "DELETE"): Promise<FavoriteDashboard> {
+  const response = await fetch(url, {
+    method,
+    headers: {
+      Accept: "application/json",
+    },
+    credentials: "same-origin",
+  });
+
+  if (!response.ok) {
+    throw await responseError(response, `즐겨찾기 요청에 실패했습니다. (${response.status})`);
   }
 
   return response.json();

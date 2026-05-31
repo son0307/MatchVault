@@ -12,7 +12,9 @@ public interface PlayerFixtureStatRepository extends JpaRepository<PlayerFixture
 
     List<PlayerFixtureStat> findAllByFixtureFixtureId(Long fixtureId);
 
-    List<PlayerFixtureStat> findAllByPlayerPlayerIdOrderByFixtureFixtureDateDesc(Long playerId);
+    List<PlayerFixtureStat> findAllByPlayerPlayerIdOrderByFixtureFixtureDateDescFixtureFixtureIdDesc(Long playerId);
+
+    Optional<PlayerFixtureStat> findTopByPlayerPlayerIdOrderByFixtureFixtureDateDescFixtureFixtureIdDesc(Long playerId);
 
     List<PlayerFixtureStat> findTop5ByPlayerPlayerIdOrderByFixtureFixtureDateDesc(Long playerId);
 
@@ -23,10 +25,17 @@ public interface PlayerFixtureStatRepository extends JpaRepository<PlayerFixture
             "WHERE s.player.playerId IN :playerIds " +
             "AND s.fixture.season = :season " +
             "AND s.fixture.fixtureDate = (" +
-            "    SELECT MAX(latest.fixture.fixtureDate) " +
-            "    FROM PlayerFixtureStat latest " +
-            "    WHERE latest.player.playerId = s.player.playerId " +
-            "    AND latest.fixture.season = :season" +
+            "    SELECT MAX(latestDate.fixture.fixtureDate) " +
+            "    FROM PlayerFixtureStat latestDate " +
+            "    WHERE latestDate.player.playerId = s.player.playerId " +
+            "    AND latestDate.fixture.season = :season" +
+            ") " +
+            "AND s.fixture.fixtureId = (" +
+            "    SELECT MAX(latestFixture.fixture.fixtureId) " +
+            "    FROM PlayerFixtureStat latestFixture " +
+            "    WHERE latestFixture.player.playerId = s.player.playerId " +
+            "    AND latestFixture.fixture.season = :season " +
+            "    AND latestFixture.fixture.fixtureDate = s.fixture.fixtureDate" +
             ")")
     List<LatestPlayerTeam> findLatestTeamsByPlayerIdsAndSeason(
             @Param("playerIds") List<Long> playerIds,

@@ -75,7 +75,7 @@ class PlayerServiceTest {
                 .build();
 
         when(playerRepository.findByPlayerId(1165L)).thenReturn(Optional.of(player));
-        when(playerFixtureStatRepository.findAllByPlayerPlayerIdOrderByFixtureFixtureDateDesc(1165L))
+        when(playerFixtureStatRepository.findAllByPlayerPlayerIdOrderByFixtureFixtureDateDescFixtureFixtureIdDesc(1165L))
                 .thenReturn(List.of(unitedMatch, wolvesMatch));
         when(playerTeamSeasonStatRepository.findAllByPlayerPlayerIdOrderBySeasonDesc(1165L))
                 .thenReturn(List.of(currentUnitedStat, pollutedUnitedStat, wolvesStat));
@@ -91,6 +91,57 @@ class PlayerServiceTest {
         assertThat(season2024.getTotalFixtures()).isEqualTo(33);
         assertThat(season2024.getMinutesPlayed()).isEqualTo(2603);
         assertThat(season2024.getGoals()).isEqualTo(15);
+    }
+
+    @Test
+    void getPlayerPanelUsesLatestMatchTeamForProfile() {
+        Player player = Player.builder()
+                .playerId(47L)
+                .name("Brennan Johnson")
+                .build();
+        Team tottenham = Team.builder()
+                .id(1L)
+                .teamId(47L)
+                .name("Tottenham")
+                .logoUrl("tottenham.png")
+                .build();
+        Team crystalPalace = Team.builder()
+                .id(2L)
+                .teamId(52L)
+                .name("Crystal Palace")
+                .logoUrl("palace.png")
+                .build();
+        Team arsenal = Team.builder()
+                .id(3L)
+                .teamId(42L)
+                .name("Arsenal")
+                .build();
+
+        PlayerFixtureStat latestPalaceMatch = PlayerFixtureStat.builder()
+                .player(player)
+                .team(crystalPalace)
+                .fixture(fixture(200L, 2025, crystalPalace, arsenal))
+                .build();
+        PlayerFixtureStat olderTottenhamMatch = PlayerFixtureStat.builder()
+                .player(player)
+                .team(tottenham)
+                .fixture(fixture(199L, 2025, tottenham, arsenal))
+                .build();
+
+        when(playerRepository.findByPlayerId(47L)).thenReturn(Optional.of(player));
+        when(playerFixtureStatRepository.findAllByPlayerPlayerIdOrderByFixtureFixtureDateDescFixtureFixtureIdDesc(47L))
+                .thenReturn(List.of(latestPalaceMatch, olderTottenhamMatch));
+        when(playerTeamSeasonStatRepository.findAllByPlayerPlayerIdOrderBySeasonDesc(47L))
+                .thenReturn(List.of(
+                        seasonStat(player, tottenham, 2025, 5, 320, 1),
+                        seasonStat(player, crystalPalace, 2025, 7, 510, 3)
+                ));
+
+        PlayerResponseDto.Panel panel = playerService.getPlayerPanel(47L);
+
+        assertThat(panel.getProfile().getTeamId()).isEqualTo(52L);
+        assertThat(panel.getProfile().getTeamName()).isEqualTo("Crystal Palace");
+        assertThat(panel.getProfile().getTeamLogoUrl()).isEqualTo("palace.png");
     }
 
     private PlayerTeamSeasonStat seasonStat(Player player, Team team, Integer season,

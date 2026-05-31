@@ -35,11 +35,15 @@ public class PlayerService {
     public PlayerResponseDto.Details getPlayerDetails(Long playerId) {
         Player player = playerRepository.findByPlayerId(playerId)
                 .orElseThrow(() -> new CustomException(ErrorCode.PLAYER_NOT_FOUND));
+        Team latestTeam = playerFixtureStatRepository
+                .findTopByPlayerPlayerIdOrderByFixtureFixtureDateDescFixtureFixtureIdDesc(playerId)
+                .map(PlayerFixtureStat::getTeam)
+                .orElse(null);
 
-        return toDetails(player);
+        return toDetails(player, latestTeam);
     }
 
-    private PlayerResponseDto.Details toDetails(Player player) {
+    private PlayerResponseDto.Details toDetails(Player player, Team latestTeam) {
         return PlayerResponseDto.Details.builder()
                 .playerId(player.getPlayerId())
                 .playerName(player.getName())
@@ -55,6 +59,9 @@ public class PlayerService {
                 .weight(player.getWeight())
                 .position(player.getPosition())
                 .photoUrl(player.getPhotoUrl())
+                .teamId(latestTeam != null ? latestTeam.getTeamId() : null)
+                .teamName(latestTeam != null ? latestTeam.getName() : null)
+                .teamLogoUrl(latestTeam != null ? latestTeam.getLogoUrl() : null)
                 .build();
     }
 
@@ -64,8 +71,13 @@ public class PlayerService {
                 .orElseThrow(() -> new CustomException(ErrorCode.PLAYER_NOT_FOUND));
 
         // 시즌 요약은 API-Football의 시즌 누적 스탯을 저장한 테이블에서 바로 가져온다.
-        List<PlayerResponseDto.MatchStat> matches = playerFixtureStatRepository
-                .findAllByPlayerPlayerIdOrderByFixtureFixtureDateDesc(playerId)
+        List<PlayerFixtureStat> matchStats = playerFixtureStatRepository
+                .findAllByPlayerPlayerIdOrderByFixtureFixtureDateDescFixtureFixtureIdDesc(playerId);
+        Team latestTeam = matchStats.stream()
+                .findFirst()
+                .map(PlayerFixtureStat::getTeam)
+                .orElse(null);
+        List<PlayerResponseDto.MatchStat> matches = matchStats
                 .stream()
                 .map(this::toMatchStat)
                 .toList();
@@ -77,7 +89,7 @@ public class PlayerService {
         );
 
         return PlayerResponseDto.Panel.builder()
-                .profile(toDetails(player))
+                .profile(toDetails(player, latestTeam))
                 .seasons(seasons)
                 .matches(matches)
                 .build();
@@ -179,6 +191,12 @@ public class PlayerService {
                 .opponentTeamName(opponent != null ? opponent.getName() : null)
                 .teamScore(scoreOf(fixture, team))
                 .opponentScore(opponent != null ? scoreOf(fixture, opponent) : null)
+                .homeTeamId(fixture.getHomeTeam().getTeamId())
+                .homeTeamName(fixture.getHomeTeam().getName())
+                .awayTeamId(fixture.getAwayTeam().getTeamId())
+                .awayTeamName(fixture.getAwayTeam().getName())
+                .homeScore(fixture.getHomeScore())
+                .awayScore(fixture.getAwayScore())
                 .minutesPlayed(stat.getMinutesPlayed())
                 .rating(stat.getRating() != null ? roundToOneDecimal(stat.getRating()) : null)
                 .goals(stat.getGoals())
