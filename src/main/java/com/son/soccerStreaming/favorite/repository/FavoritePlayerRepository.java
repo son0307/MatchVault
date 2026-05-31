@@ -12,6 +12,8 @@ public interface FavoritePlayerRepository extends JpaRepository<FavoritePlayer, 
 
     void deleteByUserIdAndPlayerPlayerId(Long userId, Long playerId);
 
+    void deleteByUserId(Long userId);
+
     @EntityGraph(attributePaths = "player")
     List<FavoritePlayer> findAllByUserIdOrderByCreatedAtDesc(Long userId);
 }

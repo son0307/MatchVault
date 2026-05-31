@@ -7,12 +7,17 @@ import { HomePage } from "./pages/HomePage";
 import { LeagueFixturesPage } from "./pages/LeagueFixturesPage";
 import { LeagueHomePage } from "./pages/LeagueHomePage";
 import { LeagueStandingsPage } from "./pages/LeagueStandingsPage";
+import { MyPage } from "./pages/MyPage";
 
 export type AuthStatus = "checking" | "authenticated" | "guest";
 
-type LeagueAuthState = {
+export type LeagueAuthState = {
   authStatus: AuthStatus;
   currentUser: CurrentUser | null;
+  season: number;
+  setSeason: (season: number) => void;
+  setCurrentUser: (user: CurrentUser | null) => void;
+  setAuthStatus: (status: AuthStatus) => void;
 };
 
 type LeagueLayoutProps = {
@@ -21,7 +26,7 @@ type LeagueLayoutProps = {
 
 const leagueTabs = [
   { label: "홈", to: "/league/overview", enabled: true },
-  { label: "순위", to: "/league/standings", enabled: true },
+  { label: "랭킹", to: "/league/standings", enabled: true },
   { label: "경기", to: "/league/fixtures", enabled: true },
   { label: "플레이어 통계", to: "/league/player-stats", enabled: false },
   { label: "팀 통계", to: "/league/team-stats", enabled: false },
@@ -40,7 +45,7 @@ export function App() {
           path="/league/overview"
           element={
             <LeagueLayout>
-              {(authState) => <LeagueHomePage authStatus={authState.authStatus} />}
+              {(authState) => <LeagueHomePage authStatus={authState.authStatus} season={authState.season} />}
             </LeagueLayout>
           }
         />
@@ -48,7 +53,7 @@ export function App() {
           path="/league/standings"
           element={
             <LeagueLayout>
-              <LeagueStandingsPage />
+              {(authState) => <LeagueStandingsPage season={authState.season} />}
             </LeagueLayout>
           }
         />
@@ -56,7 +61,7 @@ export function App() {
           path="/league/fixtures"
           element={
             <LeagueLayout>
-              <LeagueFixturesPage />
+              {(authState) => <LeagueFixturesPage season={authState.season} />}
             </LeagueLayout>
           }
         />
@@ -64,7 +69,15 @@ export function App() {
           path="/fixtures/:fixtureId"
           element={
             <LeagueLayout>
-              <FixtureDetailPage />
+              {(authState) => <FixtureDetailPage authStatus={authState.authStatus} season={authState.season} />}
+            </LeagueLayout>
+          }
+        />
+        <Route
+          path="/mypage"
+          element={
+            <LeagueLayout>
+              {(authState) => <MyPage authState={authState} season={authState.season} />}
             </LeagueLayout>
           }
         />
@@ -77,6 +90,7 @@ export function App() {
 function LeagueLayout({ children }: LeagueLayoutProps) {
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
   const [authStatus, setAuthStatus] = useState<AuthStatus>("checking");
+  const [season, setSeason] = useState(2025);
   const [authError, setAuthError] = useState("");
   const [isLoggingOut, setIsLoggingOut] = useState(false);
 
@@ -124,7 +138,9 @@ function LeagueLayout({ children }: LeagueLayoutProps) {
     if (authStatus === "authenticated" && currentUser) {
       return (
         <div className="auth-status">
-          <span>{currentUser.nickname || currentUser.email}</span>
+          <NavLink className="home-link" to="/mypage">
+            {currentUser.nickname || currentUser.email}
+          </NavLink>
           <button type="button" onClick={handleLogout} disabled={isLoggingOut}>
             {isLoggingOut ? "로그아웃 중" : "로그아웃"}
           </button>
@@ -139,7 +155,14 @@ function LeagueLayout({ children }: LeagueLayoutProps) {
     );
   }
 
-  const authState = { authStatus, currentUser };
+  function updateSeason(value: string) {
+    const nextSeason = Number(value);
+    if (Number.isInteger(nextSeason) && nextSeason >= 2000 && nextSeason <= 2100) {
+      setSeason(nextSeason);
+    }
+  }
+
+  const authState: LeagueAuthState = { authStatus, currentUser, season, setSeason, setCurrentUser, setAuthStatus };
 
   return (
     <main className="app-shell league-shell">
@@ -149,6 +172,16 @@ function LeagueLayout({ children }: LeagueLayoutProps) {
           <h1>Premier League</h1>
         </div>
         <div className="league-header-actions">
+          <label className="season-field compact league-season-field">
+            <span>Season</span>
+            <input
+              max="2100"
+              min="2000"
+              onChange={(event) => updateSeason(event.target.value)}
+              type="number"
+              value={season}
+            />
+          </label>
           <NavLink className="home-link" to="/dashboard">
             기존 대시보드
           </NavLink>

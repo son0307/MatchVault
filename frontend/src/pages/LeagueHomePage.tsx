@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { CalendarDays, ChevronLeft, ChevronRight, Star, Trophy } from "lucide-react";
 import { Link } from "react-router-dom";
 import type { AuthStatus } from "../App";
@@ -14,9 +14,7 @@ import {
   type TeamStanding,
 } from "../api";
 
-const DEFAULT_SEASON = 2025;
-
-export function LeagueHomePage({ authStatus }: { authStatus: AuthStatus }) {
+export function LeagueHomePage({ authStatus, season }: { authStatus: AuthStatus; season: number }) {
   const [selectedDate, setSelectedDate] = useState(todayKoreaDateKey());
   const [standings, setStandings] = useState<TeamStanding[]>([]);
   const [fixtures, setFixtures] = useState<FixtureSummary[]>([]);
@@ -28,6 +26,9 @@ export function LeagueHomePage({ authStatus }: { authStatus: AuthStatus }) {
   const [standingsError, setStandingsError] = useState("");
   const [fixturesError, setFixturesError] = useState("");
   const [favoritesError, setFavoritesError] = useState("");
+  const standingsRequestIdRef = useRef(0);
+  const fixturesRequestIdRef = useRef(0);
+  const favoritesRequestIdRef = useRef(0);
 
   const rankingRows = useMemo(
     () =>
@@ -40,16 +41,18 @@ export function LeagueHomePage({ authStatus }: { authStatus: AuthStatus }) {
 
   useEffect(() => {
     void loadStandings();
-  }, []);
+  }, [season]);
 
   useEffect(() => {
     if (authStatus === "checking") {
+      favoritesRequestIdRef.current += 1;
       setIsLoadingFavorites(true);
       setFavoritesError("");
       return;
     }
 
     if (authStatus === "guest") {
+      favoritesRequestIdRef.current += 1;
       setFavorites(null);
       setFavoritesNeedLogin(true);
       setFavoritesError("");
@@ -58,46 +61,73 @@ export function LeagueHomePage({ authStatus }: { authStatus: AuthStatus }) {
     }
 
     void loadFavorites();
-  }, [authStatus]);
+  }, [authStatus, season]);
 
   useEffect(() => {
     void loadFixtures(selectedDate);
-  }, [selectedDate]);
+  }, [selectedDate, season]);
 
   async function loadStandings() {
+    const requestId = standingsRequestIdRef.current + 1;
+    standingsRequestIdRef.current = requestId;
     setIsLoadingStandings(true);
     setStandingsError("");
     try {
-      setStandings(await fetchStandings(DEFAULT_SEASON));
+      const nextStandings = await fetchStandings(season);
+      if (requestId === standingsRequestIdRef.current) {
+        setStandings(nextStandings);
+      }
     } catch (error) {
+      if (requestId !== standingsRequestIdRef.current) {
+        return;
+      }
       setStandings([]);
       setStandingsError(error instanceof Error ? error.message : "팀 랭킹을 불러오지 못했습니다.");
     } finally {
-      setIsLoadingStandings(false);
+      if (requestId === standingsRequestIdRef.current) {
+        setIsLoadingStandings(false);
+      }
     }
   }
 
   async function loadFixtures(dateKey: string) {
+    const requestId = fixturesRequestIdRef.current + 1;
+    fixturesRequestIdRef.current = requestId;
     setIsLoadingFixtures(true);
     setFixturesError("");
     try {
-      const response = await fetchFixturesByDate(DEFAULT_SEASON, dateKey);
-      setFixtures(response.content ?? []);
+      const response = await fetchFixturesByDate(season, dateKey);
+      if (requestId === fixturesRequestIdRef.current) {
+        setFixtures(response.content ?? []);
+      }
     } catch (error) {
+      if (requestId !== fixturesRequestIdRef.current) {
+        return;
+      }
       setFixtures([]);
       setFixturesError(error instanceof Error ? error.message : "경기 일정을 불러오지 못했습니다.");
     } finally {
-      setIsLoadingFixtures(false);
+      if (requestId === fixturesRequestIdRef.current) {
+        setIsLoadingFixtures(false);
+      }
     }
   }
 
   async function loadFavorites() {
+    const requestId = favoritesRequestIdRef.current + 1;
+    favoritesRequestIdRef.current = requestId;
     setIsLoadingFavorites(true);
     setFavoritesError("");
     setFavoritesNeedLogin(false);
     try {
-      setFavorites(await fetchFavoriteDashboard(DEFAULT_SEASON));
+      const nextFavorites = await fetchFavoriteDashboard(season);
+      if (requestId === favoritesRequestIdRef.current) {
+        setFavorites(nextFavorites);
+      }
     } catch (error) {
+      if (requestId !== favoritesRequestIdRef.current) {
+        return;
+      }
       setFavorites(null);
       if (error instanceof ApiError && error.status === 401) {
         setFavoritesNeedLogin(true);
@@ -105,7 +135,9 @@ export function LeagueHomePage({ authStatus }: { authStatus: AuthStatus }) {
         setFavoritesError(error instanceof Error ? error.message : "즐겨찾기를 불러오지 못했습니다.");
       }
     } finally {
-      setIsLoadingFavorites(false);
+      if (requestId === favoritesRequestIdRef.current) {
+        setIsLoadingFavorites(false);
+      }
     }
   }
 
@@ -152,11 +184,18 @@ export function LeagueHomePage({ authStatus }: { authStatus: AuthStatus }) {
               <h2>즐겨찾기</h2>
             </div>
           </div>
-          {favoritesError ? <div className="section-error">{favoritesError}</div> : null}
+          {favoritesError ? (
+            <div className="section-error inline-retry">
+              <span>{favoritesError}</span>
+              <button type="button" onClick={() => void loadFavorites()}>
+                다시 불러오기
+              </button>
+            </div>
+          ) : null}
           {isLoadingFavorites ? (
             <div className="empty-state">즐겨찾기를 확인하는 중입니다.</div>
           ) : favoritesNeedLogin ? (
-            <FavoriteLoginState />
+            <FavoriteLoginStateWithLink />
           ) : (
             <FavoritesPreview favorites={favorites} />
           )}
@@ -237,6 +276,18 @@ function FavoriteLoginState() {
   );
 }
 
+function FavoriteLoginStateWithLink() {
+  return (
+    <div className="favorite-empty">
+      <strong>로그인 후 즐겨찾기를 확인할 수 있습니다.</strong>
+      <p>좋아하는 팀과 선수를 저장하면 최근 경기, 다음 경기, 시즌 기록을 한곳에서 확인할 수 있습니다.</p>
+      <Link className="favorite-login-link" to="/login">
+        로그인
+      </Link>
+    </div>
+  );
+}
+
 function FavoritesPreview({ favorites }: { favorites: FavoriteDashboard | null }) {
   const teams = favorites?.teams ?? [];
   const players = favorites?.players ?? [];
@@ -264,7 +315,7 @@ function FavoritesPreview({ favorites }: { favorites: FavoriteDashboard | null }
         <h3>선수</h3>
         <div className="favorite-mini-list">
           {players.map((player) => (
-            <FavoritePlayerItem player={player} key={player.playerId} />
+            <FavoritePlayerItemV2 player={player} key={player.playerId} />
           ))}
         </div>
       </section>
@@ -314,6 +365,35 @@ function FavoritePlayerItem({ player }: { player: FavoritePlayerCard }) {
       <p className="favorite-line">
         시즌 {numberText(player.seasonStat?.goals)}골 {numberText(player.seasonStat?.assists)}도움 · 평점 {numberText(player.seasonStat?.rating)}
       </p>
+    </article>
+  );
+}
+
+function FavoritePlayerItemV2({ player }: { player: FavoritePlayerCard }) {
+  const seasonStat = player.seasonStat;
+
+  return (
+    <article className="favorite-mini-card">
+      <div className="favorite-mini-head">
+        {player.photoUrl ? (
+          <img src={player.photoUrl} alt="" className="player-thumb" />
+        ) : (
+          <span className="player-thumb placeholder" aria-hidden="true" />
+        )}
+        <div>
+          <strong>{player.playerName ?? "-"}</strong>
+          <p>{player.position ?? "Player"} · {seasonStat?.teamName ?? "-"}</p>
+        </div>
+      </div>
+      {seasonStat ? (
+        <>
+          <p className="favorite-line">
+            시즌 {numberText(seasonStat.goals)}골 {numberText(seasonStat.assists)}도움 · 평점 {numberText(seasonStat.rating)}
+          </p>
+        </>
+      ) : (
+        <p className="favorite-line muted">해당 선수는 이번 시즌에 EPL 기록이 없습니다.</p>
+      )}
     </article>
   );
 }

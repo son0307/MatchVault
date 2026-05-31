@@ -7,6 +7,8 @@ import com.son.soccerStreaming.auth.repository.AppUserRepository;
 import com.son.soccerStreaming.auth.security.AuthUserDetails;
 import com.son.soccerStreaming.global.exception.CustomException;
 import com.son.soccerStreaming.global.exception.ErrorCode;
+import com.son.soccerStreaming.favorite.repository.FavoritePlayerRepository;
+import com.son.soccerStreaming.favorite.repository.FavoriteTeamRepository;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -39,6 +41,8 @@ public class AuthService {
     private static final Pattern NICKNAME_PATTERN = Pattern.compile("^[가-힣A-Za-z0-9_]+$");
 
     private final AppUserRepository appUserRepository;
+    private final FavoriteTeamRepository favoriteTeamRepository;
+    private final FavoritePlayerRepository favoritePlayerRepository;
     private final PasswordEncoder passwordEncoder;
     private final AuthenticationManager authenticationManager;
 
@@ -64,7 +68,7 @@ public class AuthService {
             throw new CustomException(ErrorCode.EMAIL_ALREADY_EXISTS);
         }
 
-        return storeAuthentication(new AuthUserDetails(savedUser), servletRequest);
+        return authenticate(email, request.getPassword(), servletRequest);
     }
 
     @Transactional(readOnly = true)
@@ -79,6 +83,56 @@ public class AuthService {
         }
 
         return toMe(userDetails);
+    }
+
+    @Transactional
+    public AuthResponseDto.Me updateNickname(
+            AuthUserDetails userDetails,
+            AuthRequestDto.UpdateNickname request,
+            HttpServletRequest servletRequest
+    ) {
+        Long userId = authenticatedUserId(userDetails);
+        if (request == null || isBlank(request.getNickname())) {
+            throw new CustomException(ErrorCode.INVALID_AUTH_REQUEST);
+        }
+        validateNickname(request.getNickname());
+        AppUser user = findUser(userId);
+        user.updateNickname(request.getNickname().trim());
+        refreshSecurityContext(user, servletRequest);
+        return toMe(user);
+    }
+
+    @Transactional
+    public void changePassword(AuthUserDetails userDetails, AuthRequestDto.ChangePassword request) {
+        Long userId = authenticatedUserId(userDetails);
+        if (request == null || isBlank(request.getCurrentPassword()) || isBlank(request.getNewPassword())) {
+            throw new CustomException(ErrorCode.INVALID_AUTH_REQUEST);
+        }
+        validatePassword(request.getNewPassword());
+
+        AppUser user = findUser(userId);
+        if (!passwordEncoder.matches(request.getCurrentPassword(), user.getPassword())) {
+            throw new CustomException(ErrorCode.INVALID_CURRENT_PASSWORD);
+        }
+
+        user.updatePassword(passwordEncoder.encode(request.getNewPassword()));
+    }
+
+    @Transactional
+    public void deleteAccount(AuthUserDetails userDetails, AuthRequestDto.DeleteAccount request) {
+        Long userId = authenticatedUserId(userDetails);
+        if (request == null || isBlank(request.getCurrentPassword())) {
+            throw new CustomException(ErrorCode.INVALID_AUTH_REQUEST);
+        }
+
+        AppUser user = findUser(userId);
+        if (!passwordEncoder.matches(request.getCurrentPassword(), user.getPassword())) {
+            throw new CustomException(ErrorCode.INVALID_CURRENT_PASSWORD);
+        }
+
+        favoritePlayerRepository.deleteByUserId(userId);
+        favoriteTeamRepository.deleteByUserId(userId);
+        appUserRepository.delete(user);
     }
 
     private AuthResponseDto.Me authenticate(String email, String password, HttpServletRequest servletRequest) {
@@ -133,6 +187,7 @@ public class AuthService {
                 || !isValidNickname(nickname)) {
             throw new CustomException(ErrorCode.INVALID_AUTH_REQUEST);
         }
+        validateNickname(request.getNickname());
     }
 
     private void validateLoginRequest(AuthRequestDto.Login request) {
@@ -145,6 +200,38 @@ public class AuthService {
         }
     }
 
+    private void validatePassword(String password) {
+        if (isBlank(password)) {
+            throw new CustomException(ErrorCode.INVALID_AUTH_REQUEST);
+        }
+        String trimmed = password.trim();
+        if (trimmed.length() < PASSWORD_MIN_LENGTH || trimmed.length() > PASSWORD_MAX_LENGTH) {
+            throw new CustomException(ErrorCode.INVALID_AUTH_REQUEST);
+        }
+    }
+
+    private void validateNickname(String nickname) {
+        if (isBlank(nickname)) {
+            throw new CustomException(ErrorCode.INVALID_AUTH_REQUEST);
+        }
+        int length = nickname.trim().length();
+        if (length < NICKNAME_MIN_LENGTH || length > NICKNAME_MAX_LENGTH) {
+            throw new CustomException(ErrorCode.INVALID_AUTH_REQUEST);
+        }
+    }
+
+    private Long authenticatedUserId(AuthUserDetails userDetails) {
+        if (userDetails == null) {
+            throw new CustomException(ErrorCode.AUTHENTICATION_REQUIRED);
+        }
+        return userDetails.getId();
+    }
+
+    private AppUser findUser(Long userId) {
+        return appUserRepository.findById(userId)
+                .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
+    }
+
     private AuthResponseDto.Me toMe(AuthUserDetails userDetails) {
         return AuthResponseDto.Me.builder()
                 .id(userDetails.getId())
@@ -152,6 +239,31 @@ public class AuthService {
                 .nickname(userDetails.getNickname())
                 .role(userDetails.getRole())
                 .build();
+    }
+
+    private AuthResponseDto.Me toMe(AppUser user) {
+        return AuthResponseDto.Me.builder()
+                .id(user.getId())
+                .email(user.getEmail())
+                .nickname(user.getNickname())
+                .role(user.roleOrDefault().name())
+                .build();
+    }
+
+    private void refreshSecurityContext(AppUser user, HttpServletRequest servletRequest) {
+        AuthUserDetails principal = new AuthUserDetails(user);
+        Authentication authentication = new UsernamePasswordAuthenticationToken(
+                principal,
+                null,
+                principal.getAuthorities()
+        );
+        SecurityContext securityContext = SecurityContextHolder.createEmptyContext();
+        securityContext.setAuthentication(authentication);
+        SecurityContextHolder.setContext(securityContext);
+        servletRequest.getSession(true).setAttribute(
+                HttpSessionSecurityContextRepository.SPRING_SECURITY_CONTEXT_KEY,
+                securityContext
+        );
     }
 
     private String normalizeEmail(String email) {

@@ -1,6 +1,7 @@
 package com.son.soccerStreaming.player.repository;
 
 import com.son.soccerStreaming.player.entity.PlayerTeamSeasonStat;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -26,6 +27,9 @@ public interface PlayerTeamSeasonStatRepository extends JpaRepository<PlayerTeam
     List<PlayerTeamSeasonStat> findAllByPlayerPlayerIdOrderBySeasonDesc(Long playerId);
 
     Optional<PlayerTeamSeasonStat> findTopByPlayerPlayerIdOrderBySeasonDesc(Long playerId);
+
+    @EntityGraph(attributePaths = "team")
+    List<PlayerTeamSeasonStat> findAllByPlayerPlayerIdAndSeason(Long playerId, Integer season);
 
     // Only expose players who appeared or were named on the bench at least once.
     @Query("SELECT s FROM PlayerTeamSeasonStat s " +

@@ -10,7 +10,6 @@ import {
   type TeamStanding,
 } from "../api";
 
-const DEFAULT_SEASON = 2025;
 const TEAM_PAGE_SIZE = 10;
 const TEAM_FETCH_SIZE = 100;
 
@@ -28,7 +27,7 @@ const fixtureModes: Array<{ label: string; value: FixtureMode }> = [
   { label: "팀별", value: "team" },
 ];
 
-export function LeagueFixturesPage() {
+export function LeagueFixturesPage({ season }: { season: number }) {
   const [mode, setMode] = useState<FixtureMode>("date");
   const [meta, setMeta] = useState<FixtureMeta | null>(null);
   const [weekStart, setWeekStart] = useState(startOfKoreaWeek(todayKoreaDateKey()));
@@ -43,6 +42,8 @@ export function LeagueFixturesPage() {
   const [errorMessage, setErrorMessage] = useState("");
   const [teamErrorMessage, setTeamErrorMessage] = useState("");
   const fixtureRequestId = useRef(0);
+  const metaRequestId = useRef(0);
+  const teamRequestId = useRef(0);
 
   const minRound = 1;
   const maxRound = meta?.maxRound ?? 38;
@@ -70,7 +71,7 @@ export function LeagueFixturesPage() {
   useEffect(() => {
     void loadFixtureMeta();
     void loadTeamOptions();
-  }, []);
+  }, [season]);
 
   useEffect(() => {
     if (mode === "team" && !selectedTeamId) {
@@ -79,11 +80,16 @@ export function LeagueFixturesPage() {
       return;
     }
     void loadFixtures();
-  }, [mode, weekStart, round, selectedTeamId]);
+  }, [mode, weekStart, weekEnd, round, selectedTeamId, season]);
 
   async function loadFixtureMeta() {
+    const requestId = metaRequestId.current + 1;
+    metaRequestId.current = requestId;
     try {
-      const fixtureMeta = await fetchFixtureMeta(DEFAULT_SEASON);
+      const fixtureMeta = await fetchFixtureMeta(season);
+      if (requestId !== metaRequestId.current) {
+        return;
+      }
       setMeta(fixtureMeta);
       setRound(1);
 
@@ -94,29 +100,42 @@ export function LeagueFixturesPage() {
         setWeekStart(startOfKoreaWeek(fixtureMeta.maxDate));
       }
     } catch (error) {
+      if (requestId !== metaRequestId.current) {
+        return;
+      }
       setErrorMessage(error instanceof Error ? error.message : "경기 범위를 불러오지 못했습니다.");
     }
   }
 
   async function loadTeamOptions() {
+    const requestId = teamRequestId.current + 1;
+    teamRequestId.current = requestId;
     setIsLoadingTeams(true);
     setTeamErrorMessage("");
     try {
-      const standings = await fetchStandings(DEFAULT_SEASON);
+      const standings = await fetchStandings(season);
+      if (requestId !== teamRequestId.current) {
+        return;
+      }
       const teamOptions = standingsToTeamOptions(standings);
       setTeams(teamOptions);
       setSelectedTeamId((current) => current ?? teamOptions[0]?.teamId ?? null);
     } catch (error) {
+      if (requestId !== teamRequestId.current) {
+        return;
+      }
       setTeams([]);
       setSelectedTeamId(null);
       setTeamErrorMessage(error instanceof Error ? error.message : "팀 목록을 불러오지 못했습니다.");
     } finally {
-      setIsLoadingTeams(false);
+      if (requestId === teamRequestId.current) {
+        setIsLoadingTeams(false);
+      }
     }
   }
 
   async function loadFixtures() {
-    const query = queryForMode(mode, weekStart, weekEnd, round, selectedTeamId);
+    const query = queryForMode(mode, weekStart, weekEnd, round, selectedTeamId, season);
     if (!query) {
       return;
     }
@@ -402,15 +421,16 @@ function queryForMode(
   weekEnd: string,
   round: number,
   selectedTeamId: number | null,
+  season: number,
 ) {
   if (mode === "date") {
-    return { season: DEFAULT_SEASON, dateFrom: weekStart, dateTo: weekEnd, size: 100 };
+    return { season, dateFrom: weekStart, dateTo: weekEnd, size: 100 };
   }
   if (mode === "round") {
-    return { season: DEFAULT_SEASON, round, size: 100 };
+    return { season, round, size: 100 };
   }
   if (selectedTeamId) {
-    return { season: DEFAULT_SEASON, teamId: selectedTeamId, size: TEAM_FETCH_SIZE };
+    return { season, teamId: selectedTeamId, size: TEAM_FETCH_SIZE };
   }
   return null;
 }

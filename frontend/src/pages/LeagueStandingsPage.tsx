@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { RefreshCw } from "lucide-react";
 import {
   fetchStandings,
@@ -6,8 +6,6 @@ import {
   type StandingRecord,
   type TeamStanding,
 } from "../api";
-
-const DEFAULT_SEASON = 2025;
 
 type StandingMode = "all" | "home" | "away" | "recent";
 
@@ -18,12 +16,12 @@ const standingModes: Array<{ label: string; value: StandingMode }> = [
   { label: "최근 5경기", value: "recent" },
 ];
 
-export function LeagueStandingsPage() {
-  const [season, setSeason] = useState(DEFAULT_SEASON);
+export function LeagueStandingsPage({ season }: { season: number }) {
   const [standings, setStandings] = useState<TeamStanding[]>([]);
   const [mode, setMode] = useState<StandingMode>("all");
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState("");
+  const standingsRequestIdRef = useRef(0);
 
   const rows = useMemo(
     () =>
@@ -35,32 +33,34 @@ export function LeagueStandingsPage() {
   );
 
   async function loadStandings(targetSeason = season) {
+    const requestId = standingsRequestIdRef.current + 1;
+    standingsRequestIdRef.current = requestId;
     setIsLoading(true);
     setErrorMessage("");
 
     try {
-      setStandings(await fetchStandings(targetSeason));
+      const nextStandings = await fetchStandings(targetSeason);
+      if (requestId === standingsRequestIdRef.current) {
+        setStandings(nextStandings);
+      }
     } catch (error) {
+      if (requestId !== standingsRequestIdRef.current) {
+        return;
+      }
       setStandings([]);
       setErrorMessage(
         error instanceof Error ? error.message : "순위 정보를 불러오지 못했습니다.",
       );
     } finally {
-      setIsLoading(false);
+      if (requestId === standingsRequestIdRef.current) {
+        setIsLoading(false);
+      }
     }
   }
 
   useEffect(() => {
-    void loadStandings(DEFAULT_SEASON);
-  }, []);
-
-  function updateSeason(value: string) {
-    const nextSeason = Number(value);
-    setSeason(nextSeason);
-    if (Number.isFinite(nextSeason)) {
-      void loadStandings(nextSeason);
-    }
-  }
+    void loadStandings(season);
+  }, [season]);
 
   return (
     <section className="league-content">
@@ -79,16 +79,6 @@ export function LeagueStandingsPage() {
         </div>
 
         <div className="toolbar" aria-label="시즌과 새로고침">
-          <label className="season-field compact">
-            <span>Season</span>
-            <input
-              type="number"
-              value={season}
-              min="2000"
-              max="2100"
-              onChange={(event) => updateSeason(event.target.value)}
-            />
-          </label>
           <button
             className="icon-button"
             type="button"
