@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { RefreshCw } from "lucide-react";
 import { Link } from "react-router-dom";
 import {
@@ -22,6 +22,7 @@ export function LeagueStandingsPage({ season }: { season: number }) {
   const [mode, setMode] = useState<StandingMode>("all");
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState("");
+  const standingsRequestIdRef = useRef(0);
 
   const rows = useMemo(
     () =>
@@ -33,18 +34,28 @@ export function LeagueStandingsPage({ season }: { season: number }) {
   );
 
   async function loadStandings(targetSeason = season) {
+    const requestId = standingsRequestIdRef.current + 1;
+    standingsRequestIdRef.current = requestId;
     setIsLoading(true);
     setErrorMessage("");
 
     try {
-      setStandings(await fetchStandings(targetSeason));
+      const nextStandings = await fetchStandings(targetSeason);
+      if (requestId === standingsRequestIdRef.current) {
+        setStandings(nextStandings);
+      }
     } catch (error) {
+      if (requestId !== standingsRequestIdRef.current) {
+        return;
+      }
       setStandings([]);
       setErrorMessage(
         error instanceof Error ? error.message : "순위 정보를 불러오지 못했습니다.",
       );
     } finally {
-      setIsLoading(false);
+      if (requestId === standingsRequestIdRef.current) {
+        setIsLoading(false);
+      }
     }
   }
 

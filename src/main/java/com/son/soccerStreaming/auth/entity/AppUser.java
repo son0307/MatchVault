@@ -69,6 +69,14 @@ public class AppUser {
         this.role = UserRole.ADMIN;
     }
 
+    public void updateNickname(String nickname) {
+        this.nickname = nickname;
+    }
+
+    public void updatePassword(String password) {
+        this.password = password;
+    }
+
     public UserRole roleOrDefault() {
         return role != null ? role : UserRole.USER;
     }

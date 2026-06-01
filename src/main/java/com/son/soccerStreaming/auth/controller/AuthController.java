@@ -11,7 +11,9 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -57,5 +59,37 @@ public class AuthController {
     @GetMapping("/me")
     public ResponseEntity<AuthResponseDto.Me> me(@AuthenticationPrincipal AuthUserDetails userDetails) {
         return ResponseEntity.ok(authService.me(userDetails));
+    }
+
+    @PatchMapping("/me/nickname")
+    public ResponseEntity<AuthResponseDto.Me> updateNickname(
+            @AuthenticationPrincipal AuthUserDetails userDetails,
+            @RequestBody AuthRequestDto.UpdateNickname request,
+            HttpServletRequest servletRequest
+    ) {
+        return ResponseEntity.ok(authService.updateNickname(userDetails, request, servletRequest));
+    }
+
+    @PatchMapping("/me/password")
+    public ResponseEntity<Void> changePassword(
+            @AuthenticationPrincipal AuthUserDetails userDetails,
+            @RequestBody AuthRequestDto.ChangePassword request
+    ) {
+        authService.changePassword(userDetails, request);
+        return ResponseEntity.noContent().build();
+    }
+
+    @DeleteMapping("/me")
+    public ResponseEntity<Void> deleteAccount(
+            @AuthenticationPrincipal AuthUserDetails userDetails,
+            @RequestBody AuthRequestDto.DeleteAccount request,
+            HttpServletRequest servletRequest
+    ) {
+        authService.deleteAccount(userDetails, request);
+        SecurityContextHolder.clearContext();
+        if (servletRequest.getSession(false) != null) {
+            servletRequest.getSession(false).invalidate();
+        }
+        return ResponseEntity.noContent().build();
     }
 }

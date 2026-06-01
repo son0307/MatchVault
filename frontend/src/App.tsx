@@ -11,10 +11,13 @@ import { TeamDetailPage } from "./pages/TeamDetailPage";
 
 export type AuthStatus = "checking" | "authenticated" | "guest";
 
-type LeagueState = {
+export type LeagueAuthState = {
   authStatus: AuthStatus;
   currentUser: CurrentUser | null;
   season: number;
+  setSeason: (season: number) => void;
+  setCurrentUser: (user: CurrentUser | null) => void;
+  setAuthStatus: (status: AuthStatus) => void;
 };
 
 type LeagueLayoutProps = {
@@ -27,7 +30,7 @@ const DEFAULT_SEASON = 2025;
 
 const leagueTabs = [
   { label: "홈", to: "/league/overview", enabled: true },
-  { label: "순위", to: "/league/standings", enabled: true },
+  { label: "랭킹", to: "/league/standings", enabled: true },
   { label: "경기", to: "/league/fixtures", enabled: true },
   { label: "플레이어 통계", to: "/league/player-stats", enabled: false },
   { label: "팀 통계", to: "/league/team-stats", enabled: false },
@@ -46,32 +49,40 @@ export function App() {
         <Route
           path="/league/overview"
           element={
-            <LeagueLayout onSeasonChange={setSeason} season={season}>
-              {(state) => <LeagueHomePage authStatus={state.authStatus} season={state.season} />}
+            <LeagueLayout>
+              {(authState) => <LeagueHomePage authStatus={authState.authStatus} season={authState.season} />}
             </LeagueLayout>
           }
         />
         <Route
           path="/league/standings"
           element={
-            <LeagueLayout onSeasonChange={setSeason} season={season}>
-              <LeagueStandingsPage season={season} />
+            <LeagueLayout>
+              {(authState) => <LeagueStandingsPage season={authState.season} />}
             </LeagueLayout>
           }
         />
         <Route
           path="/league/fixtures"
           element={
-            <LeagueLayout onSeasonChange={setSeason} season={season}>
-              <LeagueFixturesPage season={season} />
+            <LeagueLayout>
+              {(authState) => <LeagueFixturesPage season={authState.season} />}
             </LeagueLayout>
           }
         />
         <Route
           path="/fixtures/:fixtureId"
           element={
-            <LeagueLayout onSeasonChange={setSeason} season={season}>
-              <FixtureDetailPage />
+            <LeagueLayout>
+              {(authState) => <FixtureDetailPage authStatus={authState.authStatus} season={authState.season} />}
+            </LeagueLayout>
+          }
+        />
+        <Route
+          path="/mypage"
+          element={
+            <LeagueLayout>
+              {(authState) => <MyPage authState={authState} season={authState.season} />}
             </LeagueLayout>
           }
         />
@@ -100,6 +111,7 @@ export function App() {
 function LeagueLayout({ children, onSeasonChange, season }: LeagueLayoutProps) {
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
   const [authStatus, setAuthStatus] = useState<AuthStatus>("checking");
+  const [season, setSeason] = useState(2025);
   const [authError, setAuthError] = useState("");
   const [isLoggingOut, setIsLoggingOut] = useState(false);
 
@@ -154,7 +166,9 @@ function LeagueLayout({ children, onSeasonChange, season }: LeagueLayoutProps) {
     if (authStatus === "authenticated" && currentUser) {
       return (
         <div className="auth-status">
-          <span>{currentUser.nickname || currentUser.email}</span>
+          <NavLink className="home-link" to="/mypage">
+            {currentUser.nickname || currentUser.email}
+          </NavLink>
           <button type="button" onClick={handleLogout} disabled={isLoggingOut}>
             {isLoggingOut ? "로그아웃 중" : "로그아웃"}
           </button>
@@ -169,7 +183,14 @@ function LeagueLayout({ children, onSeasonChange, season }: LeagueLayoutProps) {
     );
   }
 
-  const state = { authStatus, currentUser, season };
+  function updateSeason(value: string) {
+    const nextSeason = Number(value);
+    if (Number.isInteger(nextSeason) && nextSeason >= 2000 && nextSeason <= 2100) {
+      setSeason(nextSeason);
+    }
+  }
+
+  const authState: LeagueAuthState = { authStatus, currentUser, season, setSeason, setCurrentUser, setAuthStatus };
 
   return (
     <main className="app-shell league-shell">
