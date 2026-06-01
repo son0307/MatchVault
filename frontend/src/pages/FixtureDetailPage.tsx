@@ -39,6 +39,7 @@ type LoadState<T> = {
   error: string;
   isLoading: boolean;
 };
+type CoverageStatus = "loading" | "ready" | "error";
 type Side = "home" | "away";
 type FavoriteTarget = "team" | "player";
 type FavoriteControls = {
@@ -74,7 +75,7 @@ export function FixtureDetailPage({ authStatus, season }: { authStatus: AuthStat
   const [statsState, setStatsState] = useState<LoadState<FixtureStatResponse>>(initialLoadState);
   const [playerStatsState, setPlayerStatsState] = useState<LoadState<FixturePlayerStatResponse>>(initialLoadState);
   const [seasonCoverages, setSeasonCoverages] = useState<LeagueSeasonCoverage[]>([]);
-  const [isSeasonCoverageLoaded, setIsSeasonCoverageLoaded] = useState(false);
+  const [coverageStatus, setCoverageStatus] = useState<CoverageStatus>("loading");
   const [favorites, setFavorites] = useState<FavoriteDashboard | null>(null);
   const [favoritesError, setFavoritesError] = useState("");
   const [pendingFavoriteKey, setPendingFavoriteKey] = useState("");
@@ -88,25 +89,29 @@ export function FixtureDetailPage({ authStatus, season }: { authStatus: AuthStat
 
   useEffect(() => {
     let isCurrent = true;
-    setIsSeasonCoverageLoaded(false);
-    fetchLeagueSeasons()
-      .then((response) => {
-        if (isCurrent) {
-          setSeasonCoverages(response.seasons ?? []);
-          setIsSeasonCoverageLoaded(true);
-        }
-      })
-      .catch(() => {
-        if (isCurrent) {
-          setSeasonCoverages([]);
-          setIsSeasonCoverageLoaded(true);
-        }
-      });
+    loadSeasonCoverages(() => isCurrent);
 
     return () => {
       isCurrent = false;
     };
   }, []);
+
+  function loadSeasonCoverages(isCurrent: () => boolean = () => true) {
+    setCoverageStatus("loading");
+    fetchLeagueSeasons()
+      .then((response) => {
+        if (isCurrent()) {
+          setSeasonCoverages(response.seasons ?? []);
+          setCoverageStatus("ready");
+        }
+      })
+      .catch(() => {
+        if (isCurrent()) {
+          setSeasonCoverages([]);
+          setCoverageStatus("error");
+        }
+      });
+  }
 
   useEffect(() => {
     if (!Number.isFinite(numericFixtureId) || numericFixtureId <= 0) {
@@ -120,10 +125,10 @@ export function FixtureDetailPage({ authStatus, season }: { authStatus: AuthStat
 
     let isCurrent = true;
     setFixtureState(initialLoadState);
-    setEventsState({ data: null, error: "", isLoading: false });
-    setLineupsState({ data: null, error: "", isLoading: false });
-    setStatsState({ data: null, error: "", isLoading: false });
-    setPlayerStatsState({ data: null, error: "", isLoading: false });
+    setEventsState(initialLoadState);
+    setLineupsState(initialLoadState);
+    setStatsState(initialLoadState);
+    setPlayerStatsState(initialLoadState);
 
     fetchFixture(numericFixtureId)
       .then((data) => {
@@ -148,7 +153,7 @@ export function FixtureDetailPage({ authStatus, season }: { authStatus: AuthStat
 
   useEffect(() => {
     const fixture = fixtureState.data;
-    if (!fixture || !isSeasonCoverageLoaded || !Number.isFinite(numericFixtureId) || numericFixtureId <= 0) {
+    if (!fixture || coverageStatus === "loading" || !Number.isFinite(numericFixtureId) || numericFixtureId <= 0) {
       return;
     }
 
@@ -192,7 +197,7 @@ export function FixtureDetailPage({ authStatus, season }: { authStatus: AuthStat
     return () => {
       isCurrent = false;
     };
-  }, [fixtureState.data, isSeasonCoverageLoaded, numericFixtureId, seasonCoverages]);
+  }, [coverageStatus, fixtureState.data, numericFixtureId, seasonCoverages]);
 
   useEffect(() => {
     if (authStatus !== "authenticated") {
@@ -377,6 +382,15 @@ export function FixtureDetailPage({ authStatus, season }: { authStatus: AuthStat
           </button>
         ))}
       </nav>
+
+      {coverageStatus === "error" ? (
+        <div className="notice warning inline-retry">
+          <span>시즌 지원 정보를 확인하지 못했습니다. 기본 상세 정보 조회를 시도합니다.</span>
+          <button type="button" onClick={() => loadSeasonCoverages()}>
+            다시 확인
+          </button>
+        </div>
+      ) : null}
 
       {activeTab === "events" ? <EventsPanel state={eventsState} fixture={fixture} /> : null}
       {activeTab === "lineups" ? <LineupsPanel favoriteControls={favoriteControls} state={lineupsState} /> : null}
