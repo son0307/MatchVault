@@ -34,6 +34,7 @@ const loadingState = <T,>(): LoadState<T> => ({
 export function PlayerDetailPage({ authStatus, season }: { authStatus: AuthStatus; season: number }) {
   const { playerId } = useParams();
   const numericPlayerId = Number(playerId);
+  const isValidPlayerId = Number.isFinite(numericPlayerId) && numericPlayerId > 0;
   const profileRequestId = useRef(0);
   const seasonRequestId = useRef(0);
   const matchesRequestId = useRef(0);
@@ -45,16 +46,25 @@ export function PlayerDetailPage({ authStatus, season }: { authStatus: AuthStatu
   const [favoriteError, setFavoriteError] = useState("");
 
   useEffect(() => {
+    if (!isValidPlayerId) {
+      setProfileState({ data: null, error: "올바른 선수 ID가 아닙니다.", isLoading: false });
+      setSeasonState({ data: null, error: "", isLoading: false });
+      setMatchesState({ data: null, error: "", isLoading: false });
+      return;
+    }
     loadProfile();
-  }, [numericPlayerId]);
+  }, [isValidPlayerId, numericPlayerId]);
 
   useEffect(() => {
+    if (!isValidPlayerId) {
+      return;
+    }
     loadSeasonSummary();
     loadRecentMatches();
-  }, [numericPlayerId, season]);
+  }, [isValidPlayerId, numericPlayerId, season]);
 
   useEffect(() => {
-    if (!Number.isFinite(numericPlayerId) || numericPlayerId <= 0) {
+    if (!isValidPlayerId) {
       setIsFavorite(false);
       return;
     }
@@ -85,10 +95,10 @@ export function PlayerDetailPage({ authStatus, season }: { authStatus: AuthStatu
     return () => {
       isCurrent = false;
     };
-  }, [authStatus, numericPlayerId, season]);
+  }, [authStatus, isValidPlayerId, numericPlayerId, season]);
 
   function loadProfile() {
-    if (!Number.isFinite(numericPlayerId) || numericPlayerId <= 0) {
+    if (!isValidPlayerId) {
       setProfileState({ data: null, error: "올바른 선수 ID가 아닙니다.", isLoading: false });
       return;
     }
@@ -114,7 +124,7 @@ export function PlayerDetailPage({ authStatus, season }: { authStatus: AuthStatu
   }
 
   function loadSeasonSummary() {
-    if (!Number.isFinite(numericPlayerId) || numericPlayerId <= 0) {
+    if (!isValidPlayerId) {
       setSeasonState({ data: null, error: "올바른 선수 ID가 아닙니다.", isLoading: false });
       return;
     }
@@ -140,7 +150,7 @@ export function PlayerDetailPage({ authStatus, season }: { authStatus: AuthStatu
   }
 
   function loadRecentMatches() {
-    if (!Number.isFinite(numericPlayerId) || numericPlayerId <= 0) {
+    if (!isValidPlayerId) {
       setMatchesState({ data: null, error: "올바른 선수 ID가 아닙니다.", isLoading: false });
       return;
     }
@@ -166,7 +176,7 @@ export function PlayerDetailPage({ authStatus, season }: { authStatus: AuthStatu
   }
 
   async function toggleFavorite() {
-    if (!Number.isFinite(numericPlayerId) || numericPlayerId <= 0) {
+    if (!isValidPlayerId) {
       return;
     }
     if (authStatus !== "authenticated") {
@@ -190,6 +200,20 @@ export function PlayerDetailPage({ authStatus, season }: { authStatus: AuthStatu
     } finally {
       setIsFavoriteLoading(false);
     }
+  }
+
+  if (!isValidPlayerId) {
+    return (
+      <section className="league-content player-detail-page">
+        <article className="panel placeholder-panel">
+          <p className="eyebrow">Player Detail</p>
+          <h2>올바른 선수 ID가 아닙니다.</h2>
+          <Link className="primary-link fixture-back-link" to="/league/overview">
+            리그 홈으로
+          </Link>
+        </article>
+      </section>
+    );
   }
 
   if (profileState.isLoading) {

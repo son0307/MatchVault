@@ -9,7 +9,7 @@ import {
   type FixtureSummary,
   type TeamStanding,
 } from "../api";
-import { formatFixtureDate, parseKoreaDateTime } from "../dateUtils";
+import { formatFixtureDateKey, parseKoreaDateTime } from "../dateUtils";
 
 const TEAM_PAGE_SIZE = 10;
 const TEAM_FETCH_SIZE = 100;
@@ -506,8 +506,7 @@ function shortDate(value: string) {
 }
 
 function dateGroupTitle(value: string) {
-  const date = parseDateKeyAsUtcDate(value);
-  return formatFixtureDate(date.toISOString(), value);
+  return formatFixtureDateKey(value, value);
 }
 
 function dateKey(value: string | null) {

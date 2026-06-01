@@ -671,8 +671,9 @@ export async function fetchPlayerSeasonSummary(playerId: number, season: number)
 }
 
 export async function fetchPlayerRecentMatches(playerId: number, season: number, size = 8): Promise<PlayerMatchStat[]> {
+  const normalizedSize = normalizePageSize(size, 8, 1, 30);
   return cachedGetJson<PlayerMatchStat[]>(
-    `/api/v1/players/${playerId}/recent-matches?season=${normalizeSeason(season)}&size=${size}`,
+    `/api/v1/players/${playerId}/recent-matches?season=${normalizeSeason(season)}&size=${normalizedSize}`,
     "선수 최근 경기를 불러오지 못했습니다.",
     SHORT_CACHE_TTL_MS,
   );
@@ -798,6 +799,13 @@ function appendParam(params: URLSearchParams, key: string, value: string | numbe
 
 function normalizeSeason(value: number) {
   return Number.isInteger(value) && value >= 2000 && value <= 2100 ? value : DEFAULT_API_SEASON;
+}
+
+function normalizePageSize(value: number, fallback: number, min: number, max: number) {
+  if (!Number.isFinite(value)) {
+    return fallback;
+  }
+  return Math.min(max, Math.max(min, Math.trunc(value)));
 }
 
 async function postJson(url: string, body: unknown): Promise<unknown> {

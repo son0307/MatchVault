@@ -154,7 +154,7 @@ export function FixtureDetailPage({ authStatus, season }: { authStatus: AuthStat
 
     let isCurrent = true;
     const coverage = seasonCoverages.find((item) => item.seasonYear === fixture.season);
-    const isSupported = (value: boolean | undefined) => value !== false;
+    const isSupported = (value: boolean | undefined) => !coverage || value !== false;
 
     if (isSupported(coverage?.events)) {
       setEventsState(initialLoadState);

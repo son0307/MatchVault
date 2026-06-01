@@ -18,7 +18,7 @@ import {
   type TeamPlayerRanking,
 } from "../api";
 import type { AuthStatus } from "../App";
-import { formatFixtureDate, parseKoreaDateTime } from "../dateUtils";
+import { formatFixtureDateKey, parseKoreaDateTime } from "../dateUtils";
 
 type LoadState<T> = {
   data: T | null;
@@ -726,9 +726,7 @@ function dateGroupTitle(value: string) {
   if (value === "unknown") {
     return "날짜 미정";
   }
-  const [year, month, day] = value.split("-").map(Number);
-  const date = new Date(Date.UTC(year, month - 1, day));
-  return formatFixtureDate(date.toISOString(), value);
+  return formatFixtureDateKey(value, value);
 }
 
 function formatTime(value: string | null) {

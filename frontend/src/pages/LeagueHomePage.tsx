@@ -13,7 +13,7 @@ import {
   type FixtureSummary,
   type TeamStanding,
 } from "../api";
-import { formatFixtureDate, parseKoreaDateTime } from "../dateUtils";
+import { formatFixtureDateKey, parseKoreaDateTime } from "../dateUtils";
 
 export function LeagueHomePage({ authStatus, season }: { authStatus: AuthStatus; season: number }) {
   const [selectedDate, setSelectedDate] = useState(todayKoreaDateKey());
@@ -442,7 +442,7 @@ function dateGroupTitle(dateKey: string) {
     day: "numeric",
     weekday: "short",
   }).format(date);
-  const adaptiveFormatted = formatFixtureDate(`${dateKey}T00:00:00+09:00`, formatted);
+  const adaptiveFormatted = formatFixtureDateKey(dateKey, formatted);
 
   if (diffDays === 0) {
     return `오늘, ${adaptiveFormatted}`;

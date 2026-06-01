@@ -1,5 +1,10 @@
 const KOREA_TIME_ZONE = "Asia/Seoul";
 
+const YEAR_FORMATTER = new Intl.DateTimeFormat("en", {
+  timeZone: KOREA_TIME_ZONE,
+  year: "numeric",
+});
+
 export function parseKoreaDateTime(value: string | null) {
   if (!value) {
     return null;
@@ -9,61 +14,46 @@ export function parseKoreaDateTime(value: string | null) {
   return Number.isNaN(date.getTime()) ? null : date;
 }
 
-export function formatFixtureDateTime(value: string | null, fallback = "-") {
-  const date = parseKoreaDateTime(value);
-  if (!date) {
-    return fallback;
+export function parseKoreaDateKey(value: string | null) {
+  if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    return null;
   }
 
-  const currentYear = Number(
-    new Intl.DateTimeFormat("en", {
-      timeZone: KOREA_TIME_ZONE,
-      year: "numeric",
-    }).format(new Date()),
-  );
-  const fixtureYear = Number(
-    new Intl.DateTimeFormat("en", {
-      timeZone: KOREA_TIME_ZONE,
-      year: "numeric",
-    }).format(date),
-  );
+  const date = new Date(`${value}T00:00:00+09:00`);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
 
-  return new Intl.DateTimeFormat("ko-KR", {
-    timeZone: KOREA_TIME_ZONE,
-    ...(fixtureYear === currentYear ? {} : { year: "numeric" }),
-    month: "long",
-    day: "numeric",
-    weekday: "short",
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-  }).format(date);
+export function formatFixtureDateTime(value: string | null, fallback = "-") {
+  return formatFixtureDateValue(parseKoreaDateTime(value), fallback, true);
 }
 
 export function formatFixtureDate(value: string | null, fallback = "-") {
-  const date = parseKoreaDateTime(value);
+  return formatFixtureDateValue(parseKoreaDateTime(value), fallback, false);
+}
+
+export function formatFixtureDateKey(value: string | null, fallback = "-") {
+  return formatFixtureDateValue(parseKoreaDateKey(value), fallback, false);
+}
+
+function formatFixtureDateValue(date: Date | null, fallback: string, includeTime: boolean) {
   if (!date) {
     return fallback;
   }
 
-  const currentYear = Number(
-    new Intl.DateTimeFormat("en", {
-      timeZone: KOREA_TIME_ZONE,
-      year: "numeric",
-    }).format(new Date()),
-  );
-  const fixtureYear = Number(
-    new Intl.DateTimeFormat("en", {
-      timeZone: KOREA_TIME_ZONE,
-      year: "numeric",
-    }).format(date),
-  );
-
+  const currentYear = Number(YEAR_FORMATTER.format(new Date()));
+  const fixtureYear = Number(YEAR_FORMATTER.format(date));
   return new Intl.DateTimeFormat("ko-KR", {
     timeZone: KOREA_TIME_ZONE,
     ...(fixtureYear === currentYear ? {} : { year: "numeric" }),
     month: "long",
     day: "numeric",
     weekday: "short",
+    ...(includeTime
+      ? {
+          hour: "2-digit",
+          minute: "2-digit",
+          hour12: false,
+        }
+      : {}),
   }).format(date);
 }
