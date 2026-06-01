@@ -18,6 +18,7 @@ import {
   type TeamPlayerRanking,
 } from "../api";
 import type { AuthStatus } from "../App";
+import { formatFixtureDateKey, parseKoreaDateTime } from "../dateUtils";
 
 type LoadState<T> = {
   data: T | null;
@@ -208,6 +209,86 @@ export function TeamDetailPage({ authStatus, season }: { authStatus: AuthStatus;
     }
   }
 
+  function retryTeamPage() {
+    if (!Number.isFinite(numericTeamId) || numericTeamId <= 0) {
+      return;
+    }
+
+    const requestId = loadRequestId.current + 1;
+    loadRequestId.current = requestId;
+    const isLatest = () => loadRequestId.current === requestId;
+
+    setTeamState({ data: null, error: "", isLoading: true });
+    setPlayersState({ data: null, error: "", isLoading: true });
+    setFixturesState({ data: null, error: "", isLoading: true });
+    setRankState({ data: null, error: "", isLoading: true });
+    setFixturePage(0);
+
+    fetchTeamDetails(numericTeamId)
+      .then((data) => {
+        if (isLatest()) {
+          setTeamState({ data, error: "", isLoading: false });
+        }
+      })
+      .catch((error) => {
+        if (isLatest()) {
+          setTeamState({
+            data: null,
+            error: error instanceof Error ? error.message : "팀 정보를 불러오지 못했습니다.",
+            isLoading: false,
+          });
+        }
+      });
+
+    fetchTeamPlayers(numericTeamId, season)
+      .then((players) => {
+        if (isLatest()) {
+          setPlayersState({ data: players, error: "", isLoading: false });
+        }
+      })
+      .catch((error) => {
+        if (isLatest()) {
+          setPlayersState({
+            data: null,
+            error: error instanceof Error ? error.message : "팀 선수 목록을 불러오지 못했습니다.",
+            isLoading: false,
+          });
+        }
+      });
+
+    fetchTeamPlayerRankings(numericTeamId, season)
+      .then((response) => {
+        if (isLatest()) {
+          setRankState({ data: response.rows ?? [], error: "", isLoading: false });
+        }
+      })
+      .catch((error) => {
+        if (isLatest()) {
+          setRankState({
+            data: null,
+            error: error instanceof Error ? error.message : "팀 선수 통계를 불러오지 못했습니다.",
+            isLoading: false,
+          });
+        }
+      });
+
+    fetchFixtures({ season, teamId: numericTeamId, size: FIXTURE_FETCH_SIZE })
+      .then((response) => {
+        if (isLatest()) {
+          setFixturesState({ data: response.content ?? [], error: "", isLoading: false });
+        }
+      })
+      .catch((error) => {
+        if (isLatest()) {
+          setFixturesState({
+            data: null,
+            error: error instanceof Error ? error.message : "팀 경기 일정을 불러오지 못했습니다.",
+            isLoading: false,
+          });
+        }
+      });
+  }
+
   function retryFixtures() {
     if (!Number.isFinite(numericTeamId) || numericTeamId <= 0) {
       return;
@@ -278,6 +359,9 @@ export function TeamDetailPage({ authStatus, season }: { authStatus: AuthStatus;
           <p className="eyebrow">Team Detail</p>
           <h2>팀 정보를 불러오지 못했습니다.</h2>
           <p className="muted">{teamState.error || "잠시 후 다시 시도해 주세요."}</p>
+          <button className="section-retry-button" type="button" onClick={retryTeamPage}>
+            새로 고침
+          </button>
           <Link className="primary-link fixture-back-link" to="/league/standings">
             순위표로
           </Link>
@@ -363,6 +447,7 @@ function FavoriteToggleButton({
 }) {
   return (
     <button
+      aria-label={`${typeLabel} 즐겨찾기 ${isActive ? "해제" : "등록"}`}
       className={`favorite-toggle-button${isActive ? " active" : ""}`}
       disabled={isLoading}
       onClick={onClick}
@@ -370,7 +455,6 @@ function FavoriteToggleButton({
       type="button"
     >
       <Star size={17} aria-hidden="true" fill={isActive ? "currentColor" : "none"} />
-      <span>{isLoading ? "처리 중" : isActive ? "즐겨찾기 해제" : "즐겨찾기"}</span>
     </button>
   );
 }
@@ -626,12 +710,7 @@ function fixtureTime(value: string | null) {
 }
 
 function parseFixtureDate(value: string | null) {
-  if (!value) {
-    return null;
-  }
-  const text = /Z$|[+-]\d\d:\d\d$/.test(value) ? value : `${value}+09:00`;
-  const date = new Date(text);
-  return Number.isNaN(date.getTime()) ? null : date;
+  return parseKoreaDateTime(value);
 }
 
 function formatKoreaDate(date: Date) {
@@ -647,14 +726,7 @@ function dateGroupTitle(value: string) {
   if (value === "unknown") {
     return "날짜 미정";
   }
-  const [year, month, day] = value.split("-").map(Number);
-  const date = new Date(Date.UTC(year, month - 1, day));
-  return new Intl.DateTimeFormat("ko-KR", {
-    timeZone: "Asia/Seoul",
-    month: "long",
-    day: "numeric",
-    weekday: "short",
-  }).format(date);
+  return formatFixtureDateKey(value, value);
 }
 
 function formatTime(value: string | null) {

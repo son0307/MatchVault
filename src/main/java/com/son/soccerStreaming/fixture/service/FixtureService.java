@@ -81,6 +81,7 @@ public class FixtureService {
         return FixtureResponseDto.Summary.builder()
                 .fixtureId(fixture.getFixtureId())
                 .fixtureDate(DateTimeUtils.utcToKorea(fixture.getFixtureDate()))
+                .season(fixture.getSeason())
                 .round(fixture.getRound())
                 .homeTeamId(fixture.getHomeTeam().getTeamId())
                 .awayTeamId(fixture.getAwayTeam().getTeamId())

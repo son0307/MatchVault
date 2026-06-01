@@ -32,6 +32,11 @@ api-football:
       enabled: ${API_FOOTBALL_SYNC_FAILURE_RETRY_ENABLED:true}
       max-attempts: ${API_FOOTBALL_SYNC_FAILURE_RETRY_MAX_ATTEMPTS:2}
       delay-minutes: ${API_FOOTBALL_SYNC_FAILURE_RETRY_DELAY_MINUTES:1}
+    league-seasons:
+      enabled: ${API_FOOTBALL_LEAGUE_SEASONS_SYNC_ENABLED:true}
+      run-on-startup: ${API_FOOTBALL_LEAGUE_SEASONS_SYNC_RUN_ON_STARTUP:true}
+      league: ${API_FOOTBALL_LEAGUE_SEASONS_LEAGUE:39}
+      daily-cron: ${API_FOOTBALL_LEAGUE_SEASONS_DAILY_CRON:0 0 3 * * *}
     teams:
       enabled: ${API_FOOTBALL_TEAMS_SYNC_ENABLED:false}
       run-on-startup: ${API_FOOTBALL_TEAMS_SYNC_RUN_ON_STARTUP:false}

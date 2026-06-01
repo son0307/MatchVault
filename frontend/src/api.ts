@@ -1,6 +1,7 @@
 export type FixtureSummary = {
   fixtureId: number;
   fixtureDate: string | null;
+  season: number | null;
   round: number | null;
   homeTeamId: number | null;
   awayTeamId: number | null;
@@ -18,6 +19,33 @@ export type FixtureMeta = {
   maxDate: string | null;
   minRound: number | null;
   maxRound: number | null;
+};
+
+export type LeagueSeasonCoverage = {
+  leagueId: number;
+  leagueName: string | null;
+  seasonYear: number;
+  label: string;
+  startDate: string | null;
+  endDate: string | null;
+  currentSeason: boolean;
+  events: boolean;
+  lineups: boolean;
+  fixtureStats: boolean;
+  playerStats: boolean;
+  standings: boolean;
+  players: boolean;
+  topScorers: boolean;
+  topAssists: boolean;
+  topCards: boolean;
+  injuries: boolean;
+  predictions: boolean;
+  odds: boolean;
+};
+
+export type LeagueSeasonCoverageResponse = {
+  currentSeason: number;
+  seasons: LeagueSeasonCoverage[];
 };
 
 export type FixtureEventResponse = {
@@ -429,6 +457,7 @@ export class ApiError extends Error {
 
 const SHORT_CACHE_TTL_MS = 60_000;
 const DETAIL_CACHE_TTL_MS = 5 * 60_000;
+const DEFAULT_API_SEASON = 2025;
 
 type CacheEntry<T> = {
   expiresAt: number;
@@ -460,7 +489,7 @@ export async function fetchHomeSummary(season: number): Promise<HomeSummary> {
 
 export async function fetchStandings(season: number): Promise<TeamStanding[]> {
   return cachedGetJson<TeamStanding[]>(
-    `/api/v1/teams/standings?season=${season}`,
+    `/api/v1/teams/standings?season=${normalizeSeason(season)}`,
     "순위 정보를 불러오지 못했습니다.",
     DETAIL_CACHE_TTL_MS,
   );
@@ -504,7 +533,7 @@ export async function fetchFixture(fixtureId: number): Promise<FixtureSummary> {
 
 export async function fetchFixtureMeta(season: number): Promise<FixtureMeta> {
   return cachedGetJson<FixtureMeta>(
-    `/api/v1/fixtures/meta?season=${season}`,
+    `/api/v1/fixtures/meta?season=${normalizeSeason(season)}`,
     "경기 범위를 불러오지 못했습니다.",
     DETAIL_CACHE_TTL_MS,
   );
@@ -560,7 +589,7 @@ export async function fetchTeamDetails(teamId: number): Promise<TeamDetails> {
 
 export async function fetchTeamPlayers(teamId: number, season: number): Promise<PlayerSummary[]> {
   return cachedGetJson<PlayerSummary[]>(
-    `/api/v1/teams/${teamId}/players?season=${season}`,
+    `/api/v1/teams/${teamId}/players?season=${normalizeSeason(season)}`,
     "팀 선수 목록을 불러오지 못했습니다.",
     DETAIL_CACHE_TTL_MS,
   );
@@ -568,7 +597,7 @@ export async function fetchTeamPlayers(teamId: number, season: number): Promise<
 
 export async function fetchTeamPlayerRankings(teamId: number, season: number): Promise<TeamPlayerRankings> {
   return cachedGetJson<TeamPlayerRankings>(
-    `/api/v1/teams/${teamId}/player-rankings?season=${season}`,
+    `/api/v1/teams/${teamId}/player-rankings?season=${normalizeSeason(season)}`,
     "팀 선수 통계를 불러오지 못했습니다.",
     DETAIL_CACHE_TTL_MS,
   );
@@ -616,37 +645,6 @@ export async function fetchCurrentUser(): Promise<CurrentUser> {
   return parseCurrentUser(await responseJson(response, "로그인 사용자 정보가 올바르지 않습니다."));
 }
 
-export async function fetchFavoriteDashboard(season: number): Promise<FavoriteDashboard> {
-  const response = await fetch(`/api/v1/favorites/dashboard?season=${season}`, {
-    headers: {
-      Accept: "application/json",
-    },
-    credentials: "same-origin",
-  });
-
-  if (!response.ok) {
-    throw new ApiError(`즐겨찾기를 불러오지 못했습니다. (${response.status})`, response.status);
-  }
-
-  return response.json();
-}
-
-export async function addFavoriteTeam(teamId: number, season: number): Promise<FavoriteDashboard> {
-  return requestFavoriteDashboard(`/api/v1/favorites/teams/${teamId}?season=${season}`, "POST");
-}
-
-export async function removeFavoriteTeam(teamId: number, season: number): Promise<FavoriteDashboard> {
-  return requestFavoriteDashboard(`/api/v1/favorites/teams/${teamId}?season=${season}`, "DELETE");
-}
-
-export async function addFavoritePlayer(playerId: number, season: number): Promise<FavoriteDashboard> {
-  return requestFavoriteDashboard(`/api/v1/favorites/players/${playerId}?season=${season}`, "POST");
-}
-
-export async function removeFavoritePlayer(playerId: number, season: number): Promise<FavoriteDashboard> {
-  return requestFavoriteDashboard(`/api/v1/favorites/players/${playerId}?season=${season}`, "DELETE");
-}
-
 export async function fetchPlayerPanel(playerId: number): Promise<PlayerPanel> {
   return cachedGetJson<PlayerPanel>(
     `/api/v1/players/${playerId}/panel`,
@@ -655,6 +653,31 @@ export async function fetchPlayerPanel(playerId: number): Promise<PlayerPanel> {
   );
 }
 
+
+export async function fetchPlayerDetails(playerId: number): Promise<PlayerProfile> {
+  return cachedGetJson<PlayerProfile>(
+    `/api/v1/players/${playerId}`,
+    "선수 프로필을 불러오지 못했습니다.",
+    DETAIL_CACHE_TTL_MS,
+  );
+}
+
+export async function fetchPlayerSeasonSummary(playerId: number, season: number): Promise<PlayerSeasonSummary> {
+  return cachedGetJson<PlayerSeasonSummary>(
+    `/api/v1/players/${playerId}/season-summary?season=${normalizeSeason(season)}`,
+    "선수 시즌 스탯을 불러오지 못했습니다.",
+    DETAIL_CACHE_TTL_MS,
+  );
+}
+
+export async function fetchPlayerRecentMatches(playerId: number, season: number, size = 8): Promise<PlayerMatchStat[]> {
+  const normalizedSize = normalizePageSize(size, 8, 1, 30);
+  return cachedGetJson<PlayerMatchStat[]>(
+    `/api/v1/players/${playerId}/recent-matches?season=${normalizeSeason(season)}&size=${normalizedSize}`,
+    "선수 최근 경기를 불러오지 못했습니다.",
+    SHORT_CACHE_TTL_MS,
+  );
+}
 
 async function cachedGetJson<T>(url: string, fallbackMessage: string, ttlMs: number): Promise<T> {
   const now = Date.now();
@@ -723,25 +746,31 @@ export async function fetchFavoriteDashboard(season: number): Promise<FavoriteDa
     throw await responseError(response, `즐겨찾기 요청에 실패했습니다. (${response.status})`);
   }
 
-  const dashboard = await response.json();
-  clearApiMemoryCache();
-  return dashboard;
+  return response.json();
+}
+
+export async function fetchLeagueSeasons(leagueId = 39): Promise<LeagueSeasonCoverageResponse> {
+  return cachedGetJson<LeagueSeasonCoverageResponse>(
+    `/api/v1/leagues/${leagueId}/seasons`,
+    "시즌 정보를 불러오지 못했습니다.",
+    DETAIL_CACHE_TTL_MS,
+  );
 }
 
 export async function addFavoriteTeam(teamId: number, season: number): Promise<FavoriteDashboard> {
-  return postJson(`/api/v1/favorites/teams/${teamId}?season=${normalizeSeason(season)}`, {}) as Promise<FavoriteDashboard>;
+  return requestFavoriteDashboard(`/api/v1/favorites/teams/${teamId}?season=${normalizeSeason(season)}`, "POST");
 }
 
 export async function removeFavoriteTeam(teamId: number, season: number): Promise<FavoriteDashboard> {
-  return deleteJson(`/api/v1/favorites/teams/${teamId}?season=${normalizeSeason(season)}`) as Promise<FavoriteDashboard>;
+  return requestFavoriteDashboard(`/api/v1/favorites/teams/${teamId}?season=${normalizeSeason(season)}`, "DELETE");
 }
 
 export async function addFavoritePlayer(playerId: number, season: number): Promise<FavoriteDashboard> {
-  return postJson(`/api/v1/favorites/players/${playerId}?season=${normalizeSeason(season)}`, {}) as Promise<FavoriteDashboard>;
+  return requestFavoriteDashboard(`/api/v1/favorites/players/${playerId}?season=${normalizeSeason(season)}`, "POST");
 }
 
 export async function removeFavoritePlayer(playerId: number, season: number): Promise<FavoriteDashboard> {
-  return deleteJson(`/api/v1/favorites/players/${playerId}?season=${normalizeSeason(season)}`) as Promise<FavoriteDashboard>;
+  return requestFavoriteDashboard(`/api/v1/favorites/players/${playerId}?season=${normalizeSeason(season)}`, "DELETE");
 }
 
 async function requestFavoriteDashboard(url: string, method: "POST" | "DELETE"): Promise<FavoriteDashboard> {
@@ -769,7 +798,14 @@ function appendParam(params: URLSearchParams, key: string, value: string | numbe
 }
 
 function normalizeSeason(value: number) {
-  return Number.isInteger(value) && value >= 2000 && value <= 2100 ? value : 2025;
+  return Number.isInteger(value) && value >= 2000 && value <= 2100 ? value : DEFAULT_API_SEASON;
+}
+
+function normalizePageSize(value: number, fallback: number, min: number, max: number) {
+  if (!Number.isFinite(value)) {
+    return fallback;
+  }
+  return Math.min(max, Math.max(min, Math.trunc(value)));
 }
 
 async function postJson(url: string, body: unknown): Promise<unknown> {

@@ -9,6 +9,7 @@ import {
   type FixtureSummary,
   type TeamStanding,
 } from "../api";
+import { formatFixtureDateKey, parseKoreaDateTime } from "../dateUtils";
 
 const TEAM_PAGE_SIZE = 10;
 const TEAM_FETCH_SIZE = 100;
@@ -417,7 +418,6 @@ function roundLabel(fixtures: FixtureSummary[]) {
 
 function queryForMode(
   mode: FixtureMode,
-  season: number,
   weekStart: string,
   weekEnd: string,
   round: number,
@@ -506,13 +506,7 @@ function shortDate(value: string) {
 }
 
 function dateGroupTitle(value: string) {
-  const date = parseDateKeyAsUtcDate(value);
-  return new Intl.DateTimeFormat("ko-KR", {
-    timeZone: "Asia/Seoul",
-    month: "long",
-    day: "numeric",
-    weekday: "short",
-  }).format(date);
+  return formatFixtureDateKey(value, value);
 }
 
 function dateKey(value: string | null) {
@@ -528,12 +522,7 @@ function fixtureTime(value: string | null) {
 }
 
 function parseFixtureDate(value: string | null) {
-  if (!value) {
-    return null;
-  }
-  const text = /Z$|[+-]\d\d:\d\d$/.test(value) ? value : `${value}+09:00`;
-  const date = new Date(text);
-  return Number.isNaN(date.getTime()) ? null : date;
+  return parseKoreaDateTime(value);
 }
 
 function formatTime(value: string | null) {

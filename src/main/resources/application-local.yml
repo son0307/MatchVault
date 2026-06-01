@@ -1,5 +1,8 @@
 api-football:
   sync:
+    league-seasons:
+      enabled: false
+      run-on-startup: false
     teams:
       enabled: false
       run-on-startup: false

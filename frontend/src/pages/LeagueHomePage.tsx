@@ -13,6 +13,7 @@ import {
   type FixtureSummary,
   type TeamStanding,
 } from "../api";
+import { formatFixtureDateKey, parseKoreaDateTime } from "../dateUtils";
 
 export function LeagueHomePage({ authStatus, season }: { authStatus: AuthStatus; season: number }) {
   const [selectedDate, setSelectedDate] = useState(todayKoreaDateKey());
@@ -391,7 +392,9 @@ function FavoritePlayerItemV2({ player }: { player: FavoritePlayerCard }) {
           <span className="player-thumb placeholder" aria-hidden="true" />
         )}
         <div>
-          <strong>{player.playerName ?? "-"}</strong>
+          <Link className="favorite-player-link" to={`/players/${player.playerId}`}>
+            {player.playerName ?? "-"}
+          </Link>
           <p>{player.position ?? "Player"} · {seasonStat?.teamName ?? "-"}</p>
         </div>
       </div>
@@ -439,17 +442,18 @@ function dateGroupTitle(dateKey: string) {
     day: "numeric",
     weekday: "short",
   }).format(date);
+  const adaptiveFormatted = formatFixtureDateKey(dateKey, formatted);
 
   if (diffDays === 0) {
-    return `오늘, ${formatted}`;
+    return `오늘, ${adaptiveFormatted}`;
   }
   if (diffDays === 1) {
-    return `내일, ${formatted}`;
+    return `내일, ${adaptiveFormatted}`;
   }
   if (diffDays === -1) {
-    return `어제, ${formatted}`;
+    return `어제, ${adaptiveFormatted}`;
   }
-  return formatted;
+  return adaptiveFormatted;
 }
 
 function formatTime(value: string | null) {
@@ -457,8 +461,8 @@ function formatTime(value: string | null) {
     return "-";
   }
 
-  const date = new Date(/Z$|[+-]\d\d:\d\d$/.test(value) ? value : `${value}+09:00`);
-  if (Number.isNaN(date.getTime())) {
+  const date = parseKoreaDateTime(value);
+  if (!date || Number.isNaN(date.getTime())) {
     return value.slice(11, 16) || "-";
   }
 

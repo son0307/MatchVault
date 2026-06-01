@@ -14,6 +14,11 @@ public interface PlayerFixtureStatRepository extends JpaRepository<PlayerFixture
 
     List<PlayerFixtureStat> findAllByPlayerPlayerIdOrderByFixtureFixtureDateDescFixtureFixtureIdDesc(Long playerId);
 
+    List<PlayerFixtureStat> findAllByPlayerPlayerIdAndFixtureSeasonOrderByFixtureFixtureDateDescFixtureFixtureIdDesc(
+            Long playerId,
+            Integer season
+    );
+
     Optional<PlayerFixtureStat> findTopByPlayerPlayerIdOrderByFixtureFixtureDateDescFixtureFixtureIdDesc(Long playerId);
 
     List<PlayerFixtureStat> findTop5ByPlayerPlayerIdOrderByFixtureFixtureDateDesc(Long playerId);

@@ -13,6 +13,7 @@ public class FixtureResponseDto {
     public static class Summary {
         private Long fixtureId;
         private LocalDateTime fixtureDate;
+        private Integer season;
         private Integer round;
         private Long homeTeamId;
         private Long awayTeamId;
