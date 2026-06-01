@@ -133,6 +133,24 @@ export function PlayerDetailPage({ authStatus, season }: { authStatus: AuthStatu
     }
   }
 
+  function retryPlayerPanel() {
+    if (!Number.isFinite(numericPlayerId) || numericPlayerId <= 0) {
+      return;
+    }
+    setState({ data: null, error: "", isLoading: true });
+    fetchPlayerPanel(numericPlayerId)
+      .then((data) => {
+        setState({ data, error: "", isLoading: false });
+      })
+      .catch((error) => {
+        setState({
+          data: null,
+          error: error instanceof Error ? error.message : "선수 정보를 불러오지 못했습니다.",
+          isLoading: false,
+        });
+      });
+  }
+
   if (state.isLoading) {
     return (
       <section className="league-content player-detail-page">
@@ -148,6 +166,9 @@ export function PlayerDetailPage({ authStatus, season }: { authStatus: AuthStatu
           <p className="eyebrow">Player Detail</p>
           <h2>선수 정보를 불러오지 못했습니다.</h2>
           <p className="muted">{state.error || "잠시 후 다시 시도해 주세요."}</p>
+          <button className="section-retry-button" type="button" onClick={retryPlayerPanel}>
+            새로 고침
+          </button>
           <Link className="primary-link fixture-back-link" to="/league/overview">
             리그 홈으로
           </Link>
@@ -162,6 +183,7 @@ export function PlayerDetailPage({ authStatus, season }: { authStatus: AuthStatu
   return (
     <section className="league-content player-detail-page">
       <PlayerHero
+        canUseFavorite={authStatus === "authenticated"}
         favoriteError={favoriteError}
         isFavorite={isFavorite}
         isFavoriteLoading={isFavoriteLoading}
@@ -178,6 +200,7 @@ export function PlayerDetailPage({ authStatus, season }: { authStatus: AuthStatu
 function PlayerHero({
   profile,
   seasons,
+  canUseFavorite,
   isFavorite,
   isFavoriteLoading,
   favoriteError,
@@ -185,6 +208,7 @@ function PlayerHero({
 }: {
   profile: PlayerProfile;
   seasons: PlayerSeasonSummary[];
+  canUseFavorite: boolean;
   isFavorite: boolean;
   isFavoriteLoading: boolean;
   favoriteError: string;
@@ -213,12 +237,14 @@ function PlayerHero({
         <p className="eyebrow">{profile.position ?? "Player"}</p>
         <div className="detail-title-row">
           <h2>{profile.playerName ?? "-"}</h2>
-          <FavoriteToggleButton
-            isActive={isFavorite}
-            isLoading={isFavoriteLoading}
-            onClick={onToggleFavorite}
-            typeLabel="선수"
-          />
+          {canUseFavorite ? (
+            <FavoriteToggleButton
+              isActive={isFavorite}
+              isLoading={isFavoriteLoading}
+              onClick={onToggleFavorite}
+              typeLabel="선수"
+            />
+          ) : null}
         </div>
         {favoriteError ? <p className="favorite-inline-error">{favoriteError}</p> : null}
         <div className="player-meta-list">

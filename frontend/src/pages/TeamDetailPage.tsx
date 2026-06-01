@@ -208,6 +208,61 @@ export function TeamDetailPage({ authStatus, season }: { authStatus: AuthStatus;
     }
   }
 
+  function retryFixtures() {
+    if (!Number.isFinite(numericTeamId) || numericTeamId <= 0) {
+      return;
+    }
+    setFixturePage(0);
+    setFixturesState({ data: null, error: "", isLoading: true });
+    fetchFixtures({ season, teamId: numericTeamId, size: FIXTURE_FETCH_SIZE })
+      .then((response) => {
+        setFixturesState({ data: response.content ?? [], error: "", isLoading: false });
+      })
+      .catch((error) => {
+        setFixturesState({
+          data: null,
+          error: error instanceof Error ? error.message : "팀 경기 일정을 불러오지 못했습니다.",
+          isLoading: false,
+        });
+      });
+  }
+
+  function retryPlayers() {
+    if (!Number.isFinite(numericTeamId) || numericTeamId <= 0) {
+      return;
+    }
+    setPlayersState({ data: null, error: "", isLoading: true });
+    fetchTeamPlayers(numericTeamId, season)
+      .then((players) => {
+        setPlayersState({ data: players, error: "", isLoading: false });
+      })
+      .catch((error) => {
+        setPlayersState({
+          data: null,
+          error: error instanceof Error ? error.message : "팀 선수 목록을 불러오지 못했습니다.",
+          isLoading: false,
+        });
+      });
+  }
+
+  function retryRankings() {
+    if (!Number.isFinite(numericTeamId) || numericTeamId <= 0) {
+      return;
+    }
+    setRankState({ data: null, error: "", isLoading: true });
+    fetchTeamPlayerRankings(numericTeamId, season)
+      .then((response) => {
+        setRankState({ data: response.rows ?? [], error: "", isLoading: false });
+      })
+      .catch((error) => {
+        setRankState({
+          data: null,
+          error: error instanceof Error ? error.message : "팀 선수 통계를 불러오지 못했습니다.",
+          isLoading: false,
+        });
+      });
+  }
+
   if (teamState.isLoading) {
     return (
       <section className="league-content team-detail-page">
@@ -234,27 +289,35 @@ export function TeamDetailPage({ authStatus, season }: { authStatus: AuthStatus;
   return (
     <section className="league-content team-detail-page">
       <TeamHero
+        canUseFavorite={authStatus === "authenticated"}
         favoriteError={favoriteError}
         isFavorite={isFavorite}
         isFavoriteLoading={isFavoriteLoading}
         onToggleFavorite={toggleFavorite}
         team={teamState.data}
       />
-      <TeamFixturePanel fixturePage={fixturePage} fixturesState={fixturesState} setFixturePage={setFixturePage} />
-      <TeamPlayersPanel playersState={playersState} />
-      <TeamPlayerRanksPanel rankState={rankState} />
+      <TeamFixturePanel
+        fixturePage={fixturePage}
+        fixturesState={fixturesState}
+        onRetry={retryFixtures}
+        setFixturePage={setFixturePage}
+      />
+      <TeamPlayersPanel onRetry={retryPlayers} playersState={playersState} />
+      <TeamPlayerRanksPanel onRetry={retryRankings} rankState={rankState} />
     </section>
   );
 }
 
 function TeamHero({
   team,
+  canUseFavorite,
   isFavorite,
   isFavoriteLoading,
   favoriteError,
   onToggleFavorite,
 }: {
   team: TeamDetails;
+  canUseFavorite: boolean;
   isFavorite: boolean;
   isFavoriteLoading: boolean;
   favoriteError: string;
@@ -267,16 +330,18 @@ function TeamHero({
         <p className="eyebrow">{team.country ?? "Team"}</p>
         <div className="detail-title-row">
           <h2>{team.teamName ?? "-"}</h2>
-          <FavoriteToggleButton
-            isActive={isFavorite}
-            isLoading={isFavoriteLoading}
-            onClick={onToggleFavorite}
-            typeLabel="팀"
-          />
+          {canUseFavorite ? (
+            <FavoriteToggleButton
+              isActive={isFavorite}
+              isLoading={isFavoriteLoading}
+              onClick={onToggleFavorite}
+              typeLabel="팀"
+            />
+          ) : null}
         </div>
         {favoriteError ? <p className="favorite-inline-error">{favoriteError}</p> : null}
         <div className="team-detail-meta">
-          <span>{team.code ?? "코드 정보 없음"}</span>
+          <span>{team.country ?? "국가 정보 없음"}</span>
           <span>{team.founded ? `${team.founded} 창단` : "창단 정보 없음"}</span>
           <span>{team.venue?.venueName ?? "경기장 정보 없음"}</span>
         </div>
@@ -313,10 +378,12 @@ function FavoriteToggleButton({
 function TeamFixturePanel({
   fixturePage,
   fixturesState,
+  onRetry,
   setFixturePage,
 }: {
   fixturePage: number;
   fixturesState: LoadState<FixtureSummary[]>;
+  onRetry: () => void;
   setFixturePage: Dispatch<SetStateAction<number>>;
 }) {
   const orderedFixtures = useMemo(
@@ -338,7 +405,7 @@ function TeamFixturePanel({
         <h2>경기 일정</h2>
       </div>
       {fixturesState.isLoading ? <div className="empty-state">경기 일정을 불러오는 중입니다.</div> : null}
-      {fixturesState.error ? <div className="section-error">{fixturesState.error}</div> : null}
+      {fixturesState.error ? <SectionRetryError message={fixturesState.error} onRetry={onRetry} /> : null}
       {!fixturesState.isLoading && !fixturesState.error ? <TeamFixtureGroups groupedFixtures={groupedFixtures} /> : null}
       {!fixturesState.isLoading && !fixturesState.error && orderedFixtures.length > TEAM_FIXTURE_PAGE_SIZE ? (
         <div className="team-pager team-detail-pager">
@@ -388,7 +455,7 @@ function TeamFixtureGroups({ groupedFixtures }: { groupedFixtures: Array<[string
   );
 }
 
-function TeamPlayersPanel({ playersState }: { playersState: LoadState<PlayerSummary[]> }) {
+function TeamPlayersPanel({ playersState, onRetry }: { playersState: LoadState<PlayerSummary[]>; onRetry: () => void }) {
   const players = (playersState.data ?? []).slice().sort(comparePlayers);
 
   return (
@@ -398,7 +465,7 @@ function TeamPlayersPanel({ playersState }: { playersState: LoadState<PlayerSumm
         <h2>등록 선수</h2>
       </div>
       {playersState.isLoading ? <div className="empty-state">선수 목록을 불러오는 중입니다.</div> : null}
-      {playersState.error ? <div className="section-error">{playersState.error}</div> : null}
+      {playersState.error ? <SectionRetryError message={playersState.error} onRetry={onRetry} /> : null}
       {!playersState.isLoading && !playersState.error ? (
         players.length ? (
           <div className="team-player-grid">
@@ -422,7 +489,7 @@ function TeamPlayersPanel({ playersState }: { playersState: LoadState<PlayerSumm
   );
 }
 
-function TeamPlayerRanksPanel({ rankState }: { rankState: LoadState<TeamPlayerRanking[]> }) {
+function TeamPlayerRanksPanel({ rankState, onRetry }: { rankState: LoadState<TeamPlayerRanking[]>; onRetry: () => void }) {
   const rows = rankState.data ?? [];
   const isLoading = rankState.isLoading;
   const error = rankState.error;
@@ -445,7 +512,7 @@ function TeamPlayerRanksPanel({ rankState }: { rankState: LoadState<TeamPlayerRa
         <h2>선수 통계</h2>
       </div>
       {isLoading ? <div className="empty-state">선수 통계를 불러오는 중입니다.</div> : null}
-      {rankState.error ? <div className="section-error">{rankState.error}</div> : null}
+      {rankState.error ? <SectionRetryError message={rankState.error} onRetry={onRetry} /> : null}
       {!rankState.isLoading && !rankState.error && rows.length ? (
         <div className="team-rank-grid">
           {rankGroups.map((group) => (
@@ -467,6 +534,17 @@ function TeamPlayerRanksPanel({ rankState }: { rankState: LoadState<TeamPlayerRa
       ) : null}
       {!isLoading && !rows.length && !error ? <div className="empty-state">표시할 선수 통계가 없습니다.</div> : null}
     </article>
+  );
+}
+
+function SectionRetryError({ message, onRetry }: { message: string; onRetry: () => void }) {
+  return (
+    <div className="section-error section-retry-error">
+      <span>{message}</span>
+      <button type="button" onClick={onRetry}>
+        새로 고침
+      </button>
+    </div>
   );
 }
 

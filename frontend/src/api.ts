@@ -528,33 +528,19 @@ export async function fetchFixtureLineups(fixtureId: number): Promise<FixtureLin
 }
 
 export async function fetchFixtureStats(fixtureId: number): Promise<FixtureStatResponse> {
-  const response = await fetch(`/api/v1/fixtures/${fixtureId}/stats`, {
-    headers: {
-      Accept: "application/json",
-    },
-    credentials: "same-origin",
-  });
-
-  if (!response.ok) {
-    throw new ApiError(`팀 통계를 불러오지 못했습니다. (${response.status})`, response.status);
-  }
-
-  return response.json();
+  return cachedGetJson<FixtureStatResponse>(
+    `/api/v1/fixtures/${fixtureId}/stats`,
+    "팀 통계를 불러오지 못했습니다.",
+    SHORT_CACHE_TTL_MS,
+  );
 }
 
 export async function fetchFixturePlayerStats(fixtureId: number): Promise<FixturePlayerStatResponse> {
-  const response = await fetch(`/api/v1/fixtures/${fixtureId}/player-stats`, {
-    headers: {
-      Accept: "application/json",
-    },
-    credentials: "same-origin",
-  });
-
-  if (!response.ok) {
-    throw new ApiError(`선수별 경기 통계를 불러오지 못했습니다. (${response.status})`, response.status);
-  }
-
-  return response.json();
+  return cachedGetJson<FixturePlayerStatResponse>(
+    `/api/v1/fixtures/${fixtureId}/player-stats`,
+    "선수별 경기 통계를 불러오지 못했습니다.",
+    SHORT_CACHE_TTL_MS,
+  );
 }
 
 export async function fetchTeams(): Promise<TeamSummary[]> {
@@ -568,7 +554,6 @@ export async function fetchTeamDetails(teamId: number): Promise<TeamDetails> {
     "팀 정보를 불러오지 못했습니다.",
     DETAIL_CACHE_TTL_MS,
   );
-
 }
 
 export async function fetchTeamPlayers(teamId: number, season: number): Promise<PlayerSummary[]> {
@@ -577,7 +562,6 @@ export async function fetchTeamPlayers(teamId: number, season: number): Promise<
     "팀 선수 목록을 불러오지 못했습니다.",
     DETAIL_CACHE_TTL_MS,
   );
-
 }
 
 export async function fetchTeamPlayerRankings(teamId: number, season: number): Promise<TeamPlayerRankings> {
@@ -586,7 +570,6 @@ export async function fetchTeamPlayerRankings(teamId: number, season: number): P
     "팀 선수 통계를 불러오지 못했습니다.",
     DETAIL_CACHE_TTL_MS,
   );
-
 }
 
 export async function login(email: string, password: string): Promise<CurrentUser> {
@@ -668,8 +651,8 @@ export async function fetchPlayerPanel(playerId: number): Promise<PlayerPanel> {
     "선수 정보를 불러오지 못했습니다.",
     DETAIL_CACHE_TTL_MS,
   );
-
 }
+
 
 async function cachedGetJson<T>(url: string, fallbackMessage: string, ttlMs: number): Promise<T> {
   const now = Date.now();

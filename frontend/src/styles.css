@@ -522,6 +522,35 @@ h2 {
   font-weight: 800;
 }
 
+.section-retry-error {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.section-retry-error span {
+  min-width: 0;
+}
+
+.section-retry-error button,
+.section-retry-button {
+  min-height: 34px;
+  border: 1px solid #d79a9a;
+  border-radius: 6px;
+  padding: 0 10px;
+  background: #ffffff;
+  color: #9f1616;
+  cursor: pointer;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+.section-retry-error button:hover,
+.section-retry-button:hover {
+  background: #fff1f1;
+}
+
 .compact-ranking {
   display: grid;
 }

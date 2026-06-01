@@ -180,7 +180,7 @@ function LeagueLayout({ children, onSeasonChange, season }: LeagueLayoutProps) {
         </div>
         <div className="league-header-actions">
           <label className="season-field compact league-season-field">
-            <span>Season</span>
+            <span>현재 시즌</span>
             <input
               type="number"
               value={season}
