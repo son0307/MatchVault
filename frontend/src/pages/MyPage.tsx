@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
-import { Navigate, useNavigate } from "react-router-dom";
+import { Link, Navigate, useNavigate } from "react-router-dom";
 import { KeyRound, Star, Trash2, UserRound } from "lucide-react";
 import type { LeagueAuthState } from "../App";
 import {
@@ -388,7 +388,9 @@ function FavoriteTeamManageList({
               <div className="favorite-mini-head">
                 {team.logoUrl ? <img src={team.logoUrl} alt="" className="team-logo" /> : <span className="team-logo placeholder" />}
                 <div>
-                  <strong>{team.teamName ?? "-"}</strong>
+                  <Link className="team-name-link" to={`/teams/${team.teamId}`}>
+                    {team.teamName ?? "-"}
+                  </Link>
                   <p>{numberText(team.rank)}위 · {numberText(team.points)}점 · 최근 {team.form ?? "-"}</p>
                 </div>
               </div>
@@ -463,7 +465,9 @@ function FavoritePlayerManageCard({
       <div className="favorite-mini-head">
         {player.photoUrl ? <img src={player.photoUrl} alt="" className="player-thumb" /> : <span className="player-thumb placeholder" />}
         <div>
-          <strong>{player.playerName ?? "-"}</strong>
+          <Link className="favorite-player-link" to={`/players/${player.playerId}`}>
+            {player.playerName ?? "-"}
+          </Link>
           <p>{player.position ?? "Player"} · {seasonStat?.teamName ?? "-"}</p>
         </div>
       </div>

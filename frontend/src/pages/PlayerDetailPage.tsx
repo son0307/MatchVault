@@ -1,76 +1,57 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import { Activity, CalendarDays, ChevronDown, ChevronLeft, ChevronRight, Shirt, Star, UserRound } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { Activity, CalendarDays, Shirt, Star, UserRound } from "lucide-react";
 import { Link, useParams } from "react-router-dom";
 import {
   ApiError,
   addFavoritePlayer,
   fetchFavoriteDashboard,
-  fetchPlayerPanel,
+  fetchPlayerDetails,
+  fetchPlayerRecentMatches,
+  fetchPlayerSeasonSummary,
   removeFavoritePlayer,
   type PlayerMatchStat,
-  type PlayerPanel,
   type PlayerProfile,
   type PlayerSeasonSummary,
+  type PlayerTeamSeasonSummary,
 } from "../api";
 import type { AuthStatus } from "../App";
+import { formatFixtureDate, parseKoreaDateTime } from "../dateUtils";
 
-type LoadState = {
-  data: PlayerPanel | null;
+type LoadState<T> = {
+  data: T | null;
   error: string;
   isLoading: boolean;
 };
 
-const MATCHES_PER_PAGE = 5;
+const RECENT_MATCH_SIZE = 8;
+
+const loadingState = <T,>(): LoadState<T> => ({
+  data: null,
+  error: "",
+  isLoading: true,
+});
 
 export function PlayerDetailPage({ authStatus, season }: { authStatus: AuthStatus; season: number }) {
   const { playerId } = useParams();
   const numericPlayerId = Number(playerId);
-  const loadRequestId = useRef(0);
-  const [state, setState] = useState<LoadState>({
-    data: null,
-    error: "",
-    isLoading: true,
-  });
+  const profileRequestId = useRef(0);
+  const seasonRequestId = useRef(0);
+  const matchesRequestId = useRef(0);
+  const [profileState, setProfileState] = useState<LoadState<PlayerProfile>>(loadingState);
+  const [seasonState, setSeasonState] = useState<LoadState<PlayerSeasonSummary>>(loadingState);
+  const [matchesState, setMatchesState] = useState<LoadState<PlayerMatchStat[]>>(loadingState);
   const [isFavorite, setIsFavorite] = useState(false);
   const [isFavoriteLoading, setIsFavoriteLoading] = useState(false);
   const [favoriteError, setFavoriteError] = useState("");
 
   useEffect(() => {
-    if (!Number.isFinite(numericPlayerId) || numericPlayerId <= 0) {
-      setState({
-        data: null,
-        error: "올바른 선수 ID가 아닙니다.",
-        isLoading: false,
-      });
-      return;
-    }
-
-    const requestId = loadRequestId.current + 1;
-    loadRequestId.current = requestId;
-    let isCurrent = true;
-    const isLatest = () => isCurrent && loadRequestId.current === requestId;
-    setState({ data: null, error: "", isLoading: true });
-
-    fetchPlayerPanel(numericPlayerId)
-      .then((data) => {
-        if (isLatest()) {
-          setState({ data, error: "", isLoading: false });
-        }
-      })
-      .catch((error) => {
-        if (isLatest()) {
-          setState({
-            data: null,
-            error: error instanceof Error ? error.message : "선수 정보를 불러오지 못했습니다.",
-            isLoading: false,
-          });
-        }
-      });
-
-    return () => {
-      isCurrent = false;
-    };
+    loadProfile();
   }, [numericPlayerId]);
+
+  useEffect(() => {
+    loadSeasonSummary();
+    loadRecentMatches();
+  }, [numericPlayerId, season]);
 
   useEffect(() => {
     if (!Number.isFinite(numericPlayerId) || numericPlayerId <= 0) {
@@ -106,6 +87,84 @@ export function PlayerDetailPage({ authStatus, season }: { authStatus: AuthStatu
     };
   }, [authStatus, numericPlayerId, season]);
 
+  function loadProfile() {
+    if (!Number.isFinite(numericPlayerId) || numericPlayerId <= 0) {
+      setProfileState({ data: null, error: "올바른 선수 ID가 아닙니다.", isLoading: false });
+      return;
+    }
+
+    const requestId = profileRequestId.current + 1;
+    profileRequestId.current = requestId;
+    setProfileState(loadingState);
+    fetchPlayerDetails(numericPlayerId)
+      .then((profile) => {
+        if (requestId === profileRequestId.current) {
+          setProfileState({ data: profile, error: "", isLoading: false });
+        }
+      })
+      .catch((error) => {
+        if (requestId === profileRequestId.current) {
+          setProfileState({
+            data: null,
+            error: error instanceof Error ? error.message : "선수 프로필을 불러오지 못했습니다.",
+            isLoading: false,
+          });
+        }
+      });
+  }
+
+  function loadSeasonSummary() {
+    if (!Number.isFinite(numericPlayerId) || numericPlayerId <= 0) {
+      setSeasonState({ data: null, error: "올바른 선수 ID가 아닙니다.", isLoading: false });
+      return;
+    }
+
+    const requestId = seasonRequestId.current + 1;
+    seasonRequestId.current = requestId;
+    setSeasonState(loadingState);
+    fetchPlayerSeasonSummary(numericPlayerId, season)
+      .then((summary) => {
+        if (requestId === seasonRequestId.current) {
+          setSeasonState({ data: summary, error: "", isLoading: false });
+        }
+      })
+      .catch((error) => {
+        if (requestId === seasonRequestId.current) {
+          setSeasonState({
+            data: null,
+            error: error instanceof Error ? error.message : "선수 시즌 스탯을 불러오지 못했습니다.",
+            isLoading: false,
+          });
+        }
+      });
+  }
+
+  function loadRecentMatches() {
+    if (!Number.isFinite(numericPlayerId) || numericPlayerId <= 0) {
+      setMatchesState({ data: null, error: "올바른 선수 ID가 아닙니다.", isLoading: false });
+      return;
+    }
+
+    const requestId = matchesRequestId.current + 1;
+    matchesRequestId.current = requestId;
+    setMatchesState(loadingState);
+    fetchPlayerRecentMatches(numericPlayerId, season, RECENT_MATCH_SIZE)
+      .then((matches) => {
+        if (requestId === matchesRequestId.current) {
+          setMatchesState({ data: matches, error: "", isLoading: false });
+        }
+      })
+      .catch((error) => {
+        if (requestId === matchesRequestId.current) {
+          setMatchesState({
+            data: null,
+            error: error instanceof Error ? error.message : "선수 최근 경기를 불러오지 못했습니다.",
+            isLoading: false,
+          });
+        }
+      });
+  }
+
   async function toggleFavorite() {
     if (!Number.isFinite(numericPlayerId) || numericPlayerId <= 0) {
       return;
@@ -133,41 +192,23 @@ export function PlayerDetailPage({ authStatus, season }: { authStatus: AuthStatu
     }
   }
 
-  function retryPlayerPanel() {
-    if (!Number.isFinite(numericPlayerId) || numericPlayerId <= 0) {
-      return;
-    }
-    setState({ data: null, error: "", isLoading: true });
-    fetchPlayerPanel(numericPlayerId)
-      .then((data) => {
-        setState({ data, error: "", isLoading: false });
-      })
-      .catch((error) => {
-        setState({
-          data: null,
-          error: error instanceof Error ? error.message : "선수 정보를 불러오지 못했습니다.",
-          isLoading: false,
-        });
-      });
-  }
-
-  if (state.isLoading) {
+  if (profileState.isLoading) {
     return (
       <section className="league-content player-detail-page">
-        <article className="panel placeholder-panel">선수 정보를 불러오는 중입니다.</article>
+        <article className="panel placeholder-panel">선수 프로필을 불러오는 중입니다.</article>
       </section>
     );
   }
 
-  if (state.error || !state.data?.profile) {
+  if (profileState.error || !profileState.data) {
     return (
       <section className="league-content player-detail-page">
         <article className="panel placeholder-panel">
           <p className="eyebrow">Player Detail</p>
-          <h2>선수 정보를 불러오지 못했습니다.</h2>
-          <p className="muted">{state.error || "잠시 후 다시 시도해 주세요."}</p>
-          <button className="section-retry-button" type="button" onClick={retryPlayerPanel}>
-            새로 고침
+          <h2>선수 프로필을 불러오지 못했습니다.</h2>
+          <p className="muted">{profileState.error || "잠시 후 다시 시도해 주세요."}</p>
+          <button className="section-retry-button" type="button" onClick={loadProfile}>
+            다시 불러오기
           </button>
           <Link className="primary-link fixture-back-link" to="/league/overview">
             리그 홈으로
@@ -177,9 +218,6 @@ export function PlayerDetailPage({ authStatus, season }: { authStatus: AuthStatu
     );
   }
 
-  const seasons = state.data.seasons ?? [];
-  const matches = state.data.matches ?? [];
-
   return (
     <section className="league-content player-detail-page">
       <PlayerHero
@@ -188,18 +226,18 @@ export function PlayerDetailPage({ authStatus, season }: { authStatus: AuthStatu
         isFavorite={isFavorite}
         isFavoriteLoading={isFavoriteLoading}
         onToggleFavorite={toggleFavorite}
-        profile={state.data.profile}
-        seasons={seasons}
+        profile={profileState.data}
+        seasonState={seasonState}
       />
-      <SeasonSummaryPanel matches={matches} seasons={seasons} />
-      <RecentMatchesPanel matches={matches} />
+      <SeasonSummaryPanel onRetry={loadSeasonSummary} season={season} state={seasonState} />
+      <RecentMatchesPanel onRetry={loadRecentMatches} state={matchesState} />
     </section>
   );
 }
 
 function PlayerHero({
   profile,
-  seasons,
+  seasonState,
   canUseFavorite,
   isFavorite,
   isFavoriteLoading,
@@ -207,21 +245,13 @@ function PlayerHero({
   onToggleFavorite,
 }: {
   profile: PlayerProfile;
-  seasons: PlayerSeasonSummary[];
+  seasonState: LoadState<PlayerSeasonSummary>;
   canUseFavorite: boolean;
   isFavorite: boolean;
   isFavoriteLoading: boolean;
   favoriteError: string;
   onToggleFavorite: () => void;
 }) {
-  const primaryTeam = profile.teamName
-    ? {
-        id: profile.teamId,
-        logoUrl: profile.teamLogoUrl,
-        name: profile.teamName,
-      }
-    : latestTeam(seasons);
-
   return (
     <article className="panel player-hero">
       <div className="player-photo-wrap">
@@ -250,42 +280,73 @@ function PlayerHero({
         <div className="player-meta-list">
           <span>{profile.nationality ?? "국적 정보 없음"}</span>
           <span>{profile.age ? `${profile.age}세` : "나이 정보 없음"}</span>
-          <span>{profile.height ?? "신장 정보 없음"}</span>
-          <span>{profile.weight ?? "체중 정보 없음"}</span>
+          <span>{profile.height ? `${profile.height}cm` : "신장 정보 없음"}</span>
+          <span>{profile.weight ? `${profile.weight}kg` : "체중 정보 없음"}</span>
         </div>
       </div>
-      <div className="player-team-card">
-        {primaryTeam?.logoUrl ? <img src={primaryTeam.logoUrl} alt="" className="team-logo large" /> : null}
-        <div>
-          {primaryTeam?.id ? (
-            <Link className="team-name-link" to={`/teams/${primaryTeam.id}`}>
-              {primaryTeam.name ?? "소속팀 정보 없음"}
-            </Link>
-          ) : (
-            <strong>{primaryTeam?.name ?? "소속팀 정보 없음"}</strong>
-          )}
-          <p>
-            {profile.backNumber ? `No. ${profile.backNumber}` : "등번호 정보 없음"}
-            {profile.birthDate ? ` · ${formatDateOnly(profile.birthDate)}` : ""}
-          </p>
-        </div>
-      </div>
+      <SeasonTeamSummary state={seasonState} />
     </article>
   );
 }
 
-function latestTeam(seasons: PlayerSeasonSummary[]) {
-  const latestSeason = seasons.find((season) => season.teams?.length);
-  const latestTeamSummary = latestSeason?.teams[0];
-  if (!latestTeamSummary) {
-    return null;
+function SeasonTeamSummary({ state }: { state: LoadState<PlayerSeasonSummary> }) {
+  if (state.isLoading) {
+    return (
+      <div className="player-team-card">
+        <div>
+          <strong>소속팀 확인 중</strong>
+          <p>선택 시즌 기준으로 불러오고 있습니다.</p>
+        </div>
+      </div>
+    );
   }
 
-  return {
-    id: latestTeamSummary.teamId,
-    logoUrl: latestTeamSummary.teamLogoUrl,
-    name: latestTeamSummary.teamName,
-  };
+  if (state.error) {
+    return (
+      <div className="player-team-card">
+        <div>
+          <strong>소속팀 정보를 불러오지 못했습니다.</strong>
+          <p>{state.error}</p>
+        </div>
+      </div>
+    );
+  }
+
+  const teams = state.data?.teams ?? [];
+  if (!teams.length) {
+    return (
+      <div className="player-team-card">
+        <div>
+          <strong>해당 시즌 소속팀 정보 없음</strong>
+          <p>선택 시즌의 EPL 기록이 없습니다.</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="player-team-card">
+      <div className="player-season-team-logos">
+        {teams.map((team) =>
+          team.teamLogoUrl ? (
+            <img src={team.teamLogoUrl} alt="" className="team-logo large" key={team.teamId} />
+          ) : (
+            <span className="team-logo large placeholder" aria-hidden="true" key={team.teamId} />
+          ),
+        )}
+      </div>
+      <div>
+        <strong>{teams.length > 1 ? "선택 시즌 소속팀" : "선택 시즌 소속팀"}</strong>
+        <div className="player-season-team-links">
+          {teams.map((team) => (
+            <Link className="team-name-link" to={`/teams/${team.teamId}`} key={team.teamId}>
+              {team.teamName ?? "-"}
+            </Link>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
 }
 
 function FavoriteToggleButton({
@@ -301,6 +362,7 @@ function FavoriteToggleButton({
 }) {
   return (
     <button
+      aria-label={`${typeLabel} 즐겨찾기 ${isActive ? "해제" : "등록"}`}
       className={`favorite-toggle-button${isActive ? " active" : ""}`}
       disabled={isLoading}
       onClick={onClick}
@@ -308,24 +370,40 @@ function FavoriteToggleButton({
       type="button"
     >
       <Star size={17} aria-hidden="true" fill={isActive ? "currentColor" : "none"} />
-      <span>{isLoading ? "처리 중" : isActive ? "즐겨찾기 해제" : "즐겨찾기"}</span>
     </button>
   );
 }
 
 function SeasonSummaryPanel({
-  seasons,
-  matches,
+  season,
+  state,
+  onRetry,
 }: {
-  seasons: PlayerSeasonSummary[];
-  matches: PlayerMatchStat[];
+  season: number;
+  state: LoadState<PlayerSeasonSummary>;
+  onRetry: () => void;
 }) {
-  const [expandedSeason, setExpandedSeason] = useState<number | null>(null);
-
-  if (!seasons.length) {
+  if (state.isLoading) {
     return (
       <article className="panel detail-panel">
-        <div className="empty-state">시즌 요약 정보가 없습니다.</div>
+        <div className="empty-state">시즌 스탯을 불러오는 중입니다.</div>
+      </article>
+    );
+  }
+
+  if (state.error) {
+    return <SectionError title="시즌 스탯을 불러오지 못했습니다." message={state.error} onRetry={onRetry} />;
+  }
+
+  const summary = state.data;
+  if (!summary || (!summary.totalFixtures && !(summary.teams ?? []).length)) {
+    return (
+      <article className="panel detail-panel">
+        <div className="detail-panel-heading player-panel-title">
+          <Shirt size={19} aria-hidden="true" />
+          <h2>{season} 시즌 스탯</h2>
+        </div>
+        <div className="empty-state">선택 시즌의 EPL 기록이 없습니다.</div>
       </article>
     );
   }
@@ -334,239 +412,89 @@ function SeasonSummaryPanel({
     <article className="panel detail-panel">
       <div className="detail-panel-heading player-panel-title">
         <Shirt size={19} aria-hidden="true" />
-        <h2>시즌 요약</h2>
+        <h2>{summary.season ?? season} 시즌 스탯</h2>
       </div>
-      <div className="player-season-accordion">
-        {seasons.map((season) => {
-          const seasonKey = season.season ?? -1;
-          const isOpen = expandedSeason === seasonKey;
-
-          return (
-            <SeasonAccordionItem
-              isOpen={isOpen}
-              key={seasonKey}
-              matches={matches.filter((match) => match.season === season.season)}
-              onToggle={() => setExpandedSeason(isOpen ? null : seasonKey)}
-              season={season}
-            />
-          );
-        })}
+      <div className="player-stat-chips">
+        <StatChip label="경기" value={summary.totalFixtures} />
+        <StatChip label="출전 시간" value={summary.minutesPlayed} />
+        <StatChip label="골" value={summary.goals} />
+        <StatChip label="도움" value={summary.assists} />
+        <StatChip label="평점" value={ratingText(summary.averageRating)} />
+        <StatChip label="슈팅" value={summary.shots} />
+        <StatChip label="유효 슈팅" value={summary.shotsOnTarget} />
+        <StatChip label="키패스" value={summary.keyPasses} />
+        <StatChip label="경고" value={summary.yellowCards} />
+        <StatChip label="퇴장" value={summary.redCards} />
       </div>
+      <SeasonTeamStats teams={summary.teams ?? []} />
     </article>
   );
 }
 
-function SeasonAccordionItem({
-  season,
-  matches,
-  isOpen,
-  onToggle,
-}: {
-  season: PlayerSeasonSummary;
-  matches: PlayerMatchStat[];
-  isOpen: boolean;
-  onToggle: () => void;
-}) {
-  const teamGroups = useMemo(
-    () => groupSeasonMatchesByTeam(matches, season.teams ?? []),
-    [matches, season.teams],
-  );
-
-  return (
-    <section className={`player-season-item${isOpen ? " open" : ""}`}>
-      <button className="player-season-toggle" type="button" onClick={onToggle} aria-expanded={isOpen}>
-        <div>
-          <strong>{season.season ?? "-"} 시즌</strong>
-          <span>
-            {numberText(season.totalFixtures)}경기 · {numberText(season.goals)}골 · {numberText(season.assists)}도움
-          </span>
-        </div>
-        <div className="player-season-toggle-meta">
-          <span>평점 {ratingText(season.averageRating)}</span>
-          <ChevronDown size={18} aria-hidden="true" />
-        </div>
-      </button>
-
-      {isOpen ? (
-        <div className="player-season-body">
-          <div className="player-stat-chips">
-            <StatChip label="경기" value={season.totalFixtures} />
-            <StatChip label="출전 시간" value={season.minutesPlayed} />
-            <StatChip label="슈팅" value={season.shots} />
-            <StatChip label="유효 슈팅" value={season.shotsOnTarget} />
-            <StatChip label="키패스" value={season.keyPasses} />
-            <StatChip label="경고" value={season.yellowCards} />
-            <StatChip label="퇴장" value={season.redCards} />
-          </div>
-
-          <SeasonTeamGroups groups={teamGroups} />
-        </div>
-      ) : null}
-    </section>
-  );
-}
-
-function StatChip({ label, value }: { label: string; value: number }) {
+function StatChip({ label, value }: { label: string; value: number | string }) {
   return (
     <div>
       <span>{label}</span>
-      <strong>{numberText(value)}</strong>
+      <strong>{typeof value === "number" ? numberText(value) : value}</strong>
     </div>
   );
 }
 
-type SeasonTeamMatchGroup = {
-  key: string;
-  teamId: number | null;
-  teamName: string | null;
-  teamLogoUrl: string | null;
-  summary: PlayerSeasonSummary["teams"][number] | null;
-  matches: PlayerMatchStat[];
-};
-
-function groupSeasonMatchesByTeam(
-  matches: PlayerMatchStat[],
-  teams: PlayerSeasonSummary["teams"],
-): SeasonTeamMatchGroup[] {
-  const summariesById = new Map(teams.map((team) => [team.teamId, team]));
-  const summariesByName = new Map(teams.map((team) => [team.teamName ?? "", team]));
-  const groups = new Map<string, SeasonTeamMatchGroup>();
-
-  sortMatchesByDateAsc(matches).forEach((match) => {
-    const summary = match.teamId ? summariesById.get(match.teamId) ?? null : summariesByName.get(match.teamName ?? "") ?? null;
-    const key = match.teamId ? `team-${match.teamId}` : `team-${match.teamName ?? "unknown"}`;
-    const group = groups.get(key) ?? {
-      key,
-      teamId: match.teamId,
-      teamName: match.teamName ?? summary?.teamName ?? null,
-      teamLogoUrl: summary?.teamLogoUrl ?? null,
-      summary,
-      matches: [],
-    };
-
-    group.matches.push(match);
-    groups.set(key, group);
-  });
-
-  teams.forEach((team) => {
-    const key = `team-${team.teamId}`;
-    if (!groups.has(key)) {
-      groups.set(key, {
-        key,
-        teamId: team.teamId,
-        teamName: team.teamName,
-        teamLogoUrl: team.teamLogoUrl,
-        summary: team,
-        matches: [],
-      });
-    }
-  });
-
-  return Array.from(groups.values());
-}
-
-function sortMatchesByDateAsc(matches: PlayerMatchStat[]) {
-  return matches.slice().sort((left, right) => {
-    const leftTime = matchTime(left);
-    const rightTime = matchTime(right);
-
-    return leftTime - rightTime || left.fixtureId - right.fixtureId;
-  });
-}
-
-function matchTime(match: PlayerMatchStat) {
-  if (!match.fixtureDate) {
-    return Number.MAX_SAFE_INTEGER;
-  }
-
-  const date = new Date(hasExplicitTimeZone(match.fixtureDate) ? match.fixtureDate : `${match.fixtureDate}+09:00`);
-  return Number.isNaN(date.getTime()) ? Number.MAX_SAFE_INTEGER : date.getTime();
-}
-
-function SeasonTeamGroups({ groups }: { groups: SeasonTeamMatchGroup[] }) {
-  if (!groups.length) {
-    return <div className="empty-state compact">해당 시즌 경기 기록이 없습니다.</div>;
+function SeasonTeamStats({ teams }: { teams: PlayerTeamSeasonSummary[] }) {
+  if (!teams.length) {
+    return null;
   }
 
   return (
     <div className="player-season-team-groups">
-      {groups.map((group) => (
-        <SeasonTeamGroup group={group} key={group.key} />
+      {teams.map((team) => (
+        <section className="player-season-team-group" key={team.teamId}>
+          <div className="player-team-row season-team-heading">
+            {team.teamLogoUrl ? (
+              <img src={team.teamLogoUrl} alt="" className="team-logo" />
+            ) : (
+              <span className="team-logo placeholder" aria-hidden="true" />
+            )}
+            <Link className="team-name-link" to={`/teams/${team.teamId}`}>
+              {team.teamName ?? "-"}
+            </Link>
+            <span>
+              {numberText(team.totalFixtures)}경기 · {numberText(team.goals)}G {numberText(team.assists)}A
+            </span>
+          </div>
+          <div className="player-stat-chips">
+            <StatChip label="출전 시간" value={team.minutesPlayed} />
+            <StatChip label="평점" value={ratingText(team.averageRating)} />
+            <StatChip label="슈팅" value={team.shots} />
+            <StatChip label="유효 슈팅" value={team.shotsOnTarget} />
+            <StatChip label="키패스" value={team.keyPasses} />
+            <StatChip label="경고" value={team.yellowCards} />
+            <StatChip label="퇴장" value={team.redCards} />
+          </div>
+        </section>
       ))}
     </div>
   );
 }
 
-function SeasonTeamGroup({ group }: { group: SeasonTeamMatchGroup }) {
-  const [page, setPage] = useState(1);
-  const pageCount = Math.max(1, Math.ceil(group.matches.length / MATCHES_PER_PAGE));
-  const currentPage = Math.min(page, pageCount);
-  const visibleMatches = group.matches.slice((currentPage - 1) * MATCHES_PER_PAGE, currentPage * MATCHES_PER_PAGE);
-  const summary = group.summary;
-
-  useEffect(() => {
-    setPage(1);
-  }, [group.key]);
-
-  return (
-    <section className="player-season-team-group">
-      <div className="player-team-row season-team-heading">
-        {group.teamLogoUrl ? <img src={group.teamLogoUrl} alt="" className="team-logo" /> : <span className="team-logo placeholder" aria-hidden="true" />}
-        {group.teamId ? (
-          <Link className="team-name-link" to={`/teams/${group.teamId}`}>
-            {group.teamName ?? "-"}
-          </Link>
-        ) : (
-          <strong>{group.teamName ?? "-"}</strong>
-        )}
-        <span>
-          {summary ? `${summary.totalFixtures}경기 · ${summary.goals}G ${summary.assists}A` : `${group.matches.length}경기`}
-        </span>
-      </div>
-
-      <SeasonMatchList matches={visibleMatches} />
-      {group.matches.length > MATCHES_PER_PAGE ? (
-        <div className="player-season-pager">
-          <button type="button" onClick={() => setPage((value) => Math.max(1, value - 1))} disabled={currentPage === 1}>
-            <ChevronLeft size={16} aria-hidden="true" />
-            이전
-          </button>
-          <strong>
-            {currentPage} / {pageCount}
-          </strong>
-          <button
-            type="button"
-            onClick={() => setPage((value) => Math.min(pageCount, value + 1))}
-            disabled={currentPage === pageCount}
-          >
-            다음
-            <ChevronRight size={16} aria-hidden="true" />
-          </button>
-        </div>
-      ) : null}
-    </section>
-  );
-}
-
-function SeasonMatchList({ matches }: { matches: PlayerMatchStat[] }) {
-  if (!matches.length) {
-    return <div className="empty-state compact">이 팀 소속 경기 기록이 없습니다.</div>;
+function RecentMatchesPanel({ state, onRetry }: { state: LoadState<PlayerMatchStat[]>; onRetry: () => void }) {
+  if (state.isLoading) {
+    return (
+      <article className="panel detail-panel">
+        <div className="empty-state">최근 경기를 불러오는 중입니다.</div>
+      </article>
+    );
   }
 
-  return (
-    <div className="player-match-list season">
-      {matches.map((match) => (
-        <PlayerMatchRow match={match} key={match.fixtureId} />
-      ))}
-    </div>
-  );
-}
+  if (state.error) {
+    return <SectionError title="최근 경기를 불러오지 못했습니다." message={state.error} onRetry={onRetry} />;
+  }
 
-function RecentMatchesPanel({ matches }: { matches: PlayerMatchStat[] }) {
+  const matches = state.data ?? [];
   if (!matches.length) {
     return (
       <article className="panel detail-panel">
-        <div className="empty-state">최근 경기 기록이 없습니다.</div>
+        <div className="empty-state">선택 시즌의 경기 기록이 없습니다.</div>
       </article>
     );
   }
@@ -578,9 +506,23 @@ function RecentMatchesPanel({ matches }: { matches: PlayerMatchStat[] }) {
         <h2>최근 경기</h2>
       </div>
       <div className="player-match-list">
-        {matches.slice(0, 8).map((match) => (
+        {matches.map((match) => (
           <PlayerMatchRow match={match} key={match.fixtureId} />
         ))}
+      </div>
+    </article>
+  );
+}
+
+function SectionError({ title, message, onRetry }: { title: string; message: string; onRetry: () => void }) {
+  return (
+    <article className="panel detail-panel">
+      <div className="section-error section-retry-error">
+        <strong>{title}</strong>
+        <p>{message}</p>
+        <button className="section-retry-button" type="button" onClick={onRetry}>
+          다시 불러오기
+        </button>
       </div>
     </article>
   );
@@ -638,21 +580,7 @@ function inferAwayScore(match: PlayerMatchStat) {
 }
 
 function formatDate(value: string | null) {
-  if (!value) {
-    return "-";
-  }
-
-  const date = new Date(hasExplicitTimeZone(value) ? value : `${value}+09:00`);
-  if (Number.isNaN(date.getTime())) {
-    return value.slice(0, 10) || "-";
-  }
-
-  return new Intl.DateTimeFormat("ko-KR", {
-    timeZone: "Asia/Seoul",
-    month: "short",
-    day: "numeric",
-    weekday: "short",
-  }).format(date);
+  return formatFixtureDate(value, value?.slice(0, 10) || "-");
 }
 
 function formatDateOnly(value: string) {
@@ -669,17 +597,25 @@ function formatDateOnly(value: string) {
   }).format(date);
 }
 
-function hasExplicitTimeZone(value: string) {
-  return /(?:z|[+-]\d{2}:?\d{2})$/i.test(value);
-}
-
 function ratingText(value: number | null | undefined) {
-  if (value === null || value === undefined || value === 0) {
+  if (value === null || value === undefined || Number.isNaN(value)) {
     return "-";
   }
   return value.toFixed(1);
 }
 
 function numberText(value: number | null | undefined) {
-  return value === null || value === undefined ? "-" : String(value);
+  if (value === null || value === undefined || Number.isNaN(value)) {
+    return "-";
+  }
+  return String(value);
+}
+
+function matchTime(match: PlayerMatchStat) {
+  const date = parseKoreaDateTime(match.fixtureDate);
+  return date?.getTime() ?? Number.MAX_SAFE_INTEGER;
+}
+
+export function sortMatchesByDateAsc(matches: PlayerMatchStat[]) {
+  return matches.slice().sort((left, right) => matchTime(left) - matchTime(right) || left.fixtureId - right.fixtureId);
 }

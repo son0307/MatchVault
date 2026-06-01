@@ -1,11 +1,19 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { BrowserRouter, Navigate, NavLink, Route, Routes } from "react-router-dom";
-import { ApiError, fetchCurrentUser, logout, type CurrentUser } from "./api";
+import {
+  ApiError,
+  fetchCurrentUser,
+  fetchLeagueSeasons,
+  logout,
+  type CurrentUser,
+  type LeagueSeasonCoverage,
+} from "./api";
 import { AuthPage } from "./pages/AuthPage";
 import { FixtureDetailPage } from "./pages/FixtureDetailPage";
 import { LeagueFixturesPage } from "./pages/LeagueFixturesPage";
 import { LeagueHomePage } from "./pages/LeagueHomePage";
 import { LeagueStandingsPage } from "./pages/LeagueStandingsPage";
+import { MyPage } from "./pages/MyPage";
 import { PlayerDetailPage } from "./pages/PlayerDetailPage";
 import { TeamDetailPage } from "./pages/TeamDetailPage";
 
@@ -21,24 +29,20 @@ export type LeagueAuthState = {
 };
 
 type LeagueLayoutProps = {
-  children: ReactNode | ((state: LeagueState) => ReactNode);
-  onSeasonChange: (season: number) => void;
-  season: number;
+  children: ReactNode | ((state: LeagueAuthState) => ReactNode);
 };
 
 const DEFAULT_SEASON = 2025;
 
 const leagueTabs = [
   { label: "홈", to: "/league/overview", enabled: true },
-  { label: "랭킹", to: "/league/standings", enabled: true },
+  { label: "순위", to: "/league/standings", enabled: true },
   { label: "경기", to: "/league/fixtures", enabled: true },
   { label: "플레이어 통계", to: "/league/player-stats", enabled: false },
   { label: "팀 통계", to: "/league/team-stats", enabled: false },
 ];
 
 export function App() {
-  const [season, setSeason] = useState(DEFAULT_SEASON);
-
   return (
     <BrowserRouter>
       <Routes>
@@ -57,18 +61,12 @@ export function App() {
         <Route
           path="/league/standings"
           element={
-            <LeagueLayout>
-              {(authState) => <LeagueStandingsPage season={authState.season} />}
-            </LeagueLayout>
+            <LeagueLayout>{(authState) => <LeagueStandingsPage season={authState.season} />}</LeagueLayout>
           }
         />
         <Route
           path="/league/fixtures"
-          element={
-            <LeagueLayout>
-              {(authState) => <LeagueFixturesPage season={authState.season} />}
-            </LeagueLayout>
-          }
+          element={<LeagueLayout>{(authState) => <LeagueFixturesPage season={authState.season} />}</LeagueLayout>}
         />
         <Route
           path="/fixtures/:fixtureId"
@@ -81,24 +79,22 @@ export function App() {
         <Route
           path="/mypage"
           element={
-            <LeagueLayout>
-              {(authState) => <MyPage authState={authState} season={authState.season} />}
-            </LeagueLayout>
+            <LeagueLayout>{(authState) => <MyPage authState={authState} season={authState.season} />}</LeagueLayout>
           }
         />
         <Route
           path="/players/:playerId"
           element={
-            <LeagueLayout onSeasonChange={setSeason} season={season}>
-              {(state) => <PlayerDetailPage authStatus={state.authStatus} season={state.season} />}
+            <LeagueLayout>
+              {(authState) => <PlayerDetailPage authStatus={authState.authStatus} season={authState.season} />}
             </LeagueLayout>
           }
         />
         <Route
           path="/teams/:teamId"
           element={
-            <LeagueLayout onSeasonChange={setSeason} season={season}>
-              {(state) => <TeamDetailPage authStatus={state.authStatus} season={state.season} />}
+            <LeagueLayout>
+              {(authState) => <TeamDetailPage authStatus={authState.authStatus} season={authState.season} />}
             </LeagueLayout>
           }
         />
@@ -108,15 +104,19 @@ export function App() {
   );
 }
 
-function LeagueLayout({ children, onSeasonChange, season }: LeagueLayoutProps) {
+function LeagueLayout({ children }: LeagueLayoutProps) {
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
   const [authStatus, setAuthStatus] = useState<AuthStatus>("checking");
-  const [season, setSeason] = useState(2025);
+  const [season, setSeason] = useState(DEFAULT_SEASON);
   const [authError, setAuthError] = useState("");
+  const [seasonOptions, setSeasonOptions] = useState<LeagueSeasonCoverage[]>([]);
+  const [seasonError, setSeasonError] = useState("");
+  const [isLoadingSeasons, setIsLoadingSeasons] = useState(true);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
 
   useEffect(() => {
     void loadCurrentUser();
+    void loadLeagueSeasons();
   }, []);
 
   async function loadCurrentUser() {
@@ -136,6 +136,23 @@ function LeagueLayout({ children, onSeasonChange, season }: LeagueLayoutProps) {
     }
   }
 
+  async function loadLeagueSeasons() {
+    setIsLoadingSeasons(true);
+    setSeasonError("");
+    try {
+      const response = await fetchLeagueSeasons();
+      setSeasonOptions(response.seasons ?? []);
+      if (Number.isInteger(response.currentSeason)) {
+        setSeason(response.currentSeason);
+      }
+    } catch (error) {
+      setSeasonOptions([]);
+      setSeasonError(error instanceof Error ? error.message : "시즌 정보를 불러오지 못했습니다.");
+    } finally {
+      setIsLoadingSeasons(false);
+    }
+  }
+
   async function handleLogout() {
     setIsLoggingOut(true);
     setAuthError("");
@@ -148,13 +165,6 @@ function LeagueLayout({ children, onSeasonChange, season }: LeagueLayoutProps) {
       setAuthError(error instanceof Error ? error.message : "로그아웃에 실패했습니다. 다시 시도해 주세요.");
     } finally {
       setIsLoggingOut(false);
-    }
-  }
-
-  function handleSeasonChange(value: string) {
-    const nextSeason = Number(value);
-    if (Number.isInteger(nextSeason) && nextSeason >= 2000 && nextSeason <= 2100) {
-      onSeasonChange(nextSeason);
     }
   }
 
@@ -185,7 +195,7 @@ function LeagueLayout({ children, onSeasonChange, season }: LeagueLayoutProps) {
 
   function updateSeason(value: string) {
     const nextSeason = Number(value);
-    if (Number.isInteger(nextSeason) && nextSeason >= 2000 && nextSeason <= 2100) {
+    if (Number.isInteger(nextSeason)) {
       setSeason(nextSeason);
     }
   }
@@ -202,19 +212,28 @@ function LeagueLayout({ children, onSeasonChange, season }: LeagueLayoutProps) {
         <div className="league-header-actions">
           <label className="season-field compact league-season-field">
             <span>현재 시즌</span>
-            <input
-              type="number"
+            <select
               value={season}
-              min="2000"
-              max="2100"
-              onChange={(event) => handleSeasonChange(event.target.value)}
-            />
+              disabled={isLoadingSeasons || seasonOptions.length === 0}
+              onChange={(event) => updateSeason(event.target.value)}
+            >
+              {seasonOptions.length ? (
+                seasonOptions.map((option) => (
+                  <option key={option.seasonYear} value={option.seasonYear}>
+                    {option.label ?? option.seasonYear}
+                  </option>
+                ))
+              ) : (
+                <option value={season}>{season}</option>
+              )}
+            </select>
           </label>
           {renderAuthAction()}
         </div>
       </header>
 
       {authError ? <div className="notice error auth-error">{authError}</div> : null}
+      {seasonError ? <div className="notice error auth-error">{seasonError}</div> : null}
 
       <nav className="league-tabs" aria-label="리그 메뉴">
         {leagueTabs.map((tab) =>
@@ -234,7 +253,7 @@ function LeagueLayout({ children, onSeasonChange, season }: LeagueLayoutProps) {
         )}
       </nav>
 
-      {typeof children === "function" ? children(state) : children}
+      {typeof children === "function" ? children(authState) : children}
     </main>
   );
 }

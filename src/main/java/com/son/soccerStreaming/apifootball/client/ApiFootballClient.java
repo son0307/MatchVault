@@ -2,6 +2,7 @@ package com.son.soccerStreaming.apifootball.client;
 
 import com.son.soccerStreaming.apifootball.dto.ApiFootballInjuryDto;
 import com.son.soccerStreaming.apifootball.dto.ApiFootballFixtureStatisticsDto;
+import com.son.soccerStreaming.apifootball.dto.ApiFootballLeagueDto;
 import com.son.soccerStreaming.apifootball.dto.ApiFootballLineupDto;
 import com.son.soccerStreaming.apifootball.dto.ApiFootballLiveDto;
 import com.son.soccerStreaming.apifootball.dto.ApiFootballPlayerDto;
@@ -86,6 +87,18 @@ public class ApiFootballClient {
         );
 
         return responseOf(body);
+    }
+
+    public List<ApiFootballLeagueDto.LeagueResponse> getLeagueSeasons(Integer league) {
+        ApiFootballLeagueDto.ApiResponse<ApiFootballLeagueDto.LeagueResponse> body = get(
+                "getLeagueSeasons",
+                "/leagues?id={league}",
+                new ParameterizedTypeReference<>() {
+                },
+                league
+        );
+
+        return leagueResponseOf(body);
     }
 
     public List<ApiFootballLiveDto.FixtureResponse> getLiveFixtures(Integer league) {
@@ -341,6 +354,13 @@ public class ApiFootballClient {
     }
 
     private <T> List<T> teamResponseOf(ApiFootballTeamDto.ApiResponse<T> body) {
+        if (body == null || body.getResponse() == null) {
+            return List.of();
+        }
+        return body.getResponse();
+    }
+
+    private <T> List<T> leagueResponseOf(ApiFootballLeagueDto.ApiResponse<T> body) {
         if (body == null || body.getResponse() == null) {
             return List.of();
         }

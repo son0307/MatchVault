@@ -96,6 +96,45 @@ public class PlayerService {
                 .build();
     }
 
+    @Transactional(readOnly = true)
+    public PlayerResponseDto.SeasonSummary getPlayerSeasonSummary(Long playerId, Integer season) {
+        ensurePlayerExists(playerId);
+
+        List<PlayerResponseDto.MatchStat> matches = playerFixtureStatRepository
+                .findAllByPlayerPlayerIdAndFixtureSeasonOrderByFixtureFixtureDateDescFixtureFixtureIdDesc(playerId, season)
+                .stream()
+                .map(this::toMatchStat)
+                .toList();
+        List<PlayerTeamSeasonStat> seasonStats = playerTeamSeasonStatRepository.findAllByPlayerPlayerIdAndSeason(playerId, season);
+        List<PlayerResponseDto.SeasonSummary> summaries = aggregateSeasonSummaries(
+                seasonStats,
+                teamsBySeasonFromMatches(matches)
+        );
+
+        return summaries.stream()
+                .findFirst()
+                .orElseGet(() -> emptySeasonSummary(season));
+    }
+
+    @Transactional(readOnly = true)
+    public List<PlayerResponseDto.MatchStat> getPlayerRecentMatches(Long playerId, Integer season, int size) {
+        ensurePlayerExists(playerId);
+        int limit = Math.max(1, Math.min(size, 30));
+
+        return playerFixtureStatRepository
+                .findAllByPlayerPlayerIdAndFixtureSeasonOrderByFixtureFixtureDateDescFixtureFixtureIdDesc(playerId, season)
+                .stream()
+                .limit(limit)
+                .map(this::toMatchStat)
+                .toList();
+    }
+
+    private void ensurePlayerExists(Long playerId) {
+        if (!playerRepository.existsByPlayerId(playerId)) {
+            throw new CustomException(ErrorCode.PLAYER_NOT_FOUND);
+        }
+    }
+
     private Map<Integer, Set<Long>> teamsBySeasonFromMatches(List<PlayerResponseDto.MatchStat> matches) {
         Map<Integer, Set<Long>> teamsBySeason = new HashMap<>();
         for (PlayerResponseDto.MatchStat match : matches) {
@@ -153,6 +192,23 @@ public class PlayerService {
                 .teams(stats.stream()
                         .map(this::toTeamSeasonSummary)
                         .toList())
+                .build();
+    }
+
+    private PlayerResponseDto.SeasonSummary emptySeasonSummary(Integer season) {
+        return PlayerResponseDto.SeasonSummary.builder()
+                .season(season)
+                .totalFixtures(0)
+                .minutesPlayed(0)
+                .averageRating(0)
+                .goals(0)
+                .assists(0)
+                .shots(0)
+                .shotsOnTarget(0)
+                .keyPasses(0)
+                .yellowCards(0)
+                .redCards(0)
+                .teams(List.of())
                 .build();
     }
 

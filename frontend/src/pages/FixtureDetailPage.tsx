@@ -13,6 +13,7 @@ import {
   fetchFixtureLineups,
   fetchFixturePlayerStats,
   fetchFixtureStats,
+  fetchLeagueSeasons,
   removeFavoritePlayer,
   removeFavoriteTeam,
   type FavoriteDashboard,
@@ -28,7 +29,9 @@ import {
   type FixtureTeamLineup,
   type FixtureTeamPlayerStats,
   type FixtureTeamStat,
+  type LeagueSeasonCoverage,
 } from "../api";
+import { formatFixtureDateTime } from "../dateUtils";
 
 type DetailTab = "events" | "lineups" | "stats";
 type LoadState<T> = {
@@ -52,6 +55,7 @@ const detailTabs: Array<{ label: string; value: DetailTab }> = [
   { label: "라인업", value: "lineups" },
   { label: "통계", value: "stats" },
 ];
+const UNSUPPORTED_MESSAGE = "해당 시즌에는 지원하지 않습니다.";
 
 const initialLoadState = <T,>(): LoadState<T> => ({
   data: null,
@@ -69,6 +73,8 @@ export function FixtureDetailPage({ authStatus, season }: { authStatus: AuthStat
   const [lineupsState, setLineupsState] = useState<LoadState<FixtureLineupResponse>>(initialLoadState);
   const [statsState, setStatsState] = useState<LoadState<FixtureStatResponse>>(initialLoadState);
   const [playerStatsState, setPlayerStatsState] = useState<LoadState<FixturePlayerStatResponse>>(initialLoadState);
+  const [seasonCoverages, setSeasonCoverages] = useState<LeagueSeasonCoverage[]>([]);
+  const [isSeasonCoverageLoaded, setIsSeasonCoverageLoaded] = useState(false);
   const [favorites, setFavorites] = useState<FavoriteDashboard | null>(null);
   const [favoritesError, setFavoritesError] = useState("");
   const [pendingFavoriteKey, setPendingFavoriteKey] = useState("");
@@ -79,6 +85,28 @@ export function FixtureDetailPage({ authStatus, season }: { authStatus: AuthStat
   useEffect(() => {
     currentSeasonRef.current = season;
   }, [season]);
+
+  useEffect(() => {
+    let isCurrent = true;
+    setIsSeasonCoverageLoaded(false);
+    fetchLeagueSeasons()
+      .then((response) => {
+        if (isCurrent) {
+          setSeasonCoverages(response.seasons ?? []);
+          setIsSeasonCoverageLoaded(true);
+        }
+      })
+      .catch(() => {
+        if (isCurrent) {
+          setSeasonCoverages([]);
+          setIsSeasonCoverageLoaded(true);
+        }
+      });
+
+    return () => {
+      isCurrent = false;
+    };
+  }, []);
 
   useEffect(() => {
     if (!Number.isFinite(numericFixtureId) || numericFixtureId <= 0) {
@@ -92,10 +120,10 @@ export function FixtureDetailPage({ authStatus, season }: { authStatus: AuthStat
 
     let isCurrent = true;
     setFixtureState(initialLoadState);
-    setEventsState(initialLoadState);
-    setLineupsState(initialLoadState);
-    setStatsState(initialLoadState);
-    setPlayerStatsState(initialLoadState);
+    setEventsState({ data: null, error: "", isLoading: false });
+    setLineupsState({ data: null, error: "", isLoading: false });
+    setStatsState({ data: null, error: "", isLoading: false });
+    setPlayerStatsState({ data: null, error: "", isLoading: false });
 
     fetchFixture(numericFixtureId)
       .then((data) => {
@@ -113,20 +141,58 @@ export function FixtureDetailPage({ authStatus, season }: { authStatus: AuthStat
         }
       });
 
-    void loadSection(fetchFixtureEvents(numericFixtureId), setEventsState, "경기 이벤트를 불러오지 못했습니다.", () => isCurrent);
-    void loadSection(fetchFixtureLineups(numericFixtureId), setLineupsState, "라인업을 불러오지 못했습니다.", () => isCurrent);
-    void loadSection(fetchFixtureStats(numericFixtureId), setStatsState, "팀 통계를 불러오지 못했습니다.", () => isCurrent);
-    void loadSection(
-      fetchFixturePlayerStats(numericFixtureId),
-      setPlayerStatsState,
-      "선수별 경기 통계를 불러오지 못했습니다.",
-      () => isCurrent,
-    );
-
     return () => {
       isCurrent = false;
     };
   }, [numericFixtureId]);
+
+  useEffect(() => {
+    const fixture = fixtureState.data;
+    if (!fixture || !isSeasonCoverageLoaded || !Number.isFinite(numericFixtureId) || numericFixtureId <= 0) {
+      return;
+    }
+
+    let isCurrent = true;
+    const coverage = seasonCoverages.find((item) => item.seasonYear === fixture.season);
+    const isSupported = (value: boolean | undefined) => value !== false;
+
+    if (isSupported(coverage?.events)) {
+      setEventsState(initialLoadState);
+      void loadSection(fetchFixtureEvents(numericFixtureId), setEventsState, "경기 이벤트를 불러오지 못했습니다.", () => isCurrent);
+    } else {
+      setEventsState({ data: null, error: UNSUPPORTED_MESSAGE, isLoading: false });
+    }
+
+    if (isSupported(coverage?.lineups)) {
+      setLineupsState(initialLoadState);
+      void loadSection(fetchFixtureLineups(numericFixtureId), setLineupsState, "라인업을 불러오지 못했습니다.", () => isCurrent);
+    } else {
+      setLineupsState({ data: null, error: UNSUPPORTED_MESSAGE, isLoading: false });
+    }
+
+    if (isSupported(coverage?.fixtureStats)) {
+      setStatsState(initialLoadState);
+      void loadSection(fetchFixtureStats(numericFixtureId), setStatsState, "팀 통계를 불러오지 못했습니다.", () => isCurrent);
+    } else {
+      setStatsState({ data: null, error: UNSUPPORTED_MESSAGE, isLoading: false });
+    }
+
+    if (isSupported(coverage?.playerStats)) {
+      setPlayerStatsState(initialLoadState);
+      void loadSection(
+        fetchFixturePlayerStats(numericFixtureId),
+        setPlayerStatsState,
+        "선수별 경기 통계를 불러오지 못했습니다.",
+        () => isCurrent,
+      );
+    } else {
+      setPlayerStatsState({ data: null, error: UNSUPPORTED_MESSAGE, isLoading: false });
+    }
+
+    return () => {
+      isCurrent = false;
+    };
+  }, [fixtureState.data, isSeasonCoverageLoaded, numericFixtureId, seasonCoverages]);
 
   useEffect(() => {
     if (authStatus !== "authenticated") {
@@ -670,12 +736,14 @@ function LineupList({
                 {player.playerName ?? "-"}
               </Link>
               <em>{player.position ?? "-"}</em>
-              <FavoriteToggleButton
-                isFavorite={favoriteControls.favoritePlayerIds.has(player.playerId)}
-                isPending={favoriteControls.pendingFavoriteKey === `player-${player.playerId}`}
-                label={`${player.playerName ?? "선수"} 즐겨찾기`}
-                onClick={() => favoriteControls.onTogglePlayer(player.playerId)}
-              />
+              {favoriteControls.authStatus === "authenticated" ? (
+                <FavoriteToggleButton
+                  isFavorite={favoriteControls.favoritePlayerIds.has(player.playerId)}
+                  isPending={favoriteControls.pendingFavoriteKey === `player-${player.playerId}`}
+                  label={`${player.playerName ?? "선수"} 즐겨찾기`}
+                  onClick={() => favoriteControls.onTogglePlayer(player.playerId)}
+                />
+              ) : null}
             </div>
           ))
         ) : (
@@ -1161,27 +1229,7 @@ function scoreText(fixture: FixtureSummary) {
 }
 
 function formatDate(value: string | null) {
-  if (!value) {
-    return "날짜 미정";
-  }
-
-  const date = new Date(hasExplicitTimeZone(value) ? value : `${value}+09:00`);
-  if (Number.isNaN(date.getTime())) {
-    return "날짜 미정";
-  }
-
-  return new Intl.DateTimeFormat("ko-KR", {
-    timeZone: "Asia/Seoul",
-    month: "long",
-    day: "numeric",
-    weekday: "short",
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(date);
-}
-
-function hasExplicitTimeZone(value: string) {
-  return /(?:z|[+-]\d{2}:?\d{2})$/i.test(value);
+  return formatFixtureDateTime(value, "날짜 미정");
 }
 
 function formatStat(value: number, format?: "percent" | "decimal") {

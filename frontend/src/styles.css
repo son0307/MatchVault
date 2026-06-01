@@ -90,7 +90,8 @@ h2 {
   font-weight: 700;
 }
 
-.season-field input {
+.season-field input,
+.season-field select {
   width: 96px;
   height: 40px;
   border: 1px solid #c8d5c8;
@@ -100,7 +101,8 @@ h2 {
   color: #162018;
 }
 
-.season-field.compact input {
+.season-field.compact input,
+.season-field.compact select {
   height: 38px;
 }
 
@@ -145,7 +147,8 @@ h2 {
   max-width: 360px;
 }
 
-.league-season-field input {
+.league-season-field input,
+.league-season-field select {
   width: 110px;
   max-width: 100%;
 }
@@ -1983,6 +1986,14 @@ h2 {
 
 .player-team-card div {
   min-width: 0;
+}
+
+.player-season-team-logos,
+.player-season-team-links {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
 }
 
 .player-team-card strong,

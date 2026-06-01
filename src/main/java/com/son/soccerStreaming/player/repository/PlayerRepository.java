@@ -9,5 +9,7 @@ import java.util.List;
 public interface PlayerRepository extends JpaRepository<Player, Long> {
     Optional<Player> findByPlayerId(Long playerId);
 
+    boolean existsByPlayerId(Long playerId);
+
     List<Player> findTop20ByNameContainingIgnoreCaseOrderByNameAsc(String keyword);
 }
