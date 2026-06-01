@@ -142,6 +142,12 @@ h2 {
   align-items: center;
   justify-content: flex-end;
   gap: 8px;
+  max-width: 360px;
+}
+
+.league-season-field input {
+  width: 110px;
+  max-width: 100%;
 }
 
 .league-season-field {
@@ -694,6 +700,35 @@ h2 {
   font-weight: 800;
 }
 
+.section-retry-error {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.section-retry-error span {
+  min-width: 0;
+}
+
+.section-retry-error button,
+.section-retry-button {
+  min-height: 34px;
+  border: 1px solid #d79a9a;
+  border-radius: 6px;
+  padding: 0 10px;
+  background: #ffffff;
+  color: #9f1616;
+  cursor: pointer;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+.section-retry-error button:hover,
+.section-retry-button:hover {
+  background: #fff1f1;
+}
+
 .compact-ranking {
   display: grid;
 }
@@ -841,11 +876,32 @@ h2 {
   min-width: 0;
 }
 
-.favorite-mini-head strong {
+.favorite-mini-head strong,
+.favorite-mini-head .team-name-link,
+.favorite-player-link {
   display: block;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.favorite-player-link,
+.lineup-player-link,
+.event-player-link,
+.player-stat-link,
+.team-name-link {
+  color: #162018;
+  font-weight: 900;
+}
+
+.favorite-player-link:hover,
+.lineup-player-link:hover,
+.event-player-link:hover,
+.player-stat-link:hover,
+.team-name-link:hover {
+  color: #1b5e20;
+  text-decoration: underline;
+  text-underline-offset: 3px;
 }
 
 .favorite-mini-head p,
@@ -1359,7 +1415,8 @@ h2 {
   text-align: right;
 }
 
-.detail-team strong {
+.detail-team strong,
+.detail-team .team-name-link {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -1696,7 +1753,8 @@ h2 {
   font-weight: 900;
 }
 
-.lineup-list-row strong {
+.lineup-list-row strong,
+.lineup-player-link {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -1817,6 +1875,643 @@ h2 {
   margin-top: 14px;
 }
 
+.player-detail-page {
+  gap: 16px;
+}
+
+.player-hero {
+  display: grid;
+  grid-template-columns: 104px minmax(0, 1fr) minmax(220px, 0.42fr);
+  align-items: center;
+  gap: 18px;
+  padding: 20px;
+}
+
+.player-photo-wrap {
+  display: grid;
+  place-items: center;
+}
+
+.player-photo {
+  width: 92px;
+  height: 92px;
+  border-radius: 8px;
+  object-fit: cover;
+  background: #dde6dc;
+}
+
+.player-photo.placeholder {
+  display: grid;
+  place-items: center;
+  color: #6b786d;
+}
+
+.player-hero-main {
+  min-width: 0;
+}
+
+.player-hero-main h2 {
+  margin: 0;
+  overflow-wrap: anywhere;
+  font-size: clamp(1.8rem, 4vw, 2.7rem);
+  line-height: 1;
+}
+
+.detail-title-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.favorite-toggle-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 34px;
+  border: 1px solid #d9e5d8;
+  border-radius: 8px;
+  padding: 7px 10px;
+  background: #ffffff;
+  color: #53665a;
+  font-size: 0.84rem;
+  font-weight: 900;
+}
+
+.favorite-toggle-button.active {
+  border-color: #f0c64a;
+  background: #fff8da;
+  color: #7a5600;
+}
+
+.favorite-toggle-button:disabled {
+  cursor: wait;
+  opacity: 0.62;
+}
+
+.favorite-inline-error {
+  margin: 8px 0 0;
+  color: #b42318;
+  font-size: 0.84rem;
+  font-weight: 800;
+}
+
+.player-meta-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.player-meta-list span {
+  border-radius: 999px;
+  padding: 6px 10px;
+  background: #eef4ec;
+  color: #53665a;
+  font-size: 0.84rem;
+  font-weight: 800;
+}
+
+.player-team-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  border-left: 1px solid #edf1eb;
+  padding-left: 18px;
+}
+
+.player-team-card div {
+  min-width: 0;
+}
+
+.player-team-card strong,
+.player-team-card .team-name-link {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.player-team-card p {
+  margin: 4px 0 0;
+  color: #69766c;
+  font-size: 0.86rem;
+  font-weight: 800;
+}
+
+.player-panel-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.player-season-accordion {
+  display: grid;
+}
+
+.player-season-item {
+  border-bottom: 1px solid #edf1eb;
+}
+
+.player-season-item:last-child {
+  border-bottom: 0;
+}
+
+.player-season-toggle {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  border: 0;
+  padding: 16px 18px;
+  background: #ffffff;
+  color: #162018;
+  cursor: pointer;
+  text-align: left;
+}
+
+.player-season-toggle:hover {
+  background: #fbfdf9;
+}
+
+.player-season-toggle div {
+  min-width: 0;
+}
+
+.player-season-toggle strong {
+  display: block;
+  font-size: 1rem;
+}
+
+.player-season-toggle span {
+  display: block;
+  margin-top: 4px;
+  color: #69766c;
+  font-size: 0.86rem;
+  font-weight: 800;
+}
+
+.player-season-toggle-meta {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 8px;
+  color: #1b5e20;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+.player-season-toggle-meta svg {
+  transition: transform 140ms ease;
+}
+
+.player-season-item.open .player-season-toggle-meta svg {
+  transform: rotate(180deg);
+}
+
+.player-season-body {
+  border-top: 1px solid #edf1eb;
+  background: #fbfdf9;
+}
+
+.player-stat-chips {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 8px;
+  padding: 12px 14px;
+}
+
+.player-stat-chips div {
+  display: grid;
+  gap: 3px;
+  border-radius: 6px;
+  background: #ffffff;
+  padding: 8px;
+}
+
+.player-stat-chips span {
+  color: #69766c;
+  font-size: 0.76rem;
+  font-weight: 800;
+}
+
+.player-stat-chips strong {
+  font-size: 1rem;
+  font-weight: 900;
+}
+
+.player-team-list {
+  display: grid;
+  border-top: 1px solid #edf1eb;
+  background: #ffffff;
+}
+
+.player-season-team-groups {
+  display: grid;
+  border-top: 1px solid #edf1eb;
+  background: #ffffff;
+}
+
+.player-season-team-group {
+  display: grid;
+  border-bottom: 1px solid #edf1eb;
+}
+
+.player-season-team-group:last-child {
+  border-bottom: 0;
+}
+
+.player-team-row {
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr) max-content;
+  align-items: center;
+  gap: 10px;
+  min-height: 42px;
+  padding: 8px 14px;
+}
+
+.player-team-row strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.player-team-row span {
+  color: #53665a;
+  font-size: 0.84rem;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+.player-team-row.empty {
+  display: block;
+  color: #69766c;
+}
+
+.season-team-heading {
+  background: #f6f9f5;
+}
+
+.season-team-heading strong {
+  font-size: 0.96rem;
+}
+
+.player-match-list {
+  display: grid;
+}
+
+.player-match-list.season {
+  border-top: 1px solid #edf1eb;
+  background: #ffffff;
+}
+
+.player-match-row {
+  display: grid;
+  grid-template-columns: 92px minmax(0, 1fr) minmax(220px, max-content);
+  align-items: center;
+  gap: 14px;
+  min-height: 58px;
+  border-bottom: 1px solid #edf1eb;
+  padding: 10px 16px;
+  transition: background 140ms ease;
+}
+
+.player-match-row:hover {
+  background: #fbfdf9;
+}
+
+.player-match-row:last-child {
+  border-bottom: 0;
+}
+
+.player-match-row time {
+  color: #67746a;
+  font-size: 0.84rem;
+  font-weight: 900;
+}
+
+.player-match-teams {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 54px minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+}
+
+.player-match-teams strong {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.player-match-teams strong:first-child {
+  justify-content: flex-end;
+  text-align: right;
+}
+
+.player-match-teams strong span {
+  flex: 0 0 auto;
+  border-radius: 999px;
+  padding: 3px 6px;
+  background: #e8f3e8;
+  color: #1b5e20;
+  font-size: 0.72rem;
+  font-weight: 900;
+}
+
+.player-match-teams > span {
+  border-radius: 6px;
+  padding: 6px 8px;
+  background: #162018;
+  color: #ffffff;
+  font-weight: 900;
+  text-align: center;
+}
+
+.player-match-stats {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.player-match-stats span {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  border-radius: 999px;
+  padding: 5px 8px;
+  background: #eef4ec;
+  color: #53665a;
+  font-size: 0.8rem;
+  font-weight: 900;
+}
+
+.player-season-pager {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  border-top: 1px solid #edf1eb;
+  padding: 12px 14px 14px;
+  background: #ffffff;
+}
+
+.player-season-pager button {
+  display: inline-flex;
+  align-items: center;
+  min-height: 34px;
+  gap: 5px;
+  border: 1px solid #c8d5c8;
+  border-radius: 6px;
+  padding: 0 10px;
+  background: #ffffff;
+  color: #1b5e20;
+  cursor: pointer;
+  font-weight: 900;
+}
+
+.player-season-pager button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.player-season-pager strong {
+  color: #53665a;
+  font-size: 0.86rem;
+}
+
+.empty-state.compact {
+  border-top: 1px solid #edf1eb;
+  background: #ffffff;
+  padding: 16px 18px;
+}
+
+.team-detail-page {
+  gap: 16px;
+}
+
+.team-detail-hero {
+  display: grid;
+  grid-template-columns: 96px minmax(0, 1fr);
+  align-items: center;
+  gap: 18px;
+  padding: 20px;
+}
+
+.team-detail-logo {
+  width: 84px;
+  height: 84px;
+  object-fit: contain;
+}
+
+.team-detail-logo.placeholder {
+  border-radius: 8px;
+  background: #dde6dc;
+}
+
+.team-detail-hero h2 {
+  margin: 0;
+  overflow-wrap: anywhere;
+  font-size: clamp(1.8rem, 4vw, 2.7rem);
+  line-height: 1;
+}
+
+.team-detail-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.team-detail-meta span {
+  border-radius: 999px;
+  padding: 6px 10px;
+  background: #eef4ec;
+  color: #53665a;
+  font-size: 0.84rem;
+  font-weight: 800;
+}
+
+.team-fixtures-panel,
+.team-players-panel,
+.team-ranks-panel {
+  overflow: hidden;
+}
+
+.team-detail-fixture-list,
+.team-detail-fixture-group {
+  display: grid;
+}
+
+.team-detail-fixture-group {
+  border-bottom: 1px solid #edf1eb;
+}
+
+.team-detail-fixture-group:last-child {
+  border-bottom: 0;
+}
+
+.team-detail-fixture-group h3 {
+  margin: 0;
+  border-bottom: 1px solid #edf1eb;
+  padding: 12px 16px;
+  background: #f6f9f5;
+  color: #53665a;
+  font-size: 0.86rem;
+}
+
+.team-detail-fixture-row {
+  display: grid;
+  grid-template-columns: 64px minmax(0, 1fr) 58px minmax(0, 1fr) max-content;
+  align-items: center;
+  gap: 10px;
+  min-height: 52px;
+  border-bottom: 1px solid #edf1eb;
+  padding: 9px 16px;
+}
+
+.team-detail-fixture-row:last-child {
+  border-bottom: 0;
+}
+
+.team-detail-fixture-row:hover,
+.team-player-card:hover,
+.team-rank-row:hover {
+  background: #fbfdf9;
+}
+
+.team-detail-fixture-row time {
+  color: #67746a;
+  font-size: 0.84rem;
+  font-weight: 900;
+}
+
+.team-detail-fixture-row strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.team-detail-fixture-row strong:first-of-type {
+  text-align: right;
+}
+
+.team-detail-fixture-row span {
+  border-radius: 6px;
+  padding: 6px 8px;
+  background: #162018;
+  color: #ffffff;
+  font-weight: 900;
+  text-align: center;
+}
+
+.team-detail-fixture-row em {
+  color: #53665a;
+  font-size: 0.78rem;
+  font-style: normal;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+.team-player-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  padding: 14px;
+}
+
+.team-player-card {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  border: 1px solid #e1eadf;
+  border-radius: 8px;
+  padding: 10px;
+  background: #ffffff;
+}
+
+.team-player-card div {
+  min-width: 0;
+}
+
+.team-player-card strong {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.team-player-card p {
+  margin: 3px 0 0;
+  color: #69766c;
+  font-size: 0.83rem;
+  font-weight: 800;
+}
+
+.team-rank-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  padding: 14px;
+}
+
+.team-rank-card {
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid #e1eadf;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.team-rank-card h3 {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin: 0;
+  border-bottom: 1px solid #edf1eb;
+  padding: 12px 14px;
+  color: #213826;
+  font-size: 0.92rem;
+}
+
+.team-rank-row {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr) max-content;
+  align-items: center;
+  gap: 10px;
+  min-height: 40px;
+  border-bottom: 1px solid #edf1eb;
+  padding: 8px 14px;
+}
+
+.team-rank-row:last-child {
+  border-bottom: 0;
+}
+
+.team-rank-row span {
+  color: #1b5e20;
+  font-weight: 900;
+}
+
+.team-rank-row strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.team-rank-row em {
+  color: #53665a;
+  font-style: normal;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
 @media (max-width: 760px) {
   .app-shell {
     padding: 20px 14px 32px;
@@ -1834,6 +2529,14 @@ h2 {
   .auth-status {
     align-items: stretch;
     flex-direction: column;
+  }
+
+  .league-header-actions {
+    max-width: none;
+  }
+
+  .league-season-field input {
+    width: 100%;
   }
 
   .auth-status span {
@@ -1916,8 +2619,75 @@ h2 {
 
   .fixture-detail-hero,
   .lineup-detail-grid,
-  .player-stat-team-grid {
+  .player-stat-team-grid,
+  .player-hero,
+  .team-detail-hero,
+  .team-player-grid,
+  .team-rank-grid {
     grid-template-columns: 1fr;
+  }
+
+  .player-team-card {
+    border-left: 0;
+    border-top: 1px solid #edf1eb;
+    padding-left: 0;
+    padding-top: 14px;
+  }
+
+  .player-meta-list {
+    gap: 6px;
+  }
+
+  .player-stat-chips {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .player-season-toggle {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .player-season-toggle-meta {
+    justify-content: space-between;
+  }
+
+  .player-match-row {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  .player-match-teams {
+    grid-template-columns: minmax(0, 1fr) 52px minmax(0, 1fr);
+  }
+
+  .player-match-teams strong {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .player-match-teams strong:first-child {
+    align-items: flex-end;
+  }
+
+  .player-match-stats {
+    justify-content: flex-start;
+  }
+
+  .team-detail-fixture-row {
+    grid-template-columns: 48px minmax(0, 1fr) 52px;
+  }
+
+  .team-detail-fixture-row strong:first-of-type {
+    text-align: left;
+  }
+
+  .team-detail-fixture-row strong:nth-of-type(2) {
+    grid-column: 2 / 3;
+  }
+
+  .team-detail-fixture-row em {
+    grid-column: 2 / -1;
+    justify-self: start;
   }
 
   .detail-team.away {

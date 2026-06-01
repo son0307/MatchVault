@@ -5,6 +5,7 @@ import com.son.soccerStreaming.favorite.service.FavoriteService;
 import com.son.soccerStreaming.fixture.dto.FixtureResponseDto;
 import com.son.soccerStreaming.fixture.entity.Fixture;
 import com.son.soccerStreaming.fixture.repository.FixtureRepository;
+import com.son.soccerStreaming.global.util.DateTimeUtils;
 import com.son.soccerStreaming.home.dto.HomeSummaryResponseDto;
 import com.son.soccerStreaming.team.dto.TeamStandingResponseDto;
 import com.son.soccerStreaming.team.service.TeamStandingService;
@@ -63,8 +64,10 @@ public class HomeService {
     private FixtureResponseDto.Summary toFixtureSummary(Fixture fixture) {
         return FixtureResponseDto.Summary.builder()
                 .fixtureId(fixture.getFixtureId())
-                .fixtureDate(fixture.getFixtureDate())
+                .fixtureDate(DateTimeUtils.utcToKorea(fixture.getFixtureDate()))
                 .round(fixture.getRound())
+                .homeTeamId(fixture.getHomeTeam().getTeamId())
+                .awayTeamId(fixture.getAwayTeam().getTeamId())
                 .homeTeamName(fixture.getHomeTeam().getName())
                 .awayTeamName(fixture.getAwayTeam().getName())
                 .homeScore(valueOf(fixture.getHomeScore()))

@@ -237,7 +237,13 @@ function CompactRanking({ standings }: { standings: TeamStanding[] }) {
           ) : (
             <span className="team-logo placeholder" aria-hidden="true" />
           )}
-          <strong>{standing.team?.name ?? "-"}</strong>
+          {standing.team?.id ? (
+            <Link className="team-name-link" to={`/teams/${standing.team.id}`}>
+              {standing.team.name ?? "-"}
+            </Link>
+          ) : (
+            <strong>{standing.team?.name ?? "-"}</strong>
+          )}
           <b>{standing.points ?? 0}</b>
         </div>
       ))}
@@ -333,7 +339,9 @@ function FavoriteTeamItem({ team }: { team: FavoriteTeamCard }) {
           <span className="team-logo placeholder" aria-hidden="true" />
         )}
         <div>
-          <strong>{team.teamName ?? "-"}</strong>
+          <Link className="team-name-link" to={`/teams/${team.teamId}`}>
+            {team.teamName ?? "-"}
+          </Link>
           <p>{numberText(team.rank)}위 · {numberText(team.points)}점 · 최근 {team.form ?? "-"}</p>
         </div>
       </div>
@@ -358,7 +366,9 @@ function FavoritePlayerItem({ player }: { player: FavoritePlayerCard }) {
           <span className="player-thumb placeholder" aria-hidden="true" />
         )}
         <div>
-          <strong>{player.playerName ?? "-"}</strong>
+          <Link className="favorite-player-link" to={`/players/${player.playerId}`}>
+            {player.playerName ?? "-"}
+          </Link>
           <p>{player.position ?? "Player"} · {player.seasonStat?.teamName ?? "-"}</p>
         </div>
       </div>
@@ -447,7 +457,7 @@ function formatTime(value: string | null) {
     return "-";
   }
 
-  const date = new Date(/Z$|[+-]\d\d:\d\d$/.test(value) ? value : `${value}Z`);
+  const date = new Date(/Z$|[+-]\d\d:\d\d$/.test(value) ? value : `${value}+09:00`);
   if (Number.isNaN(date.getTime())) {
     return value.slice(11, 16) || "-";
   }
@@ -463,6 +473,9 @@ function formatTime(value: string | null) {
 function scoreText(fixture: FixtureSummary) {
   if (fixture.fixtureStatus === "SCHEDULED") {
     return "vs";
+  }
+  if (fixture.homeScore === null || fixture.homeScore === undefined || fixture.awayScore === null || fixture.awayScore === undefined) {
+    return "-";
   }
   return `${fixture.homeScore}:${fixture.awayScore}`;
 }

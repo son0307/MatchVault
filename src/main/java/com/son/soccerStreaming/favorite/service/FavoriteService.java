@@ -12,6 +12,7 @@ import com.son.soccerStreaming.team.entity.Team;
 import com.son.soccerStreaming.team.entity.TeamStanding;
 import com.son.soccerStreaming.global.exception.CustomException;
 import com.son.soccerStreaming.global.exception.ErrorCode;
+import com.son.soccerStreaming.global.util.DateTimeUtils;
 import com.son.soccerStreaming.auth.repository.AppUserRepository;
 import com.son.soccerStreaming.favorite.repository.FavoritePlayerRepository;
 import com.son.soccerStreaming.favorite.repository.FavoriteTeamRepository;
@@ -27,6 +28,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.List;
 
 @Service
@@ -105,7 +107,7 @@ public class FavoriteService {
     private FavoriteDashboardResponseDto.TeamCard toTeamCard(Team team, Integer season) {
         TeamStanding standing = teamStandingRepository.findByTeamTeamIdAndSeason(team.getTeamId(), season)
                 .orElse(null);
-        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime now = LocalDateTime.now(ZoneOffset.UTC);
         List<FavoriteDashboardResponseDto.TeamFixture> recentFixtures = fixtureRepository
                 .findRecentByTeam(team.getTeamId(), season, now, PageRequest.of(0, 5))
                 .stream()
@@ -140,7 +142,7 @@ public class FavoriteService {
     private FavoriteDashboardResponseDto.TeamFixture toTeamFixture(Fixture fixture, Team favoriteTeam) {
         return FavoriteDashboardResponseDto.TeamFixture.builder()
                 .fixtureId(fixture.getFixtureId())
-                .fixtureDate(fixture.getFixtureDate())
+                .fixtureDate(DateTimeUtils.utcToKorea(fixture.getFixtureDate()))
                 .homeTeamName(fixture.getHomeTeam().getName())
                 .awayTeamName(fixture.getAwayTeam().getName())
                 .homeScore(fixture.getHomeScore())
@@ -153,7 +155,7 @@ public class FavoriteService {
     private FavoriteDashboardResponseDto.LiveTeamFixture toLiveTeamFixture(Fixture fixture) {
         return FavoriteDashboardResponseDto.LiveTeamFixture.builder()
                 .fixtureId(fixture.getFixtureId())
-                .fixtureDate(fixture.getFixtureDate())
+                .fixtureDate(DateTimeUtils.utcToKorea(fixture.getFixtureDate()))
                 .homeTeamName(fixture.getHomeTeam().getName())
                 .awayTeamName(fixture.getAwayTeam().getName())
                 .homeScore(fixture.getHomeScore())
@@ -191,7 +193,7 @@ public class FavoriteService {
 
         return FavoriteDashboardResponseDto.RecentPlayerMatch.builder()
                 .fixtureId(fixture.getFixtureId())
-                .fixtureDate(fixture.getFixtureDate())
+                .fixtureDate(DateTimeUtils.utcToKorea(fixture.getFixtureDate()))
                 .teamName(team.getName())
                 .opponentTeamName(opponent != null ? opponent.getName() : null)
                 .teamScore(scoreOf(fixture, team))

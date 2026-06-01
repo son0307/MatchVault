@@ -3,11 +3,11 @@ import { BrowserRouter, Navigate, NavLink, Route, Routes } from "react-router-do
 import { ApiError, fetchCurrentUser, logout, type CurrentUser } from "./api";
 import { AuthPage } from "./pages/AuthPage";
 import { FixtureDetailPage } from "./pages/FixtureDetailPage";
-import { HomePage } from "./pages/HomePage";
 import { LeagueFixturesPage } from "./pages/LeagueFixturesPage";
 import { LeagueHomePage } from "./pages/LeagueHomePage";
 import { LeagueStandingsPage } from "./pages/LeagueStandingsPage";
-import { MyPage } from "./pages/MyPage";
+import { PlayerDetailPage } from "./pages/PlayerDetailPage";
+import { TeamDetailPage } from "./pages/TeamDetailPage";
 
 export type AuthStatus = "checking" | "authenticated" | "guest";
 
@@ -21,8 +21,12 @@ export type LeagueAuthState = {
 };
 
 type LeagueLayoutProps = {
-  children: ReactNode | ((authState: LeagueAuthState) => ReactNode);
+  children: ReactNode | ((state: LeagueState) => ReactNode);
+  onSeasonChange: (season: number) => void;
+  season: number;
 };
+
+const DEFAULT_SEASON = 2025;
 
 const leagueTabs = [
   { label: "홈", to: "/league/overview", enabled: true },
@@ -33,13 +37,14 @@ const leagueTabs = [
 ];
 
 export function App() {
+  const [season, setSeason] = useState(DEFAULT_SEASON);
+
   return (
     <BrowserRouter>
       <Routes>
         <Route path="/" element={<Navigate to="/league/overview" replace />} />
         <Route path="/login" element={<AuthPage mode="login" />} />
         <Route path="/signup" element={<AuthPage mode="signup" />} />
-        <Route path="/dashboard" element={<HomePage />} />
         <Route path="/league" element={<Navigate to="/league/overview" replace />} />
         <Route
           path="/league/overview"
@@ -81,13 +86,29 @@ export function App() {
             </LeagueLayout>
           }
         />
+        <Route
+          path="/players/:playerId"
+          element={
+            <LeagueLayout onSeasonChange={setSeason} season={season}>
+              {(state) => <PlayerDetailPage authStatus={state.authStatus} season={state.season} />}
+            </LeagueLayout>
+          }
+        />
+        <Route
+          path="/teams/:teamId"
+          element={
+            <LeagueLayout onSeasonChange={setSeason} season={season}>
+              {(state) => <TeamDetailPage authStatus={state.authStatus} season={state.season} />}
+            </LeagueLayout>
+          }
+        />
         <Route path="/league/*" element={<Navigate to="/league/overview" replace />} />
       </Routes>
     </BrowserRouter>
   );
 }
 
-function LeagueLayout({ children }: LeagueLayoutProps) {
+function LeagueLayout({ children, onSeasonChange, season }: LeagueLayoutProps) {
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
   const [authStatus, setAuthStatus] = useState<AuthStatus>("checking");
   const [season, setSeason] = useState(2025);
@@ -127,6 +148,13 @@ function LeagueLayout({ children }: LeagueLayoutProps) {
       setAuthError(error instanceof Error ? error.message : "로그아웃에 실패했습니다. 다시 시도해 주세요.");
     } finally {
       setIsLoggingOut(false);
+    }
+  }
+
+  function handleSeasonChange(value: string) {
+    const nextSeason = Number(value);
+    if (Number.isInteger(nextSeason) && nextSeason >= 2000 && nextSeason <= 2100) {
+      onSeasonChange(nextSeason);
     }
   }
 
@@ -173,18 +201,15 @@ function LeagueLayout({ children }: LeagueLayoutProps) {
         </div>
         <div className="league-header-actions">
           <label className="season-field compact league-season-field">
-            <span>Season</span>
+            <span>현재 시즌</span>
             <input
-              max="2100"
-              min="2000"
-              onChange={(event) => updateSeason(event.target.value)}
               type="number"
               value={season}
+              min="2000"
+              max="2100"
+              onChange={(event) => handleSeasonChange(event.target.value)}
             />
           </label>
-          <NavLink className="home-link" to="/dashboard">
-            기존 대시보드
-          </NavLink>
           {renderAuthAction()}
         </div>
       </header>
@@ -209,7 +234,7 @@ function LeagueLayout({ children }: LeagueLayoutProps) {
         )}
       </nav>
 
-      {typeof children === "function" ? children(authState) : children}
+      {typeof children === "function" ? children(state) : children}
     </main>
   );
 }

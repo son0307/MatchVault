@@ -97,6 +97,12 @@ public class PlayerResponseDto {
         private String opponentTeamName;
         private Integer teamScore;
         private Integer opponentScore;
+        private Long homeTeamId;
+        private String homeTeamName;
+        private Long awayTeamId;
+        private String awayTeamName;
+        private Integer homeScore;
+        private Integer awayScore;
         private Integer minutesPlayed;
         private Double rating;
         private Integer goals;

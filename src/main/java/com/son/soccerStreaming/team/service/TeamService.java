@@ -14,6 +14,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -30,7 +31,7 @@ public class TeamService {
     public List<TeamResponseDto.Summary> getTeams() {
         return teamRepository.findAllByOrderByNameAsc().stream()
                 .map(this::toSummary)
-                .toList();
+                .collect(Collectors.toCollection(ArrayList::new));
     }
 
     public TeamResponseDto.Details getTeamDetails(Long teamId) {
@@ -56,7 +57,22 @@ public class TeamService {
         return candidates.stream()
                 .filter(stat -> belongsToTeamByLatestMatch(stat, teamId, latestTeamByPlayer))
                 .map(this::toPlayerSummary)
-                .toList();
+                .collect(Collectors.toCollection(ArrayList::new));
+    }
+
+    public TeamResponseDto.PlayerRankings getPlayerRankings(Long teamId, Integer season) {
+        Team team = teamRepository.findByTeamId(teamId)
+                .orElseThrow(() -> new CustomException(ErrorCode.TEAM_NOT_FOUND));
+        List<PlayerTeamSeasonStat> candidates = playerTeamSeasonStatRepository.findAllByTeamAndSeason(team.getTeamId(), season);
+        Map<Long, Long> latestTeamByPlayer = latestTeamByPlayer(candidates, season);
+        List<TeamResponseDto.PlayerRanking> rows = candidates.stream()
+                .filter(stat -> belongsToTeamByLatestMatch(stat, team.getTeamId(), latestTeamByPlayer))
+                .map(this::toPlayerRanking)
+                .collect(Collectors.toCollection(ArrayList::new));
+
+        return TeamResponseDto.PlayerRankings.builder()
+                .rows(rows)
+                .build();
     }
 
     private Map<Long, Long> latestTeamByPlayer(List<PlayerTeamSeasonStat> candidates, Integer season) {
@@ -95,6 +111,19 @@ public class TeamService {
                 .build();
     }
 
+    private TeamResponseDto.PlayerRanking toPlayerRanking(PlayerTeamSeasonStat stat) {
+        return TeamResponseDto.PlayerRanking.builder()
+                .playerId(stat.getPlayer().getPlayerId())
+                .playerName(stat.getPlayer().getName())
+                .photoUrl(stat.getPlayer().getPhotoUrl())
+                .position(stat.getPosition() != null ? stat.getPosition() : stat.getPlayer().getPosition())
+                .goals(valueOf(stat.getGoals()))
+                .assists(valueOf(stat.getAssists()))
+                .rating(stat.getRating() != null ? roundToOneDecimal(stat.getRating()) : 0)
+                .minutes(valueOf(stat.getMinutes()))
+                .build();
+    }
+
     private TeamResponseDto.Summary toSummary(Team team) {
         return TeamResponseDto.Summary.builder()
                 .teamId(team.getTeamId())
@@ -118,5 +147,13 @@ public class TeamService {
                 .surface(venue.getSurface())
                 .venueImageUrl(venue.getVenueImageUrl())
                 .build();
+    }
+
+    private double roundToOneDecimal(double value) {
+        return Math.round(value * 10) / 10.0;
+    }
+
+    private int valueOf(Integer value) {
+        return value == null ? 0 : value;
     }
 }

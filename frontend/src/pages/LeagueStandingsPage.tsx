@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { RefreshCw } from "lucide-react";
+import { Link } from "react-router-dom";
 import {
   fetchStandings,
   type RecentForm,
@@ -141,7 +142,9 @@ function StandingsTable({ rows }: { rows: StandingRow[] }) {
                 ) : (
                   <span className="team-logo placeholder" aria-hidden="true" />
                 )}
-                <strong>{row.teamName}</strong>
+                <Link className="team-name-link" to={`/teams/${row.teamId}`}>
+                  {row.teamName}
+                </Link>
               </td>
               <td>{row.played}</td>
               <td>{row.win}</td>

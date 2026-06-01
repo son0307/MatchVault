@@ -2,6 +2,7 @@ package com.son.soccerStreaming.search.service;
 
 import com.son.soccerStreaming.fixture.entity.Fixture;
 import com.son.soccerStreaming.fixture.repository.FixtureRepository;
+import com.son.soccerStreaming.global.util.DateTimeUtils;
 import com.son.soccerStreaming.player.entity.Player;
 import com.son.soccerStreaming.player.repository.PlayerRepository;
 import com.son.soccerStreaming.search.dto.SearchResponseDto;
@@ -101,7 +102,7 @@ public class SearchService {
     private SearchResponseDto.FixtureResult toFixtureResult(Fixture fixture) {
         return SearchResponseDto.FixtureResult.builder()
                 .fixtureId(fixture.getFixtureId())
-                .fixtureDate(fixture.getFixtureDate())
+                .fixtureDate(DateTimeUtils.utcToKorea(fixture.getFixtureDate()))
                 .homeTeamName(fixture.getHomeTeam().getName())
                 .awayTeamName(fixture.getAwayTeam().getName())
                 .homeScore(fixture.getHomeScore())

@@ -7,6 +7,7 @@ import com.son.soccerStreaming.fixture.entity.Fixture;
 import com.son.soccerStreaming.fixture.repository.FixtureRepository;
 import com.son.soccerStreaming.global.exception.CustomException;
 import com.son.soccerStreaming.global.exception.ErrorCode;
+import com.son.soccerStreaming.global.util.DateTimeUtils;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -79,7 +80,7 @@ public class FixtureService {
     private FixtureResponseDto.Summary toSummary(Fixture fixture) {
         return FixtureResponseDto.Summary.builder()
                 .fixtureId(fixture.getFixtureId())
-                .fixtureDate(fixture.getFixtureDate())
+                .fixtureDate(DateTimeUtils.utcToKorea(fixture.getFixtureDate()))
                 .round(fixture.getRound())
                 .homeTeamId(fixture.getHomeTeam().getTeamId())
                 .awayTeamId(fixture.getAwayTeam().getTeamId())

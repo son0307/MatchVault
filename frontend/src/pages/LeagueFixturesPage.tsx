@@ -417,6 +417,7 @@ function roundLabel(fixtures: FixtureSummary[]) {
 
 function queryForMode(
   mode: FixtureMode,
+  season: number,
   weekStart: string,
   weekEnd: string,
   round: number,
@@ -530,7 +531,7 @@ function parseFixtureDate(value: string | null) {
   if (!value) {
     return null;
   }
-  const text = /Z$|[+-]\d\d:\d\d$/.test(value) ? value : `${value}Z`;
+  const text = /Z$|[+-]\d\d:\d\d$/.test(value) ? value : `${value}+09:00`;
   const date = new Date(text);
   return Number.isNaN(date.getTime()) ? null : date;
 }
@@ -549,7 +550,13 @@ function formatTime(value: string | null) {
 }
 
 function scoreText(fixture: FixtureSummary) {
-  return fixture.fixtureStatus === "SCHEDULED" ? "vs" : `${fixture.homeScore}:${fixture.awayScore}`;
+  if (fixture.fixtureStatus === "SCHEDULED") {
+    return "vs";
+  }
+  if (fixture.homeScore === null || fixture.homeScore === undefined || fixture.awayScore === null || fixture.awayScore === undefined) {
+    return "-";
+  }
+  return `${fixture.homeScore}:${fixture.awayScore}`;
 }
 
 function valueOf(value: number | null | undefined) {

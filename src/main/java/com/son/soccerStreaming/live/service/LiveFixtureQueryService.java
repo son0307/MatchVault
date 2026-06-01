@@ -3,6 +3,7 @@ package com.son.soccerStreaming.live.service;
 import com.son.soccerStreaming.fixture.dto.FixtureResponseDto;
 import com.son.soccerStreaming.fixture.entity.Fixture;
 import com.son.soccerStreaming.fixture.repository.FixtureRepository;
+import com.son.soccerStreaming.global.util.DateTimeUtils;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -29,8 +30,10 @@ public class LiveFixtureQueryService {
     private FixtureResponseDto.Summary toFixtureSummary(Fixture fixture) {
         return FixtureResponseDto.Summary.builder()
                 .fixtureId(fixture.getFixtureId())
-                .fixtureDate(fixture.getFixtureDate())
+                .fixtureDate(DateTimeUtils.utcToKorea(fixture.getFixtureDate()))
                 .round(fixture.getRound())
+                .homeTeamId(fixture.getHomeTeam().getTeamId())
+                .awayTeamId(fixture.getAwayTeam().getTeamId())
                 .homeTeamName(fixture.getHomeTeam().getName())
                 .awayTeamName(fixture.getAwayTeam().getName())
                 .homeScore(valueOf(fixture.getHomeScore()))
