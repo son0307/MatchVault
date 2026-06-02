@@ -116,7 +116,7 @@ public class PlayerTeamSeasonStat {
             Integer penaltyMissed,
             Integer penaltySaved
     ) {
-        this.backNumber = backNumber;
+        this.backNumber = backNumber != null ? backNumber : this.backNumber;
         this.position = position;
         this.appearances = appearances;
         this.lineups = lineups;

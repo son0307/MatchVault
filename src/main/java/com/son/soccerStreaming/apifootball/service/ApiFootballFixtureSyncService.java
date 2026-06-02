@@ -32,7 +32,7 @@ public class ApiFootballFixtureSyncService {
     @Transactional
     public int syncSeasonFixtures(Integer league, Integer season) {
         int syncedCount = upsertFixtures(apiFootballClient.getFixtures(league, season), false);
-        apiFootballSyncStatusService.recordSuccess("fixtures", "Fixtures");
+        apiFootballSyncStatusService.recordSuccess("fixtures", "Fixtures", season);
         return syncedCount;
     }
 
@@ -43,7 +43,7 @@ public class ApiFootballFixtureSyncService {
                 .toList();
 
         int syncedCount = upsertFixtures(liveFixtures, true);
-        apiFootballSyncStatusService.recordSuccess("fixtures", "Fixtures");
+        apiFootballSyncStatusService.recordSuccess("fixtures", "Fixtures", season);
         return syncedCount;
     }
 

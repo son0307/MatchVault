@@ -187,7 +187,7 @@ public class ApiFootballFixturePlayerStatSyncService {
     }
 
     private Double parseDouble(String value) {
-        if (value == null || value.isBlank()) {
+        if (value == null || value.isBlank() || value.equals("–")) {
             return null;
         }
         return Double.parseDouble(value);

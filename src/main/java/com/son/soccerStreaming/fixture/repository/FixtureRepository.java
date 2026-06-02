@@ -14,7 +14,23 @@ import java.util.Optional;
 public interface FixtureRepository extends JpaRepository<Fixture, Long>, FixtureRepositoryCustom {
     Optional<Fixture> findByFixtureId(Long fixtureId);
 
+    @Query("SELECT f FROM Fixture f JOIN FETCH f.homeTeam JOIN FETCH f.awayTeam WHERE f.fixtureId = :fixtureId")
+    Optional<Fixture> findWithTeamsByFixtureId(@Param("fixtureId") Long fixtureId);
+
     List<Fixture> findAllBySeasonOrderByFixtureDateAsc(Integer season);
+
+    @EntityGraph(attributePaths = {"homeTeam", "awayTeam"})
+    @Query("SELECT f FROM Fixture f " +
+            "WHERE (:season IS NULL OR f.season = :season) " +
+            "AND (LOWER(f.homeTeam.name) LIKE LOWER(CONCAT('%', :keyword, '%')) " +
+            "OR LOWER(f.awayTeam.name) LIKE LOWER(CONCAT('%', :keyword, '%')) " +
+            "OR CAST(f.fixtureId AS string) LIKE CONCAT('%', :keyword, '%')) " +
+            "ORDER BY f.fixtureDate DESC")
+    List<Fixture> searchAdminFixtures(
+            @Param("keyword") String keyword,
+            @Param("season") Integer season,
+            org.springframework.data.domain.Pageable pageable
+    );
 
     boolean existsByFixtureStatus(String fixtureStatus);
 

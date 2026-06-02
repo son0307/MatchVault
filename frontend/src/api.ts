@@ -190,6 +190,38 @@ export type TeamSummary = {
   logoUrl: string | null;
 };
 
+export type SearchScope = "all" | "team" | "player" | "fixture";
+
+export type SearchResponse = {
+  teams: TeamSearchResult[];
+  players: PlayerSearchResult[];
+  fixtures: FixtureSearchResult[];
+};
+
+export type TeamSearchResult = {
+  teamId: number;
+  teamName: string | null;
+  code: string | null;
+  logoUrl: string | null;
+};
+
+export type PlayerSearchResult = {
+  playerId: number;
+  playerName: string | null;
+  position: string | null;
+  photoUrl: string | null;
+};
+
+export type FixtureSearchResult = {
+  fixtureId: number;
+  fixtureDate: string | null;
+  homeTeamName: string | null;
+  awayTeamName: string | null;
+  homeScore: number | null;
+  awayScore: number | null;
+  fixtureStatus: string | null;
+};
+
 export type TeamDetails = TeamSummary & {
   country: string | null;
   founded: number | null;
@@ -577,6 +609,14 @@ export async function fetchFixturePlayerStats(fixtureId: number): Promise<Fixtur
 export async function fetchTeams(): Promise<TeamSummary[]> {
   return cachedGetJson<TeamSummary[]>("/api/v1/teams", "팀 목록을 불러오지 못했습니다.", DETAIL_CACHE_TTL_MS);
 
+}
+
+export async function searchGlobal(keyword: string, type: SearchScope): Promise<SearchResponse> {
+  const params = new URLSearchParams();
+  params.set("q", keyword);
+  params.set("type", type);
+
+  return fetchJson<SearchResponse>(`/api/v1/search?${params.toString()}`, "검색 결과를 불러오지 못했습니다.");
 }
 
 export async function fetchTeamDetails(teamId: number): Promise<TeamDetails> {

@@ -14,6 +14,7 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 
+import java.nio.charset.StandardCharsets;
 import java.util.Map;
 
 @Configuration
@@ -38,6 +39,7 @@ public class SecurityConfig {
                         .accessDeniedHandler((request, response, accessDeniedException) -> {
                             response.setStatus(HttpStatus.FORBIDDEN.value());
                             response.setContentType(MediaType.APPLICATION_JSON_VALUE);
+                            response.setCharacterEncoding(StandardCharsets.UTF_8.name());
                             objectMapper.writeValue(response.getWriter(), Map.of(
                                     "status", HttpStatus.FORBIDDEN.value(),
                                     "error", "ACCESS_DENIED",
@@ -47,6 +49,7 @@ public class SecurityConfig {
                         .authenticationEntryPoint((request, response, authException) -> {
                             response.setStatus(HttpStatus.UNAUTHORIZED.value());
                             response.setContentType(MediaType.APPLICATION_JSON_VALUE);
+                            response.setCharacterEncoding(StandardCharsets.UTF_8.name());
                             objectMapper.writeValue(response.getWriter(), Map.of(
                                     "status", HttpStatus.UNAUTHORIZED.value(),
                                     "error", "AUTHENTICATION_REQUIRED",

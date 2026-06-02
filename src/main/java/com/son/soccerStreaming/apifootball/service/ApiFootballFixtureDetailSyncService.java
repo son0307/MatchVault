@@ -151,14 +151,13 @@ public class ApiFootballFixtureDetailSyncService {
         if (!failedChunks.isEmpty()) {
             throw new ApiFootballFixtureDetailSyncException(failedChunks, chunks.size());
         }
-        if (!fixtureIds.isEmpty()) {
-            apiFootballSyncStatusService.recordSuccess("fixture-details", "Season Details");
-        }
         return results;
     }
 
     public int syncSeasonFixtureDetails(Integer season, boolean applyLiveStandingImpact) {
-        return syncFixtureDetails(fixtureRepository.findAllBySeasonOrderByFixtureDateAsc(season), applyLiveStandingImpact);
+        int syncedCount = syncFixtureDetails(fixtureRepository.findAllBySeasonOrderByFixtureDateAsc(season), applyLiveStandingImpact);
+        apiFootballSyncStatusService.recordSuccess("fixture-details", "Season Details", season);
+        return syncedCount;
     }
 
     private List<List<Long>> chunks(List<Long> fixtureIds) {

@@ -28,7 +28,7 @@ public class FixtureEventService {
         }
 
         List<FixtureEventResponseDto.Event> events = fixtureEventRepository
-                .findAllByFixtureFixtureIdOrderByElapsedAscEventSequenceAsc(fixtureId)
+                .findAllByFixtureFixtureIdOrderByMatchTimeAsc(fixtureId)
                 .stream()
                 .map(this::toEvent)
                 .toList();

@@ -49,7 +49,7 @@ public class ApiFootballStandingSyncService {
         }
 
         log.info("API-Football standing sync completed. league={}, season={}, count={}", league, season, syncedCount);
-        apiFootballSyncStatusService.recordSuccess("standings", "Standings");
+        apiFootballSyncStatusService.recordSuccess("standings", "Standings", season);
         return syncedCount;
     }
 

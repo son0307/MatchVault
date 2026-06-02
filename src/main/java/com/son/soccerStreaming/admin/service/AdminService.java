@@ -11,6 +11,19 @@ import com.son.soccerStreaming.admin.entity.AdminAuditLog;
 import com.son.soccerStreaming.admin.entity.AdminAuditType;
 import com.son.soccerStreaming.admin.entity.AdminOverrideTargetType;
 import com.son.soccerStreaming.auth.entity.AppUser;
+import com.son.soccerStreaming.fixture.entity.Fixture;
+import com.son.soccerStreaming.fixture.entity.FixtureEvent;
+import com.son.soccerStreaming.fixture.entity.FixtureLineup;
+import com.son.soccerStreaming.fixture.entity.FixtureStat;
+import com.son.soccerStreaming.fixture.entity.PlayerFixtureStat;
+import com.son.soccerStreaming.fixture.repository.FixtureEventRepository;
+import com.son.soccerStreaming.fixture.repository.FixtureLineupRepository;
+import com.son.soccerStreaming.fixture.repository.FixtureRepository;
+import com.son.soccerStreaming.fixture.repository.FixtureStatRepository;
+import com.son.soccerStreaming.fixture.repository.PlayerFixtureStatRepository;
+import com.son.soccerStreaming.fixture.service.FixtureRedisService;
+import com.son.soccerStreaming.league.entity.LeagueSeasonCoverage;
+import com.son.soccerStreaming.league.repository.LeagueSeasonCoverageRepository;
 import com.son.soccerStreaming.player.entity.Player;
 import com.son.soccerStreaming.team.entity.Team;
 import com.son.soccerStreaming.team.entity.Venue;
@@ -24,14 +37,18 @@ import com.son.soccerStreaming.team.repository.TeamRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.data.domain.PageRequest;
 
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.function.Predicate;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 @Service
@@ -68,13 +85,19 @@ public class AdminService {
             "number",
             "photoUrl"
     );
+    private static final Set<String> EVENT_TYPES = Set.of("Goal", "Card", "Subst", "Var");
+    private static final Map<String, Set<String>> EVENT_DETAILS_BY_TYPE = Map.of(
+            "Goal", Set.of("Normal Goal", "Own Goal", "Penalty", "Missed Penalty"),
+            "Card", Set.of("Yellow Card", "Red card"),
+            "Var", Set.of("Goal cancelled", "Penalty confirmed")
+    );
+    private static final Pattern SUBSTITUTION_DETAIL_PATTERN = Pattern.compile("Substitution\\s+\\d+");
 
     private static final List<SyncStatusDefinition> SYNC_STATUS_DEFINITIONS = List.of(
             new SyncStatusDefinition("teams", "Teams"),
             new SyncStatusDefinition("standings", "Standings"),
             new SyncStatusDefinition("fixtures", "Fixtures"),
             new SyncStatusDefinition("fixture-details", "Season Details"),
-            new SyncStatusDefinition("fixture-detail", "Fixture Detail"),
             new SyncStatusDefinition("players", "Players"),
             new SyncStatusDefinition("injuries", "Injuries")
     );
@@ -82,6 +105,13 @@ public class AdminService {
     private final AppUserRepository appUserRepository;
     private final TeamRepository teamRepository;
     private final PlayerRepository playerRepository;
+    private final FixtureRepository fixtureRepository;
+    private final FixtureEventRepository fixtureEventRepository;
+    private final FixtureLineupRepository fixtureLineupRepository;
+    private final FixtureStatRepository fixtureStatRepository;
+    private final PlayerFixtureStatRepository playerFixtureStatRepository;
+    private final FixtureRedisService fixtureRedisService;
+    private final LeagueSeasonCoverageRepository leagueSeasonCoverageRepository;
     private final AdminOverrideService adminOverrideService;
     private final AdminAuditLogRepository adminAuditLogRepository;
     private final ApiFootballSyncStatusRepository apiFootballSyncStatusRepository;
@@ -109,6 +139,233 @@ public class AdminService {
                 .stream()
                 .map(this::toPlayerResponse)
                 .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public List<AdminDto.FixtureAdminSummaryResponse> searchFixtures(String keyword, Integer season) {
+        String search = keyword == null ? "" : keyword.trim();
+        if (search.isBlank()) {
+            search = "";
+        }
+        return fixtureRepository.searchAdminFixtures(search, season, PageRequest.of(0, 20))
+                .stream()
+                .map(this::toFixtureSummaryResponse)
+                .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public AdminDto.FixtureAdminDetailResponse getFixtureAdminDetail(Long fixtureId) {
+        Fixture fixture = findFixtureWithTeams(fixtureId);
+        return toFixtureDetailResponse(fixture);
+    }
+
+    @Transactional
+    public AdminDto.FixtureAdminDetailResponse updateFixture(Long adminUserId, Long fixtureId, AdminDto.FixtureUpdateRequest request) {
+        Fixture fixture = findFixtureWithTeams(fixtureId);
+        List<FieldChange> changes = changedFixtureFields(fixture, request);
+
+        fixture.updateFixtureMetadata(
+                request.getFixtureDate() != null ? request.getFixtureDate() : fixture.getFixtureDate(),
+                request.getReferee(),
+                fixture.getTimezone(),
+                fixture.getTimestamp(),
+                fixture.getFirstPeriod(),
+                fixture.getSecondPeriod(),
+                request.getVenueId(),
+                request.getVenueName(),
+                request.getVenueCity()
+        );
+        fixture.updateTactics(
+                request.getHomeFormation(),
+                request.getAwayFormation(),
+                request.getHomeCoachName(),
+                request.getAwayCoachName()
+        );
+        fixture.updateHomeLineupColors(
+                request.getHomePlayerColorPrimary(),
+                request.getHomePlayerColorNumber(),
+                request.getHomePlayerColorBorder(),
+                request.getHomeGoalkeeperColorPrimary(),
+                request.getHomeGoalkeeperColorNumber(),
+                request.getHomeGoalkeeperColorBorder()
+        );
+        fixture.updateAwayLineupColors(
+                request.getAwayPlayerColorPrimary(),
+                request.getAwayPlayerColorNumber(),
+                request.getAwayPlayerColorBorder(),
+                request.getAwayGoalkeeperColorPrimary(),
+                request.getAwayGoalkeeperColorNumber(),
+                request.getAwayGoalkeeperColorBorder()
+        );
+        evictFixtureCaches(fixtureId);
+        saveFixtureUpdateLog(adminUserId, fixture.getFixtureId(), "Fixture updated", changes);
+        return toFixtureDetailResponse(fixture);
+    }
+
+    @Transactional
+    public AdminDto.FixtureAdminDetailResponse updateFixtureEvent(
+            Long adminUserId,
+            Long fixtureId,
+            Integer eventSequence,
+            AdminDto.FixtureEventUpdateRequest request
+    ) {
+        Fixture fixture = findFixtureWithTeams(fixtureId);
+        FixtureEvent event = fixtureEventRepository.findByFixtureFixtureIdAndEventSequence(fixtureId, eventSequence)
+                .orElseThrow(() -> new CustomException(ErrorCode.FIXTURE_NOT_FOUND));
+        validateFixtureEventRequest(fixture, request);
+        String eventType = normalizeEventType(request.getEventType());
+        event.updateEvent(
+                request.getElapsed(),
+                request.getExtra(),
+                findTeamOrNull(request.getTeamId()),
+                findPlayerOrNull(request.getPlayerId()),
+                findPlayerOrNull(request.getAssistPlayerId()),
+                eventType,
+                request.getEventDetail(),
+                request.getComments()
+        );
+        evictFixtureCaches(fixtureId);
+        saveFixtureUpdateLog(adminUserId, fixtureId, "Fixture event updated: sequence=" + eventSequence, List.of());
+        return toFixtureDetailResponse(fixture);
+    }
+
+    @Transactional
+    public AdminDto.FixtureAdminDetailResponse createFixtureEvent(
+            Long adminUserId,
+            Long fixtureId,
+            AdminDto.FixtureEventUpdateRequest request
+    ) {
+        Fixture fixture = findFixtureWithTeams(fixtureId);
+        validateFixtureEventRequest(fixture, request);
+        String eventType = normalizeEventType(request.getEventType());
+        Integer nextSequence = fixtureEventRepository.findAllByFixtureFixtureIdOrderByMatchTimeAsc(fixtureId)
+                .stream()
+                .map(FixtureEvent::getEventSequence)
+                .filter(Objects::nonNull)
+                .max(Integer::compareTo)
+                .map(sequence -> sequence + 1)
+                .orElse(1);
+        FixtureEvent event = FixtureEvent.builder()
+                .fixture(fixture)
+                .eventSequence(nextSequence)
+                .elapsed(request.getElapsed())
+                .extra(request.getExtra())
+                .team(findTeamOrNull(request.getTeamId()))
+                .player(findPlayerOrNull(request.getPlayerId()))
+                .assistPlayer(findPlayerOrNull(request.getAssistPlayerId()))
+                .eventType(eventType)
+                .eventDetail(request.getEventDetail())
+                .comments(request.getComments())
+                .build();
+        fixtureEventRepository.save(event);
+        evictFixtureCaches(fixtureId);
+        saveFixtureUpdateLog(adminUserId, fixtureId, "Fixture event created: sequence=" + nextSequence, List.of());
+        return toFixtureDetailResponse(fixture);
+    }
+
+    @Transactional
+    public AdminDto.FixtureAdminDetailResponse updateFixtureLineup(
+            Long adminUserId,
+            Long fixtureId,
+            Long teamId,
+            Long playerId,
+            AdminDto.FixtureLineupUpdateRequest request
+    ) {
+        Fixture fixture = findFixtureWithTeams(fixtureId);
+        FixtureLineup lineup = fixtureLineupRepository.findByFixtureFixtureIdAndTeamTeamIdAndPlayerPlayerId(fixtureId, teamId, playerId)
+                .orElseThrow(() -> new CustomException(ErrorCode.FIXTURE_NOT_FOUND));
+        lineup.updateLineup(
+                lineup.getJerseyNumber(),
+                request.getPosition(),
+                request.getGrid(),
+                Boolean.TRUE.equals(request.getStarter())
+        );
+        evictFixtureCaches(fixtureId);
+        saveFixtureUpdateLog(adminUserId, fixtureId, "Fixture lineup updated: player=" + playerId, List.of());
+        return toFixtureDetailResponse(fixture);
+    }
+
+    @Transactional
+    public AdminDto.FixtureAdminDetailResponse updateFixtureTeamStat(
+            Long adminUserId,
+            Long fixtureId,
+            Long teamId,
+            AdminDto.FixtureTeamStatUpdateRequest request
+    ) {
+        Fixture fixture = findFixtureWithTeams(fixtureId);
+        FixtureStat stat = fixtureStatRepository.findByFixtureFixtureIdAndTeamTeamId(fixtureId, teamId)
+                .orElseThrow(() -> new CustomException(ErrorCode.FIXTURE_NOT_FOUND));
+        stat.updateStats(
+                request.getShotsOnGoal(),
+                request.getShotsOffGoal(),
+                request.getTotalShots(),
+                request.getBlockedShots(),
+                request.getShotsInsideBox(),
+                request.getShotsOutsideBox(),
+                request.getFouls(),
+                request.getCornerKicks(),
+                request.getOffsides(),
+                request.getBallPossession(),
+                request.getYellowCards(),
+                request.getRedCards(),
+                request.getGoalkeeperSaves(),
+                request.getTotalPasses(),
+                request.getPassesAccurate(),
+                calculatePassAccuracy(request.getPassesAccurate(), request.getTotalPasses()),
+                request.getExpectedGoals()
+        );
+        evictFixtureCaches(fixtureId);
+        saveFixtureUpdateLog(adminUserId, fixtureId, "Fixture team stats updated: team=" + teamId, List.of());
+        return toFixtureDetailResponse(fixture);
+    }
+
+    @Transactional
+    public AdminDto.FixtureAdminDetailResponse updateFixturePlayerStat(
+            Long adminUserId,
+            Long fixtureId,
+            Long playerId,
+            AdminDto.FixturePlayerStatUpdateRequest request
+    ) {
+        Fixture fixture = findFixtureWithTeams(fixtureId);
+        PlayerFixtureStat stat = playerFixtureStatRepository.findByFixtureFixtureIdAndPlayerPlayerId(fixtureId, playerId)
+                .orElseThrow(() -> new CustomException(ErrorCode.FIXTURE_NOT_FOUND));
+        stat.updateLiveStat(
+                request.getMinutesPlayed(),
+                request.getRating(),
+                request.getCaptain(),
+                request.getSubstitute(),
+                request.getGoals(),
+                request.getAssists(),
+                request.getConceded(),
+                request.getSaves(),
+                request.getShotsTotal(),
+                request.getShotsOnTarget(),
+                request.getPassesTotal(),
+                request.getPassesKey(),
+                request.getPassesAccurate(),
+                calculatePassAccuracy(request.getPassesAccurate(), request.getPassesTotal()),
+                request.getTacklesTotal(),
+                request.getBlocks(),
+                request.getInterceptions(),
+                request.getDuelsTotal(),
+                request.getDuelsWon(),
+                request.getDribblesAttempts(),
+                request.getDribblesSuccess(),
+                request.getDribblesPast(),
+                request.getFoulsDrawn(),
+                request.getFoulsCommitted(),
+                request.getYellowCards(),
+                request.getRedCards(),
+                request.getOffsides(),
+                request.getPenaltyWon(),
+                request.getPenaltyCommitted(),
+                request.getPenaltyScored(),
+                request.getPenaltyMissed(),
+                request.getPenaltySaved()
+        );
+        evictFixtureCaches(fixtureId);
+        saveFixtureUpdateLog(adminUserId, fixtureId, "Fixture player stats updated: player=" + playerId, List.of());
+        return toFixtureDetailResponse(fixture);
     }
 
     @Transactional
@@ -217,61 +474,74 @@ public class AdminService {
     }
 
     public AdminDto.SyncResponse syncTeams(Long adminUserId, Integer league, Integer season) {
-        return runSync(adminUserId, "teams", "TEAM", null, () -> apiFootballTeamSyncService.syncTeams(league, season));
+        validateSeasonExists(league, season);
+        return runSync(adminUserId, "teams", "TEAM", null, syncDetails(league, season), () -> apiFootballTeamSyncService.syncTeams(league, season));
     }
 
     public AdminDto.SyncResponse syncStandings(Long adminUserId, Integer league, Integer season) {
-        return runSync(adminUserId, "standings", "STANDING", null, () -> apiFootballStandingSyncService.syncStandings(league, season));
+        validateSeasonCoverage(league, season, coverage -> Boolean.TRUE.equals(coverage.getStandings()));
+        return runSync(adminUserId, "standings", "STANDING", null, syncDetails(league, season), () -> apiFootballStandingSyncService.syncStandings(league, season));
     }
 
     public AdminDto.SyncResponse syncFixtures(Long adminUserId, Integer league, Integer season) {
-        return runSync(adminUserId, "fixtures", "FIXTURE", null, () -> apiFootballFixtureSyncService.syncSeasonFixtures(league, season));
+        validateSeasonExists(league, season);
+        return runSync(adminUserId, "fixtures", "FIXTURE", null, syncDetails(league, season), () -> apiFootballFixtureSyncService.syncSeasonFixtures(league, season));
     }
 
     public AdminDto.SyncResponse syncSeasonFixtureDetails(Long adminUserId, Integer season) {
-        return queueSync(adminUserId, "fixture-details", "FIXTURE", null,
+        validateSeasonCoverage(39, season, this::supportsFixtureDetails);
+        return queueSync(adminUserId, "fixture-details", "FIXTURE", null, syncDetails(null, season),
                 () -> apiFootballFixtureDetailSyncService.syncSeasonFixtureDetails(season, false));
     }
 
     public AdminDto.SyncResponse syncFixtureDetail(Long adminUserId, Long fixtureId) {
-        return runSync(adminUserId, "fixture-detail", "FIXTURE", fixtureId,
+        validateFixtureDetailCoverage(fixtureId);
+        return runSync(adminUserId, "fixture-detail", "FIXTURE", fixtureId, "fixtureId=" + fixtureId,
                 () -> apiFootballFixtureDetailSyncService.syncFixtureDetail(fixtureId, false).fixtureId() != null ? 1 : 0);
     }
 
     public AdminDto.SyncResponse syncPlayers(Long adminUserId, Integer league, Integer season, Long delayMs) {
-        return queueSync(adminUserId, "players", "PLAYER", null,
+        validateSeasonCoverage(league, season, coverage -> Boolean.TRUE.equals(coverage.getPlayers()));
+        return queueSync(adminUserId, "players", "PLAYER", null, syncDetails(league, season),
                 () -> apiFootballPlayerSyncService.syncRegisteredPlayers(league, season, delayMs));
     }
 
     public AdminDto.SyncResponse syncInjuries(Long adminUserId, Integer league, Integer season) {
-        return queueSync(adminUserId, "injuries", "INJURY", null, () -> apiFootballInjurySyncService.syncInjuries(league, season));
+        validateSeasonCoverage(league, season, coverage -> Boolean.TRUE.equals(coverage.getInjuries()));
+        return queueSync(adminUserId, "injuries", "INJURY", null, syncDetails(league, season), () -> apiFootballInjurySyncService.syncInjuries(league, season));
     }
 
     @Transactional(readOnly = true)
-    public AdminDto.AuditLogListResponse getAuditLogs() {
+    public AdminDto.AuditLogListResponse getAuditLogs(Integer page, Integer size) {
+        int safePage = page == null || page < 0 ? 0 : page;
+        int safeSize = size == null ? 20 : Math.min(Math.max(size, 1), 100);
+        var logs = adminAuditLogRepository.findAllByOrderByCreatedAtDesc(PageRequest.of(safePage, safeSize));
         return AdminDto.AuditLogListResponse.builder()
-                .logs(adminAuditLogRepository.findTop50ByOrderByCreatedAtDesc()
-                        .stream()
+                .logs(logs.stream()
                         .map(this::toAuditLogResponse)
                         .toList())
+                .page(logs.getNumber())
+                .size(logs.getSize())
+                .totalPages(logs.getTotalPages())
+                .totalElements(logs.getTotalElements())
                 .build();
     }
 
     @Transactional(readOnly = true)
-    public AdminDto.SyncStatusResponse getSyncStatuses() {
+    public AdminDto.SyncStatusResponse getSyncStatuses(Integer season) {
         return AdminDto.SyncStatusResponse.builder()
                 .statuses(SYNC_STATUS_DEFINITIONS.stream()
-                        .map(this::toSyncStatusItem)
+                        .map(definition -> toSyncStatusItem(definition, season))
                         .toList())
                 .build();
     }
 
-    private AdminDto.SyncResponse runSync(Long adminUserId, String task, String targetType, Long targetId, SyncTask syncTask) {
+    private AdminDto.SyncResponse runSync(Long adminUserId, String task, String targetType, Long targetId, String details, SyncTask syncTask) {
         AppUser admin = findUser(adminUserId);
         try {
             int count = syncTask.run();
-            String message = task + " sync completed. count=" + count;
-            adminAuditLogRepository.save(AdminAuditLog.of(admin, AdminAuditType.SYNC, targetType, targetId, message, true));
+            String message = task + " sync completed. " + details + "; count=" + count;
+            adminAuditLogRepository.save(AdminAuditLog.of(admin, AdminAuditType.SYNC, targetType, targetId, message, details, true));
             return AdminDto.SyncResponse.builder()
                     .task(task)
                     .success(true)
@@ -279,8 +549,8 @@ public class AdminService {
                     .message(message)
                     .build();
         } catch (Exception exception) {
-            String message = task + " sync failed: " + exception.getMessage();
-            adminAuditLogRepository.save(AdminAuditLog.of(admin, AdminAuditType.SYNC, targetType, targetId, message, false));
+            String message = task + " sync failed. " + details + ": " + exception.getMessage();
+            adminAuditLogRepository.save(AdminAuditLog.of(admin, AdminAuditType.SYNC, targetType, targetId, message, details, false));
             return AdminDto.SyncResponse.builder()
                     .task(task)
                     .success(false)
@@ -291,10 +561,10 @@ public class AdminService {
     }
 
     private AdminDto.SyncResponse queueSync(Long adminUserId, String task, String targetType, Long targetId,
-                                            AdminSyncTaskRunner.SyncTask syncTask) {
+                                            String details, AdminSyncTaskRunner.SyncTask syncTask) {
         // Keep the admin request short; the runner writes start/completion audit logs from a worker thread.
         findUser(adminUserId);
-        adminSyncTaskRunner.run(adminUserId, task, targetType, targetId, syncTask);
+        adminSyncTaskRunner.run(adminUserId, task, targetType, targetId, details, syncTask);
         return AdminDto.SyncResponse.builder()
                 .task(task)
                 .success(true)
@@ -302,6 +572,38 @@ public class AdminService {
                 .count(0)
                 .message(task + " sync has started in the background. Check audit logs for completion.")
                 .build();
+    }
+
+    private String syncDetails(Integer league, Integer season) {
+        if (league == null) {
+            return "season=" + season;
+        }
+        return "league=" + league + "; season=" + season;
+    }
+
+    private void validateSeasonExists(Integer league, Integer season) {
+        validateSeasonCoverage(league, season, coverage -> true);
+    }
+
+    private void validateSeasonCoverage(Integer league, Integer season, Predicate<LeagueSeasonCoverage> supports) {
+        LeagueSeasonCoverage coverage = leagueSeasonCoverageRepository.findByLeagueIdAndSeasonYear(league, season)
+                .orElseThrow(() -> new CustomException(ErrorCode.INVALID_ADMIN_SYNC_COVERAGE));
+        if (!supports.test(coverage)) {
+            throw new CustomException(ErrorCode.INVALID_ADMIN_SYNC_COVERAGE);
+        }
+    }
+
+    private void validateFixtureDetailCoverage(Long fixtureId) {
+        Fixture fixture = fixtureRepository.findByFixtureId(fixtureId)
+                .orElseThrow(() -> new CustomException(ErrorCode.FIXTURE_NOT_FOUND));
+        validateSeasonCoverage(39, fixture.getSeason(), this::supportsFixtureDetails);
+    }
+
+    private boolean supportsFixtureDetails(LeagueSeasonCoverage coverage) {
+        return Boolean.TRUE.equals(coverage.getEvents())
+                || Boolean.TRUE.equals(coverage.getLineups())
+                || Boolean.TRUE.equals(coverage.getFixtureStats())
+                || Boolean.TRUE.equals(coverage.getPlayerStats());
     }
 
     private void upsertVenue(Team team, AdminDto.TeamUpdateRequest request) {
@@ -412,6 +714,147 @@ public class AdminService {
     private record FieldChange(String fieldName, Object previousValue, Object newValue) {
     }
 
+    private Fixture findFixtureWithTeams(Long fixtureId) {
+        return fixtureRepository.findWithTeamsByFixtureId(fixtureId)
+                .orElseThrow(() -> new CustomException(ErrorCode.FIXTURE_NOT_FOUND));
+    }
+
+    private Team findTeamOrNull(Long teamId) {
+        if (teamId == null) {
+            return null;
+        }
+        return teamRepository.findByTeamId(teamId)
+                .orElseThrow(() -> new CustomException(ErrorCode.TEAM_NOT_FOUND));
+    }
+
+    private void validateFixtureEventRequest(Fixture fixture, AdminDto.FixtureEventUpdateRequest request) {
+        validateRange(request.getElapsed(), 0, 90);
+        validateRange(request.getExtra(), 0, 20);
+        validateEventTypeAndDetail(request.getEventType(), request.getEventDetail());
+        validateFixtureTeam(fixture, request.getTeamId());
+        validateFixturePlayer(fixture.getFixtureId(), request.getPlayerId());
+        validateFixturePlayer(fixture.getFixtureId(), request.getAssistPlayerId());
+    }
+
+    private void validateRange(Integer value, int min, int max) {
+        if (value != null && (value < min || value > max)) {
+            throw new CustomException(ErrorCode.INVALID_ADMIN_EVENT_FIELD);
+        }
+    }
+
+    private void validateEventTypeAndDetail(String eventType, String eventDetail) {
+        String normalizedType = normalizeEventType(eventType);
+        if (!EVENT_TYPES.contains(normalizedType)) {
+            throw new CustomException(ErrorCode.INVALID_ADMIN_EVENT_FIELD);
+        }
+        if (eventDetail == null || eventDetail.isBlank()) {
+            throw new CustomException(ErrorCode.INVALID_ADMIN_EVENT_FIELD);
+        }
+        if ("Subst".equals(normalizedType)) {
+            if (!SUBSTITUTION_DETAIL_PATTERN.matcher(eventDetail).matches()) {
+                throw new CustomException(ErrorCode.INVALID_ADMIN_EVENT_FIELD);
+            }
+            return;
+        }
+        if (!EVENT_DETAILS_BY_TYPE.getOrDefault(normalizedType, Set.of()).contains(eventDetail)) {
+            throw new CustomException(ErrorCode.INVALID_ADMIN_EVENT_FIELD);
+        }
+    }
+
+    private String normalizeEventType(String eventType) {
+        if (eventType == null) {
+            return "";
+        }
+        return switch (eventType.trim().toLowerCase()) {
+            case "goal" -> "Goal";
+            case "card" -> "Card";
+            case "subst", "substitution" -> "Subst";
+            case "var" -> "Var";
+            default -> eventType;
+        };
+    }
+
+    private void validateFixtureTeam(Fixture fixture, Long teamId) {
+        if (teamId == null) {
+            return;
+        }
+        Long homeTeamId = fixture.getHomeTeam().getTeamId();
+        Long awayTeamId = fixture.getAwayTeam().getTeamId();
+        if (!teamId.equals(homeTeamId) && !teamId.equals(awayTeamId)) {
+            throw new CustomException(ErrorCode.INVALID_ADMIN_EVENT_FIELD);
+        }
+    }
+
+    private void validateFixturePlayer(Long fixtureId, Long playerId) {
+        if (playerId == null) {
+            return;
+        }
+        Set<Long> playerIds = fixtureLineupRepository.findAllByFixtureId(fixtureId)
+                .stream()
+                .map(lineup -> lineup.getPlayer().getPlayerId())
+                .collect(Collectors.toSet());
+        playerFixtureStatRepository.findAllByFixtureFixtureId(fixtureId)
+                .stream()
+                .map(stat -> stat.getPlayer().getPlayerId())
+                .forEach(playerIds::add);
+        if (!playerIds.contains(playerId)) {
+            throw new CustomException(ErrorCode.INVALID_ADMIN_EVENT_FIELD);
+        }
+    }
+
+    private Player findPlayerOrNull(Long playerId) {
+        if (playerId == null) {
+            return null;
+        }
+        return playerRepository.findByPlayerId(playerId)
+                .orElseThrow(() -> new CustomException(ErrorCode.PLAYER_NOT_FOUND));
+    }
+
+    private void saveFixtureUpdateLog(Long adminUserId, Long fixtureId, String message, List<FieldChange> changes) {
+        adminAuditLogRepository.save(AdminAuditLog.of(
+                findUser(adminUserId),
+                AdminAuditType.FIXTURE_UPDATE,
+                "FIXTURE",
+                fixtureId,
+                message,
+                detailsOf(changes),
+                true
+        ));
+    }
+
+    private List<FieldChange> changedFixtureFields(Fixture fixture, AdminDto.FixtureUpdateRequest request) {
+        List<FieldChange> changes = new ArrayList<>();
+        addIfChanged(changes, "fixtureDate", fixture.getFixtureDate(), request.getFixtureDate());
+        addIfChanged(changes, "referee", fixture.getReferee(), request.getReferee());
+        addIfChanged(changes, "venueId", fixture.getVenueId(), request.getVenueId());
+        addIfChanged(changes, "venueName", fixture.getVenueName(), request.getVenueName());
+        addIfChanged(changes, "venueCity", fixture.getVenueCity(), request.getVenueCity());
+        addIfChanged(changes, "homeFormation", fixture.getHomeFormation(), request.getHomeFormation());
+        addIfChanged(changes, "awayFormation", fixture.getAwayFormation(), request.getAwayFormation());
+        addIfChanged(changes, "homeCoachName", fixture.getHomeCoachName(), request.getHomeCoachName());
+        addIfChanged(changes, "awayCoachName", fixture.getAwayCoachName(), request.getAwayCoachName());
+        addIfChanged(changes, "homePlayerColorPrimary", fixture.getHomePlayerColorPrimary(), request.getHomePlayerColorPrimary());
+        addIfChanged(changes, "homePlayerColorNumber", fixture.getHomePlayerColorNumber(), request.getHomePlayerColorNumber());
+        addIfChanged(changes, "homePlayerColorBorder", fixture.getHomePlayerColorBorder(), request.getHomePlayerColorBorder());
+        addIfChanged(changes, "homeGoalkeeperColorPrimary", fixture.getHomeGoalkeeperColorPrimary(), request.getHomeGoalkeeperColorPrimary());
+        addIfChanged(changes, "homeGoalkeeperColorNumber", fixture.getHomeGoalkeeperColorNumber(), request.getHomeGoalkeeperColorNumber());
+        addIfChanged(changes, "homeGoalkeeperColorBorder", fixture.getHomeGoalkeeperColorBorder(), request.getHomeGoalkeeperColorBorder());
+        addIfChanged(changes, "awayPlayerColorPrimary", fixture.getAwayPlayerColorPrimary(), request.getAwayPlayerColorPrimary());
+        addIfChanged(changes, "awayPlayerColorNumber", fixture.getAwayPlayerColorNumber(), request.getAwayPlayerColorNumber());
+        addIfChanged(changes, "awayPlayerColorBorder", fixture.getAwayPlayerColorBorder(), request.getAwayPlayerColorBorder());
+        addIfChanged(changes, "awayGoalkeeperColorPrimary", fixture.getAwayGoalkeeperColorPrimary(), request.getAwayGoalkeeperColorPrimary());
+        addIfChanged(changes, "awayGoalkeeperColorNumber", fixture.getAwayGoalkeeperColorNumber(), request.getAwayGoalkeeperColorNumber());
+        addIfChanged(changes, "awayGoalkeeperColorBorder", fixture.getAwayGoalkeeperColorBorder(), request.getAwayGoalkeeperColorBorder());
+        return changes;
+    }
+
+    private Integer calculatePassAccuracy(Integer passesAccurate, Integer totalPasses) {
+        if (passesAccurate == null || totalPasses == null || totalPasses <= 0) {
+            return null;
+        }
+        return (int) Math.round((passesAccurate * 100.0) / totalPasses);
+    }
+
     private AppUser findUser(Long userId) {
         return appUserRepository.findById(userId)
                 .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
@@ -457,6 +900,193 @@ public class AdminService {
                 .build();
     }
 
+    private AdminDto.FixtureAdminSummaryResponse toFixtureSummaryResponse(Fixture fixture) {
+        return AdminDto.FixtureAdminSummaryResponse.builder()
+                .fixtureId(fixture.getFixtureId())
+                .fixtureDate(fixture.getFixtureDate())
+                .season(fixture.getSeason())
+                .round(fixture.getRound())
+                .homeTeamId(fixture.getHomeTeam().getTeamId())
+                .homeTeamName(fixture.getHomeTeam().getName())
+                .awayTeamId(fixture.getAwayTeam().getTeamId())
+                .awayTeamName(fixture.getAwayTeam().getName())
+                .homeScore(fixture.getHomeScore())
+                .awayScore(fixture.getAwayScore())
+                .fixtureStatus(fixture.getFixtureStatus())
+                .build();
+    }
+
+    private AdminDto.FixtureAdminDetailResponse toFixtureDetailResponse(Fixture fixture) {
+        Long fixtureId = fixture.getFixtureId();
+        return AdminDto.FixtureAdminDetailResponse.builder()
+                .fixture(toFixtureResponse(fixture))
+                .events(fixtureEventRepository.findAllByFixtureFixtureIdOrderByMatchTimeAsc(fixtureId)
+                        .stream()
+                        .map(this::toFixtureEventResponse)
+                        .toList())
+                .lineups(fixtureLineupRepository.findAllByFixtureId(fixtureId)
+                        .stream()
+                        .map(this::toFixtureLineupResponse)
+                        .toList())
+                .teamStats(fixtureStatRepository.findAllByFixtureFixtureId(fixtureId)
+                        .stream()
+                        .map(this::toFixtureTeamStatResponse)
+                        .toList())
+                .playerStats(playerFixtureStatRepository.findAllByFixtureFixtureId(fixtureId)
+                        .stream()
+                        .map(this::toFixturePlayerStatResponse)
+                        .toList())
+                .build();
+    }
+
+    private AdminDto.FixtureAdminResponse toFixtureResponse(Fixture fixture) {
+        return AdminDto.FixtureAdminResponse.builder()
+                .fixtureId(fixture.getFixtureId())
+                .fixtureDate(fixture.getFixtureDate())
+                .referee(fixture.getReferee())
+                .timezone(fixture.getTimezone())
+                .timestamp(fixture.getTimestamp())
+                .firstPeriod(fixture.getFirstPeriod())
+                .secondPeriod(fixture.getSecondPeriod())
+                .round(fixture.getRound())
+                .season(fixture.getSeason())
+                .venueId(fixture.getVenueId())
+                .venueName(fixture.getVenueName())
+                .venueCity(fixture.getVenueCity())
+                .statusShort(fixture.getStatusShort())
+                .statusLong(fixture.getStatusLong())
+                .elapsed(fixture.getElapsed())
+                .fixtureStatus(fixture.getFixtureStatus())
+                .homeScore(fixture.getHomeScore())
+                .awayScore(fixture.getAwayScore())
+                .homeWinner(fixture.getHomeWinner())
+                .awayWinner(fixture.getAwayWinner())
+                .halftimeHomeScore(fixture.getHalftimeHomeScore())
+                .halftimeAwayScore(fixture.getHalftimeAwayScore())
+                .fulltimeHomeScore(fixture.getFulltimeHomeScore())
+                .fulltimeAwayScore(fixture.getFulltimeAwayScore())
+                .extratimeHomeScore(fixture.getExtratimeHomeScore())
+                .extratimeAwayScore(fixture.getExtratimeAwayScore())
+                .penaltyHomeScore(fixture.getPenaltyHomeScore())
+                .penaltyAwayScore(fixture.getPenaltyAwayScore())
+                .homeTeamId(fixture.getHomeTeam().getTeamId())
+                .homeTeamName(fixture.getHomeTeam().getName())
+                .awayTeamId(fixture.getAwayTeam().getTeamId())
+                .awayTeamName(fixture.getAwayTeam().getName())
+                .homeFormation(fixture.getHomeFormation())
+                .awayFormation(fixture.getAwayFormation())
+                .homeCoachName(fixture.getHomeCoachName())
+                .awayCoachName(fixture.getAwayCoachName())
+                .homePlayerColorPrimary(fixture.getHomePlayerColorPrimary())
+                .homePlayerColorNumber(fixture.getHomePlayerColorNumber())
+                .homePlayerColorBorder(fixture.getHomePlayerColorBorder())
+                .homeGoalkeeperColorPrimary(fixture.getHomeGoalkeeperColorPrimary())
+                .homeGoalkeeperColorNumber(fixture.getHomeGoalkeeperColorNumber())
+                .homeGoalkeeperColorBorder(fixture.getHomeGoalkeeperColorBorder())
+                .awayPlayerColorPrimary(fixture.getAwayPlayerColorPrimary())
+                .awayPlayerColorNumber(fixture.getAwayPlayerColorNumber())
+                .awayPlayerColorBorder(fixture.getAwayPlayerColorBorder())
+                .awayGoalkeeperColorPrimary(fixture.getAwayGoalkeeperColorPrimary())
+                .awayGoalkeeperColorNumber(fixture.getAwayGoalkeeperColorNumber())
+                .awayGoalkeeperColorBorder(fixture.getAwayGoalkeeperColorBorder())
+                .build();
+    }
+
+    private AdminDto.FixtureEventAdminResponse toFixtureEventResponse(FixtureEvent event) {
+        return AdminDto.FixtureEventAdminResponse.builder()
+                .eventSequence(event.getEventSequence())
+                .elapsed(event.getElapsed())
+                .extra(event.getExtra())
+                .teamId(event.getTeam() != null ? event.getTeam().getTeamId() : null)
+                .teamName(event.getTeam() != null ? event.getTeam().getName() : null)
+                .playerId(event.getPlayer() != null ? event.getPlayer().getPlayerId() : null)
+                .playerName(event.getPlayer() != null ? event.getPlayer().getName() : null)
+                .assistPlayerId(event.getAssistPlayer() != null ? event.getAssistPlayer().getPlayerId() : null)
+                .assistPlayerName(event.getAssistPlayer() != null ? event.getAssistPlayer().getName() : null)
+                .eventType(event.getEventType())
+                .eventDetail(event.getEventDetail())
+                .comments(event.getComments())
+                .build();
+    }
+
+    private AdminDto.FixtureLineupAdminResponse toFixtureLineupResponse(FixtureLineup lineup) {
+        return AdminDto.FixtureLineupAdminResponse.builder()
+                .teamId(lineup.getTeam().getTeamId())
+                .teamName(lineup.getTeam().getName())
+                .playerId(lineup.getPlayer().getPlayerId())
+                .playerName(lineup.getPlayer().getName())
+                .jerseyNumber(lineup.getJerseyNumber())
+                .position(lineup.getPosition())
+                .grid(lineup.getGrid())
+                .starter(lineup.isStarter())
+                .build();
+    }
+
+    private AdminDto.FixtureTeamStatAdminResponse toFixtureTeamStatResponse(FixtureStat stat) {
+        return AdminDto.FixtureTeamStatAdminResponse.builder()
+                .teamId(stat.getTeam().getTeamId())
+                .teamName(stat.getTeam().getName())
+                .shotsOnGoal(stat.getShotsOnGoal())
+                .shotsOffGoal(stat.getShotsOffGoal())
+                .totalShots(stat.getTotalShots())
+                .blockedShots(stat.getBlockedShots())
+                .shotsInsideBox(stat.getShotsInsideBox())
+                .shotsOutsideBox(stat.getShotsOutsideBox())
+                .fouls(stat.getFouls())
+                .cornerKicks(stat.getCornerKicks())
+                .offsides(stat.getOffsides())
+                .ballPossession(stat.getBallPossession())
+                .yellowCards(stat.getYellowCards())
+                .redCards(stat.getRedCards())
+                .goalkeeperSaves(stat.getGoalkeeperSaves())
+                .totalPasses(stat.getTotalPasses())
+                .passesAccurate(stat.getPassesAccurate())
+                .passAccuracy(stat.getPassAccuracy())
+                .expectedGoals(stat.getExpectedGoals())
+                .build();
+    }
+
+    private AdminDto.FixturePlayerStatAdminResponse toFixturePlayerStatResponse(PlayerFixtureStat stat) {
+        return AdminDto.FixturePlayerStatAdminResponse.builder()
+                .playerId(stat.getPlayer().getPlayerId())
+                .playerName(stat.getPlayer().getName())
+                .teamId(stat.getTeam().getTeamId())
+                .teamName(stat.getTeam().getName())
+                .minutesPlayed(stat.getMinutesPlayed())
+                .rating(stat.getRating())
+                .captain(stat.getIsCaptain())
+                .substitute(stat.getIsSubstitute())
+                .goals(stat.getGoals())
+                .assists(stat.getAssists())
+                .conceded(stat.getConceded())
+                .saves(stat.getSaves())
+                .shotsTotal(stat.getShotsTotal())
+                .shotsOnTarget(stat.getShotsOnTarget())
+                .passesTotal(stat.getPassesTotal())
+                .passesKey(stat.getPassesKey())
+                .passesAccurate(stat.getPassesAccurate())
+                .passAccuracy(stat.getPassAccuracy())
+                .tacklesTotal(stat.getTacklesTotal())
+                .blocks(stat.getBlocks())
+                .interceptions(stat.getInterceptions())
+                .duelsTotal(stat.getDuelsTotal())
+                .duelsWon(stat.getDuelsWon())
+                .dribblesAttempts(stat.getDribblesAttempts())
+                .dribblesSuccess(stat.getDribblesSuccess())
+                .dribblesPast(stat.getDribblesPast())
+                .foulsDrawn(stat.getFoulsDrawn())
+                .foulsCommitted(stat.getFoulsCommitted())
+                .yellowCards(stat.getYellowCards())
+                .redCards(stat.getRedCards())
+                .offsides(stat.getOffsides())
+                .penaltyWon(stat.getPenaltyWon())
+                .penaltyCommitted(stat.getPenaltyCommitted())
+                .penaltyScored(stat.getPenaltyScored())
+                .penaltyMissed(stat.getPenaltyMissed())
+                .penaltySaved(stat.getPenaltySaved())
+                .build();
+    }
+
     private List<AdminDto.ManualOverrideResponse> toOverrideResponses(AdminOverrideTargetType targetType, Long targetId) {
         List<AdminOverrideService.OverrideInfo> overrides = adminOverrideService.overrideInfos(targetType, targetId);
         if (overrides == null) {
@@ -484,19 +1114,27 @@ public class AdminService {
                 .build();
     }
 
-    private AdminDto.SyncStatusItem toSyncStatusItem(SyncStatusDefinition definition) {
+    private AdminDto.SyncStatusItem toSyncStatusItem(SyncStatusDefinition definition, Integer season) {
         return AdminDto.SyncStatusItem.builder()
                 .task(definition.task())
                 .label(definition.label())
-                .lastSyncedAt(latestCompletedSyncTime(definition.task()))
+                .lastSyncedAt(latestCompletedSyncTime(definition.task(), season))
                 .build();
     }
 
-    private OffsetDateTime latestCompletedSyncTime(String task) {
-        return apiFootballSyncStatusRepository.findById(task)
+    private OffsetDateTime latestCompletedSyncTime(String task, Integer season) {
+        return apiFootballSyncStatusRepository.findById(syncStatusKey(task, season))
                 .map(status -> status.getLastSyncedAt())
                 .map(this::toKoreaOffsetDateTime)
                 .orElse(null);
+    }
+
+    private String syncStatusKey(String task, Integer season) {
+        return season == null ? task : "%s:%d".formatted(task, season);
+    }
+
+    private void evictFixtureCaches(Long fixtureId) {
+        fixtureRedisService.evictFixtureCaches(fixtureId);
     }
 
     private OffsetDateTime toKoreaOffsetDateTime(LocalDateTime dateTime) {

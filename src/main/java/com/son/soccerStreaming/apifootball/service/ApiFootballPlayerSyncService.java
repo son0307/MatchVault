@@ -67,7 +67,7 @@ public class ApiFootballPlayerSyncService {
 
         log.info("API-Football registered players sync completed. league={}, season={}, count={}",
                 league, season, syncedCount);
-        apiFootballSyncStatusService.recordSuccess("players", "Players");
+        apiFootballSyncStatusService.recordSuccess("players", "Players", season);
         return syncedCount;
     }
 
@@ -315,9 +315,13 @@ public class ApiFootballPlayerSyncService {
         ApiFootballPlayerDto.Fouls fouls = stat.getFouls();
         ApiFootballPlayerDto.Cards cards = stat.getCards();
         ApiFootballPlayerDto.Penalty penalty = stat.getPenalty();
+        Integer backNumber = games != null ? games.getNumber() : null;
+        if (backNumber == null) {
+            backNumber = latestLineupNumber(player, team, season);
+        }
 
         entity.updateSeasonStat(
-                games != null ? games.getNumber() : null,
+                backNumber,
                 games != null ? games.getPosition() : null,
                 games != null ? games.getAppearences() : null,
                 games != null ? games.getLineups() : null,
@@ -356,6 +360,20 @@ public class ApiFootballPlayerSyncService {
                 penalty != null ? penalty.getSaved() : null
         );
         playerTeamSeasonStatRepository.save(entity);
+    }
+
+    private Integer latestLineupNumber(Player player, Team team, Integer season) {
+        if (player == null || team == null || season == null) {
+            return null;
+        }
+        return fixtureLineupRepository.findLineupNumbersByPlayerTeamAndSeason(
+                        player.getPlayerId(),
+                        team.getTeamId(),
+                        season
+                )
+                .stream()
+                .findFirst()
+                .orElse(null);
     }
 
     private Long leagueIdOf(ApiFootballPlayerDto.PlayerStatistics statistics, Integer fallbackLeague) {

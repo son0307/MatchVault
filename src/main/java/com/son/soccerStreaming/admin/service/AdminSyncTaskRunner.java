@@ -21,24 +21,25 @@ public class AdminSyncTaskRunner {
     private final AdminAuditLogRepository adminAuditLogRepository;
 
     @Async("adminSyncTaskExecutor")
-    public void run(Long adminUserId, String task, String targetType, Long targetId, SyncTask syncTask) {
+    public void run(Long adminUserId, String task, String targetType, Long targetId, String details, SyncTask syncTask) {
         AppUser admin = findUser(adminUserId);
         adminAuditLogRepository.save(AdminAuditLog.of(
                 admin,
                 AdminAuditType.SYNC,
                 targetType,
                 targetId,
-                task + " sync started in the background.",
+                task + " sync started in the background. " + details,
+                details,
                 true
         ));
 
         try {
             int count = syncTask.run();
-            String message = task + " sync completed. count=" + count;
-            adminAuditLogRepository.save(AdminAuditLog.of(admin, AdminAuditType.SYNC, targetType, targetId, message, true));
+            String message = task + " sync completed. " + details + "; count=" + count;
+            adminAuditLogRepository.save(AdminAuditLog.of(admin, AdminAuditType.SYNC, targetType, targetId, message, details, true));
         } catch (Exception exception) {
-            String message = task + " sync failed: " + exception.getMessage();
-            adminAuditLogRepository.save(AdminAuditLog.of(admin, AdminAuditType.SYNC, targetType, targetId, message, false));
+            String message = task + " sync failed. " + details + ": " + exception.getMessage();
+            adminAuditLogRepository.save(AdminAuditLog.of(admin, AdminAuditType.SYNC, targetType, targetId, message, details, false));
             log.error("Admin background sync failed. task={}, targetType={}, targetId={}", task, targetType, targetId, exception);
         }
     }
