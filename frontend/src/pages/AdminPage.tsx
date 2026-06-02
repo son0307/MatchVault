@@ -127,6 +127,7 @@ type AuditLogPage = {
 };
 
 const AUDIT_LOG_PAGE_SIZE = 20;
+const ADMIN_SEARCH_KEYWORD_MAX_LENGTH = 80;
 
 const teamFields: FieldConfig[] = [
   { name: "name", label: "Name" },
@@ -392,8 +393,12 @@ export function AdminPage({ authState }: AdminPageProps) {
   }
 
   async function saveFixtureSection(url: string, form: HTMLFormElement, fields: FieldConfig[], successMessage: string, method = "PUT") {
+    await saveFixturePayload(url, formBody(form, fields), successMessage, method);
+  }
+
+  async function saveFixturePayload(url: string, body: Record<string, unknown>, successMessage: string, method = "PUT") {
     await runRequest(async () => {
-      const updated = await adminJson<FixtureDetailAdmin>(url, method, formBody(form, fields));
+      const updated = await adminJson<FixtureDetailAdmin>(url, method, body);
       clearApiMemoryCache();
       setSelectedFixture(updated);
       setMessage(successMessage);
@@ -563,9 +568,11 @@ export function AdminPage({ authState }: AdminPageProps) {
         />
         {selectedFixture ? (
           <FixtureEditor
+            key={selectedFixture.fixture.fixtureId}
             detail={selectedFixture}
             onSaveFixture={saveFixture}
             onSaveSection={saveFixtureSection}
+            onSavePayload={saveFixturePayload}
           />
         ) : null}
       </EditorPanel>
@@ -697,7 +704,13 @@ function SearchRow({
 }) {
   return (
     <form className="admin-search-row" onSubmit={onSubmit}>
-      <input type="search" value={value} placeholder={placeholder} onChange={(event) => onChange(event.target.value)} />
+      <input
+        type="search"
+        value={value}
+        placeholder={placeholder}
+        maxLength={ADMIN_SEARCH_KEYWORD_MAX_LENGTH}
+        onChange={(event) => onChange(event.target.value)}
+      />
       <button type="submit">Search</button>
     </form>
   );
@@ -762,10 +775,12 @@ function FixtureEditor({
   detail,
   onSaveFixture,
   onSaveSection,
+  onSavePayload,
 }: {
   detail: FixtureDetailAdmin;
   onSaveFixture: (event: FormEvent<HTMLFormElement>) => void;
   onSaveSection: (url: string, form: HTMLFormElement, fields: FieldConfig[], successMessage: string, method?: string) => Promise<void>;
+  onSavePayload: (url: string, body: Record<string, unknown>, successMessage: string, method?: string) => Promise<void>;
 }) {
   const fixtureId = detail.fixture.fixtureId;
   const [addingEvent, setAddingEvent] = useState(false);
@@ -802,12 +817,10 @@ function FixtureEditor({
               detail={detail}
               value={newEventValue}
               submitLabel="Create Event"
-              onSubmit={(submitEvent, fields) => {
-                submitEvent.preventDefault();
-                void onSaveSection(
+              onSubmit={(body) => {
+                void onSavePayload(
                   `/api/v1/admin/fixtures/${fixtureId}/events`,
-                  submitEvent.currentTarget,
-                  fields,
+                  body,
                   "이벤트를 추가했습니다.",
                   "POST",
                 ).then(() => setAddingEvent(false));
@@ -823,12 +836,10 @@ function FixtureEditor({
               detail={detail}
               value={event}
               submitLabel="Save Event"
-              onSubmit={(submitEvent, fields) => {
-                submitEvent.preventDefault();
-                void onSaveSection(
+              onSubmit={(body) => {
+                void onSavePayload(
                   `/api/v1/admin/fixtures/${fixtureId}/events/${event.eventSequence}`,
-                  submitEvent.currentTarget,
-                  fields,
+                  body,
                   "이벤트를 저장했습니다.",
                 );
               }}
@@ -929,27 +940,44 @@ function EventAdminForm({
   detail: FixtureDetailAdmin;
   value: Record<string, unknown>;
   submitLabel: string;
-  onSubmit: (event: FormEvent<HTMLFormElement>, fields: FieldConfig[]) => void;
+  onSubmit: (body: Record<string, unknown>) => void;
 }) {
-  const initialType = normalizeEventType(value.eventType);
-  const [selectedType, setSelectedType] = useState(initialType);
+  const [draft, setDraft] = useState(() => eventDraftValue(value));
 
   useEffect(() => {
-    setSelectedType(initialType);
-  }, [initialType]);
+    setDraft(eventDraftValue(value));
+  }, [value]);
 
+  const selectedType = normalizeEventType(draft.eventType);
   const fields = eventFieldsWithOptions(detail, selectedType);
   const formValue: Record<string, unknown> = {
-    ...value,
+    ...draft,
     eventType: selectedType,
-    eventDetail:
-      typeof value.eventDetail === "string" && eventDetailOptions(selectedType).some((option) => option.value === value.eventDetail)
-        ? value.eventDetail
-        : eventDetailOptions(selectedType)[0]?.value ?? "",
+    eventDetail: validEventDetail(selectedType, draft.eventDetail),
   };
 
+  function updateDraft(field: FieldConfig, nextValue: string) {
+    setDraft((current) => {
+      const next = { ...current, [field.name]: nextValue };
+      if (field.name !== "eventType") {
+        return next;
+      }
+      const nextType = normalizeEventType(nextValue);
+      return {
+        ...next,
+        eventType: nextType,
+        eventDetail: validEventDetail(nextType, current.eventDetail),
+      };
+    });
+  }
+
+  function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    onSubmit(payloadFromDraft(formValue, fields));
+  }
+
   return (
-    <form className="admin-edit-form" onSubmit={(event) => onSubmit(event, fields)}>
+    <form className="admin-edit-form" onSubmit={submit}>
       <h3>{title}</h3>
       <div className="admin-form-grid">
         {fields.map((field) => (
@@ -957,13 +985,35 @@ function EventAdminForm({
             key={field.name === "eventDetail" ? `${field.name}-${selectedType}` : field.name}
             field={field}
             value={formValue[field.name]}
-            onChange={field.name === "eventType" ? setSelectedType : undefined}
+            onChange={(nextValue) => updateDraft(field, nextValue)}
           />
         ))}
       </div>
       <button type="submit">{submitLabel}</button>
     </form>
   );
+}
+
+function eventDraftValue(value: Record<string, unknown>): Record<string, unknown> {
+  const eventType = normalizeEventType(value.eventType);
+  return {
+    ...value,
+    eventType,
+    eventDetail: validEventDetail(eventType, value.eventDetail),
+  };
+}
+
+function validEventDetail(eventType: string, value: unknown) {
+  const options = eventDetailOptions(eventType);
+  return typeof value === "string" && options.some((option) => option.value === value) ? value : options[0]?.value ?? "";
+}
+
+function payloadFromDraft(draft: Record<string, unknown>, fields: FieldConfig[]) {
+  const body: Record<string, unknown> = {};
+  fields.forEach((field) => {
+    body[field.name] = coerceValue(draft[field.name], field.kind);
+  });
+  return body;
 }
 
 function eventFieldsWithOptions(detail: FixtureDetailAdmin, selectedType: string): FieldConfig[] {
@@ -1073,10 +1123,16 @@ function AdminField({
   }
 
   if (field.kind === "boolean") {
+    const booleanValue = value === null || value === undefined ? "" : String(value);
     return (
       <label>
         <span>{field.label}{overridden ? " · manual" : ""}</span>
-        <select name={field.name} defaultValue={value === null || value === undefined ? "" : String(value)}>
+        <select
+          name={field.name}
+          value={onChange ? booleanValue : undefined}
+          defaultValue={onChange ? undefined : booleanValue}
+          onChange={(event) => onChange?.(event.currentTarget.value)}
+        >
           <option value="">-</option>
           <option value="true">true</option>
           <option value="false">false</option>
@@ -1090,6 +1146,7 @@ function AdminField({
     return <ColorPreviewField field={field} value={value} overridden={overridden} />;
   }
 
+  const textValue = inputValue(value, field.kind);
   return (
     <label>
       <span>{field.label}{overridden ? " · manual" : ""}</span>
@@ -1099,7 +1156,9 @@ function AdminField({
         step={field.kind === "number" ? "any" : undefined}
         min={field.min}
         max={field.max}
-        defaultValue={inputValue(value, field.kind)}
+        value={onChange ? textValue : undefined}
+        defaultValue={onChange ? undefined : textValue}
+        onChange={(event) => onChange?.(event.currentTarget.value)}
       />
       {field.help ? <small className="admin-field-help warning">{field.help}</small> : null}
     </label>
@@ -1149,7 +1208,7 @@ function formBody(form: HTMLFormElement, fields: FieldConfig[]) {
   return body;
 }
 
-function coerceValue(value: FormDataEntryValue | null, kind: FieldKind = "text") {
+function coerceValue(value: unknown, kind: FieldKind = "text") {
   if (value === null || value === "") {
     return null;
   }

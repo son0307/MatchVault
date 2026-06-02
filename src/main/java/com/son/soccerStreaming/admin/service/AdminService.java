@@ -55,6 +55,8 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class AdminService {
 
+    private static final int ADMIN_SEARCH_KEYWORD_MAX_LENGTH = 80;
+
     private static final ZoneId KOREA_ZONE = ZoneId.of("Asia/Seoul");
     private static final Set<String> TEAM_OVERRIDE_FIELDS = Set.of(
             "name",
@@ -125,7 +127,7 @@ public class AdminService {
 
     @Transactional(readOnly = true)
     public List<AdminDto.TeamAdminResponse> searchTeams(String keyword) {
-        String search = keyword == null ? "" : keyword.trim();
+        String search = adminSearchKeyword(keyword);
         return teamRepository.findTop20ByNameContainingIgnoreCaseOrderByNameAsc(search)
                 .stream()
                 .map(this::toTeamResponse)
@@ -134,7 +136,7 @@ public class AdminService {
 
     @Transactional(readOnly = true)
     public List<AdminDto.PlayerAdminResponse> searchPlayers(String keyword) {
-        String search = keyword == null ? "" : keyword.trim();
+        String search = adminSearchKeyword(keyword);
         return playerRepository.findTop20ByNameContainingIgnoreCaseOrderByNameAsc(search)
                 .stream()
                 .map(this::toPlayerResponse)
@@ -143,14 +145,19 @@ public class AdminService {
 
     @Transactional(readOnly = true)
     public List<AdminDto.FixtureAdminSummaryResponse> searchFixtures(String keyword, Integer season) {
-        String search = keyword == null ? "" : keyword.trim();
-        if (search.isBlank()) {
-            search = "";
-        }
+        String search = adminSearchKeyword(keyword);
         return fixtureRepository.searchAdminFixtures(search, season, PageRequest.of(0, 20))
                 .stream()
                 .map(this::toFixtureSummaryResponse)
                 .toList();
+    }
+
+    private String adminSearchKeyword(String keyword) {
+        String search = keyword == null ? "" : keyword.trim();
+        if (search.length() > ADMIN_SEARCH_KEYWORD_MAX_LENGTH) {
+            throw new CustomException(ErrorCode.INVALID_ADMIN_SEARCH_KEYWORD);
+        }
+        return search;
     }
 
     @Transactional(readOnly = true)
