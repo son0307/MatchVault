@@ -22,6 +22,11 @@ public class AdminSyncTaskRunner {
 
     @Async("adminSyncTaskExecutor")
     public void run(Long adminUserId, String task, String targetType, Long targetId, String details, SyncTask syncTask) {
+        run(adminUserId, task, targetType, targetId, details, syncTask, null);
+    }
+
+    @Async("adminSyncTaskExecutor")
+    public void run(Long adminUserId, String task, String targetType, Long targetId, String details, SyncTask syncTask, Runnable afterCompletion) {
         AppUser admin = findUser(adminUserId);
         adminAuditLogRepository.save(AdminAuditLog.of(
                 admin,
@@ -41,6 +46,10 @@ public class AdminSyncTaskRunner {
             String message = task + " sync failed. " + details + ": " + exception.getMessage();
             adminAuditLogRepository.save(AdminAuditLog.of(admin, AdminAuditType.SYNC, targetType, targetId, message, details, false));
             log.error("Admin background sync failed. task={}, targetType={}, targetId={}", task, targetType, targetId, exception);
+        } finally {
+            if (afterCompletion != null) {
+                afterCompletion.run();
+            }
         }
     }
 

@@ -15,6 +15,7 @@ public enum ErrorCode {
     INVALID_ADMIN_EVENT_FIELD(HttpStatus.BAD_REQUEST, "Invalid admin event field."),
     INVALID_ADMIN_SEARCH_KEYWORD(HttpStatus.BAD_REQUEST, "Admin search keyword is too long."),
     INVALID_ADMIN_SYNC_COVERAGE(HttpStatus.BAD_REQUEST, "This season does not support the requested API-Football data."),
+    ADMIN_SYNC_TOO_FREQUENT(HttpStatus.TOO_MANY_REQUESTS, "Manual sync was requested too frequently. Please wait before retrying."),
 
     // 401 UNAUTHORIZED
     LOGIN_FAILED(HttpStatus.UNAUTHORIZED, "이메일 또는 비밀번호가 올바르지 않습니다."),

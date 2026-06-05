@@ -39,6 +39,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.data.domain.PageRequest;
 
+import java.time.Duration;
+import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.time.ZoneId;
@@ -47,6 +49,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 import java.util.function.Predicate;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -56,6 +60,7 @@ import java.util.stream.Collectors;
 public class AdminService {
 
     private static final int ADMIN_SEARCH_KEYWORD_MAX_LENGTH = 80;
+    private static final Duration MANUAL_SYNC_COOLDOWN = Duration.ofSeconds(30);
 
     private static final ZoneId KOREA_ZONE = ZoneId.of("Asia/Seoul");
     private static final Set<String> TEAM_OVERRIDE_FIELDS = Set.of(
@@ -124,6 +129,7 @@ public class AdminService {
     private final ApiFootballPlayerSyncService apiFootballPlayerSyncService;
     private final ApiFootballInjurySyncService apiFootballInjurySyncService;
     private final AdminSyncTaskRunner adminSyncTaskRunner;
+    private final ConcurrentMap<String, ManualSyncState> manualSyncStates = new ConcurrentHashMap<>();
 
     @Transactional(readOnly = true)
     public List<AdminDto.TeamAdminResponse> searchTeams(String keyword) {
@@ -279,6 +285,8 @@ public class AdminService {
             AdminDto.FixtureLineupUpdateRequest request
     ) {
         Fixture fixture = findFixtureWithTeams(fixtureId);
+        validateFixtureTeam(fixture, teamId);
+        validateFixturePlayer(fixtureId, playerId);
         FixtureLineup lineup = fixtureLineupRepository.findByFixtureFixtureIdAndTeamTeamIdAndPlayerPlayerId(fixtureId, teamId, playerId)
                 .orElseThrow(() -> new CustomException(ErrorCode.FIXTURE_NOT_FOUND));
         lineup.updateLineup(
@@ -300,6 +308,7 @@ public class AdminService {
             AdminDto.FixtureTeamStatUpdateRequest request
     ) {
         Fixture fixture = findFixtureWithTeams(fixtureId);
+        validateFixtureTeam(fixture, teamId);
         FixtureStat stat = fixtureStatRepository.findByFixtureFixtureIdAndTeamTeamId(fixtureId, teamId)
                 .orElseThrow(() -> new CustomException(ErrorCode.FIXTURE_NOT_FOUND));
         stat.updateStats(
@@ -545,6 +554,8 @@ public class AdminService {
 
     private AdminDto.SyncResponse runSync(Long adminUserId, String task, String targetType, Long targetId, String details, SyncTask syncTask) {
         AppUser admin = findUser(adminUserId);
+        String syncKey = manualSyncKey(task, details);
+        acquireManualSync(syncKey);
         try {
             int count = syncTask.run();
             String message = task + " sync completed. " + details + "; count=" + count;
@@ -564,6 +575,8 @@ public class AdminService {
                     .count(0)
                     .message(message)
                     .build();
+        } finally {
+            releaseManualSync(syncKey);
         }
     }
 
@@ -571,7 +584,9 @@ public class AdminService {
                                             String details, AdminSyncTaskRunner.SyncTask syncTask) {
         // Keep the admin request short; the runner writes start/completion audit logs from a worker thread.
         findUser(adminUserId);
-        adminSyncTaskRunner.run(adminUserId, task, targetType, targetId, details, syncTask);
+        String syncKey = manualSyncKey(task, details);
+        acquireManualSync(syncKey);
+        adminSyncTaskRunner.run(adminUserId, task, targetType, targetId, details, syncTask, () -> releaseManualSync(syncKey));
         return AdminDto.SyncResponse.builder()
                 .task(task)
                 .success(true)
@@ -579,6 +594,27 @@ public class AdminService {
                 .count(0)
                 .message(task + " sync has started in the background. Check audit logs for completion.")
                 .build();
+    }
+
+    private String manualSyncKey(String task, String details) {
+        return task + ":" + details;
+    }
+
+    private void acquireManualSync(String syncKey) {
+        Instant now = Instant.now();
+        manualSyncStates.compute(syncKey, (key, current) -> {
+            if (current != null && current.running()) {
+                throw new CustomException(ErrorCode.ADMIN_SYNC_TOO_FREQUENT);
+            }
+            if (current != null && Duration.between(current.requestedAt(), now).compareTo(MANUAL_SYNC_COOLDOWN) < 0) {
+                throw new CustomException(ErrorCode.ADMIN_SYNC_TOO_FREQUENT);
+            }
+            return new ManualSyncState(now, true);
+        });
+    }
+
+    private void releaseManualSync(String syncKey) {
+        manualSyncStates.computeIfPresent(syncKey, (key, current) -> new ManualSyncState(current.requestedAt(), false));
     }
 
     private String syncDetails(Integer league, Integer season) {
@@ -719,6 +755,9 @@ public class AdminService {
     }
 
     private record FieldChange(String fieldName, Object previousValue, Object newValue) {
+    }
+
+    private record ManualSyncState(Instant requestedAt, boolean running) {
     }
 
     private Fixture findFixtureWithTeams(Long fixtureId) {

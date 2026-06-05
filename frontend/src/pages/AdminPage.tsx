@@ -1,4 +1,4 @@
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useEffect, useRef, useState } from "react";
 import { LoaderCircle } from "lucide-react";
 import { Navigate } from "react-router-dom";
 import { clearApiMemoryCache, fetchLeagueSeasons, type LeagueSeasonCoverage } from "../api";
@@ -128,6 +128,7 @@ type AuditLogPage = {
 
 const AUDIT_LOG_PAGE_SIZE = 20;
 const ADMIN_SEARCH_KEYWORD_MAX_LENGTH = 80;
+const MANUAL_SYNC_COOLDOWN_MS = 30_000;
 
 const teamFields: FieldConfig[] = [
   { name: "name", label: "Name" },
@@ -291,9 +292,14 @@ export function AdminPage({ authState }: AdminPageProps) {
   const [fixtureKeyword, setFixtureKeyword] = useState("");
   const [fixtures, setFixtures] = useState<FixtureSummaryAdmin[]>([]);
   const [selectedFixture, setSelectedFixture] = useState<FixtureDetailAdmin | null>(null);
+  const [editingFixtureId, setEditingFixtureId] = useState<number | null>(null);
+  const [loadingFixtureId, setLoadingFixtureId] = useState<number | null>(null);
+  const [savingKey, setSavingKey] = useState<string | null>(null);
   const [syncFixtureId, setSyncFixtureId] = useState("");
   const [syncMessage, setSyncMessage] = useState("");
   const [syncingTask, setSyncingTask] = useState<string | null>(null);
+  const [syncCooldownUntil, setSyncCooldownUntil] = useState<Record<string, number>>({});
+  const [syncClock, setSyncClock] = useState(Date.now());
   const [syncStatuses, setSyncStatuses] = useState<SyncStatus[]>([]);
   const [seasonCoverages, setSeasonCoverages] = useState<LeagueSeasonCoverage[]>([]);
   const [coverageStatus, setCoverageStatus] = useState<CoverageStatus>("loading");
@@ -303,6 +309,7 @@ export function AdminPage({ authState }: AdminPageProps) {
   const [auditTotalElements, setAuditTotalElements] = useState(0);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const fixtureRequestIdRef = useRef(0);
 
   useEffect(() => {
     if (authState.authStatus === "authenticated" && authState.currentUser?.role === "ADMIN") {
@@ -311,6 +318,14 @@ export function AdminPage({ authState }: AdminPageProps) {
       void loadSeasonCoverages(setSeasonCoverages, setCoverageStatus);
     }
   }, [authState.authStatus, authState.currentUser?.role, authState.season]);
+
+  useEffect(() => {
+    if (!Object.values(syncCooldownUntil).some((until) => until > syncClock)) {
+      return;
+    }
+    const timerId = window.setInterval(() => setSyncClock(Date.now()), 1000);
+    return () => window.clearInterval(timerId);
+  }, [syncCooldownUntil, syncClock]);
 
   if (authState.authStatus === "checking") {
     return <section className="panel admin-page-panel">권한을 확인하는 중입니다.</section>;
@@ -347,9 +362,30 @@ export function AdminPage({ authState }: AdminPageProps) {
   }
 
   async function selectFixture(fixtureId: number) {
-    await runRequest(async () => {
-      setSelectedFixture(await adminGet<FixtureDetailAdmin>(`/api/v1/admin/fixtures/${fixtureId}`));
-    });
+    if (savingKey !== null) {
+      return;
+    }
+    const requestId = fixtureRequestIdRef.current + 1;
+    fixtureRequestIdRef.current = requestId;
+    setEditingFixtureId(fixtureId);
+    setSelectedFixture(null);
+    setLoadingFixtureId(fixtureId);
+    setError("");
+    setMessage("");
+    try {
+      const detail = await adminGet<FixtureDetailAdmin>(`/api/v1/admin/fixtures/${fixtureId}`);
+      if (fixtureRequestIdRef.current === requestId && detail.fixture.fixtureId === fixtureId) {
+        setSelectedFixture(detail);
+      }
+    } catch (nextError) {
+      if (fixtureRequestIdRef.current === requestId) {
+        setError(nextError instanceof Error ? nextError.message : "경기 정보를 불러오지 못했습니다.");
+      }
+    } finally {
+      if (fixtureRequestIdRef.current === requestId) {
+        setLoadingFixtureId(null);
+      }
+    }
   }
 
   async function reloadAuditLogs(page = auditPage) {
@@ -358,11 +394,13 @@ export function AdminPage({ authState }: AdminPageProps) {
 
   async function saveTeam(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!selectedTeam) {
+    if (!selectedTeam || savingKey !== null) {
       return;
     }
-    await runRequest(async () => {
-      const updated = await adminJson<TeamAdmin>(`/api/v1/admin/teams/${selectedTeam.teamId}`, "PUT", formBody(event.currentTarget, teamFields));
+    const teamId = selectedTeam.teamId;
+    const body = formBody(event.currentTarget, teamFields);
+    await runSave(`team:${teamId}`, async () => {
+      const updated = await adminJson<TeamAdmin>(`/api/v1/admin/teams/${teamId}`, "PUT", body);
       clearApiMemoryCache();
       setSelectedTeam(updated);
       setMessage("팀 정보를 저장했습니다.");
@@ -372,11 +410,13 @@ export function AdminPage({ authState }: AdminPageProps) {
 
   async function savePlayer(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!selectedPlayer) {
+    if (!selectedPlayer || savingKey !== null) {
       return;
     }
-    await runRequest(async () => {
-      const updated = await adminJson<PlayerAdmin>(`/api/v1/admin/players/${selectedPlayer.playerId}`, "PUT", formBody(event.currentTarget, playerFields));
+    const playerId = selectedPlayer.playerId;
+    const body = formBody(event.currentTarget, playerFields);
+    await runSave(`player:${playerId}`, async () => {
+      const updated = await adminJson<PlayerAdmin>(`/api/v1/admin/players/${playerId}`, "PUT", body);
       clearApiMemoryCache();
       setSelectedPlayer(updated);
       setMessage("선수 정보를 저장했습니다.");
@@ -389,27 +429,81 @@ export function AdminPage({ authState }: AdminPageProps) {
     if (!selectedFixture) {
       return;
     }
-    await saveFixtureSection(`/api/v1/admin/fixtures/${selectedFixture.fixture.fixtureId}`, event.currentTarget, fixtureFields, "경기 기본 정보를 저장했습니다.");
+    const fixtureId = selectedFixture.fixture.fixtureId;
+    await saveFixtureSection(fixtureId, `/api/v1/admin/fixtures/${fixtureId}`, event.currentTarget, fixtureFields, "경기 기본 정보를 저장했습니다.");
   }
 
-  async function saveFixtureSection(url: string, form: HTMLFormElement, fields: FieldConfig[], successMessage: string, method = "PUT") {
-    await saveFixturePayload(url, formBody(form, fields), successMessage, method);
+  async function saveFixtureSection(fixtureId: number, url: string, form: HTMLFormElement, fields: FieldConfig[], successMessage: string, method = "PUT") {
+    await saveFixturePayload(fixtureId, url, formBody(form, fields), successMessage, method);
   }
 
-  async function saveFixturePayload(url: string, body: Record<string, unknown>, successMessage: string, method = "PUT") {
-    await runRequest(async () => {
+  async function saveFixturePayload(fixtureId: number, url: string, body: Record<string, unknown>, successMessage: string, method = "PUT") {
+    if (!canSaveFixture(fixtureId) || savingKey !== null) {
+      setError("현재 열려 있는 경기와 저장 대상이 일치하지 않습니다. 경기를 다시 선택해주세요.");
+      return;
+    }
+    await runSave(`fixture:${fixtureId}`, async () => {
+      if (!canSaveFixture(fixtureId)) {
+        setError("현재 열려 있는 경기와 저장 대상이 일치하지 않습니다. 경기를 다시 선택해주세요.");
+        return;
+      }
       const updated = await adminJson<FixtureDetailAdmin>(url, method, body);
       clearApiMemoryCache();
-      setSelectedFixture(updated);
+      if (canSaveFixture(fixtureId) && updated.fixture.fixtureId === fixtureId) {
+        setSelectedFixture(updated);
+      }
       setMessage(successMessage);
       await reloadAuditLogs();
     });
+  }
+
+  function canSaveFixture(fixtureId: number) {
+    return loadingFixtureId === null && editingFixtureId === fixtureId && selectedFixture?.fixture.fixtureId === fixtureId;
+  }
+
+  async function runSave(key: string, action: () => Promise<void>) {
+    if (savingKey !== null) {
+      return;
+    }
+    setSavingKey(key);
+    try {
+      await runRequest(action);
+    } finally {
+      setSavingKey(null);
+    }
+  }
+
+  function manualSyncCooldownKey(task: string) {
+    return `${task}:${authState.season}`;
+  }
+
+  function fixtureDetailCooldownKey(fixtureId: string) {
+    return `fixture-detail:${fixtureId}`;
+  }
+
+  function syncCooldownSeconds(key: string) {
+    return Math.max(0, Math.ceil(((syncCooldownUntil[key] ?? 0) - syncClock) / 1000));
+  }
+
+  function markSyncCooldown(key: string) {
+    const now = Date.now();
+    setSyncClock(now);
+    setSyncCooldownUntil((current) => ({
+      ...current,
+      [key]: now + MANUAL_SYNC_COOLDOWN_MS,
+    }));
   }
 
   async function runSync(task: string) {
     const availability = syncAvailability(task, authState.season, seasonCoverages, coverageStatus);
     if (!availability.enabled) {
       setSyncMessage(availability.message);
+      return;
+    }
+    const cooldownKey = manualSyncCooldownKey(task);
+    const cooldownSeconds = syncCooldownSeconds(cooldownKey);
+    if (cooldownSeconds > 0) {
+      setSyncMessage(`${cooldownSeconds}초 후 다시 요청할 수 있습니다.`);
       return;
     }
     const league = 39;
@@ -427,6 +521,7 @@ export function AdminPage({ authState }: AdminPageProps) {
       setSyncMessage("Fixture Detail 동기화는 먼저 경기를 선택해야 합니다.");
       return;
     }
+    markSyncCooldown(cooldownKey);
     setSyncingTask(task);
     try {
       await runRequest(async () => {
@@ -448,6 +543,13 @@ export function AdminPage({ authState }: AdminPageProps) {
       setSyncMessage("Fixture ID를 입력해주세요.");
       return;
     }
+    const cooldownKey = fixtureDetailCooldownKey(fixtureId);
+    const cooldownSeconds = syncCooldownSeconds(cooldownKey);
+    if (cooldownSeconds > 0) {
+      setSyncMessage(`${cooldownSeconds}초 후 다시 요청할 수 있습니다.`);
+      return;
+    }
+    markSyncCooldown(cooldownKey);
     setSyncingTask("fixture-detail");
     try {
       await runRequest(async () => {
@@ -463,6 +565,7 @@ export function AdminPage({ authState }: AdminPageProps) {
 
   const syncStatusByTask = new Map(syncStatuses.map((status) => [status.task, status]));
   const selectedCoverage = seasonCoverages.find((coverage) => coverage.seasonYear === authState.season) ?? null;
+  const fixtureDetailCooldownSeconds = syncFixtureId.trim() ? syncCooldownSeconds(fixtureDetailCooldownKey(syncFixtureId.trim())) : 0;
 
   async function runRequest(action: () => Promise<void>) {
     setError("");
@@ -519,6 +622,7 @@ export function AdminPage({ authState }: AdminPageProps) {
             getKey={(team) => team.teamId}
             render={(team) => `${team.name ?? "-"} #${team.teamId}`}
             onSelect={setSelectedTeam}
+            disabled={savingKey !== null}
           />
           {selectedTeam ? (
             <AdminForm
@@ -528,6 +632,7 @@ export function AdminPage({ authState }: AdminPageProps) {
               overrides={selectedTeam.manualOverrides}
               submitLabel="Save Team"
               onSubmit={saveTeam}
+              disabled={savingKey !== null}
             />
           ) : null}
         </EditorPanel>
@@ -541,6 +646,7 @@ export function AdminPage({ authState }: AdminPageProps) {
             getKey={(player) => player.playerId}
             render={(player) => `${player.name ?? "-"} #${player.playerId}`}
             onSelect={setSelectedPlayer}
+            disabled={savingKey !== null}
           />
           {selectedPlayer ? (
             <AdminForm
@@ -550,6 +656,7 @@ export function AdminPage({ authState }: AdminPageProps) {
               overrides={selectedPlayer.manualOverrides}
               submitLabel="Save Player"
               onSubmit={savePlayer}
+              disabled={savingKey !== null}
             />
           ) : null}
         </EditorPanel>
@@ -565,7 +672,9 @@ export function AdminPage({ authState }: AdminPageProps) {
             `${fixture.homeTeamName ?? "-"} vs ${fixture.awayTeamName ?? "-"} · ${fixture.fixtureStatus ?? "-"} · #${fixture.fixtureId}`
           }
           onSelect={(fixture) => void selectFixture(fixture.fixtureId)}
+          disabled={savingKey !== null}
         />
+        {loadingFixtureId !== null ? <p className="muted admin-sync-message">경기 정보를 불러오는 중입니다.</p> : null}
         {selectedFixture ? (
           <FixtureEditor
             key={selectedFixture.fixture.fixtureId}
@@ -573,6 +682,7 @@ export function AdminPage({ authState }: AdminPageProps) {
             onSaveFixture={saveFixture}
             onSaveSection={saveFixtureSection}
             onSavePayload={saveFixturePayload}
+            disabled={savingKey !== null}
           />
         ) : null}
       </EditorPanel>
@@ -590,13 +700,15 @@ export function AdminPage({ authState }: AdminPageProps) {
             const status = syncStatusByTask.get(item.task);
             const isSyncing = syncingTask === item.task;
             const availability = syncAvailability(item.task, authState.season, seasonCoverages, coverageStatus);
+            const cooldownSeconds = syncCooldownSeconds(manualSyncCooldownKey(item.task));
             return (
               <div className="admin-sync-action" key={item.task}>
-                <button type="button" onClick={() => void runSync(item.task)} disabled={syncingTask !== null || !availability.enabled}>
+                <button type="button" onClick={() => void runSync(item.task)} disabled={syncingTask !== null || cooldownSeconds > 0 || !availability.enabled}>
                   {isSyncing ? <LoaderCircle className="admin-loading-icon" aria-hidden="true" /> : null}
                   {item.label}
                 </button>
                 <span>Last sync: {formatDateTime(status?.lastSyncedAt ?? null)}</span>
+                {cooldownSeconds > 0 ? <span className="admin-sync-warning">{cooldownSeconds}초 후 재요청 가능</span> : null}
                 {!availability.enabled ? <span className="admin-sync-warning">{availability.message}</span> : null}
               </div>
             );
@@ -620,11 +732,12 @@ export function AdminPage({ authState }: AdminPageProps) {
               placeholder="Fixture ID"
             />
           </label>
-          <button type="submit" disabled={syncingTask !== null}>
+          <button type="submit" disabled={syncingTask !== null || fixtureDetailCooldownSeconds > 0}>
             {syncingTask === "fixture-detail" ? <LoaderCircle className="admin-loading-icon" aria-hidden="true" /> : null}
             Update Fixture Detail
           </button>
         </form>
+        {fixtureDetailCooldownSeconds > 0 ? <p className="muted admin-sync-message">{fixtureDetailCooldownSeconds}초 후 Fixture Detail을 다시 요청할 수 있습니다.</p> : null}
         {syncMessage ? <p className="muted admin-sync-message">{syncMessage}</p> : null}
       </details>
 
@@ -721,11 +834,13 @@ function ResultList<T>({
   getKey,
   render,
   onSelect,
+  disabled,
 }: {
   items: T[];
   getKey: (item: T) => string | number;
   render: (item: T) => string;
   onSelect: (item: T) => void;
+  disabled?: boolean;
 }) {
   if (!items.length) {
     return null;
@@ -734,7 +849,7 @@ function ResultList<T>({
   return (
     <div className="admin-result-list">
       {items.map((item) => (
-        <button type="button" key={getKey(item)} onClick={() => onSelect(item)}>
+        <button type="button" key={getKey(item)} onClick={() => onSelect(item)} disabled={disabled}>
           {render(item)}
         </button>
       ))}
@@ -749,6 +864,7 @@ function AdminForm({
   overrides,
   submitLabel,
   onSubmit,
+  disabled,
 }: {
   title: string;
   fields: FieldConfig[];
@@ -756,6 +872,7 @@ function AdminForm({
   overrides?: AdminOverride[];
   submitLabel: string;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
+  disabled?: boolean;
 }) {
   const overrideSet = new Set((overrides ?? []).map((override) => override.fieldName));
   return (
@@ -766,7 +883,7 @@ function AdminForm({
           <AdminField key={field.name} field={field} value={value[field.name]} overridden={overrideSet.has(field.name)} />
         ))}
       </div>
-      <button type="submit">{submitLabel}</button>
+      <button type="submit" disabled={disabled}>{submitLabel}</button>
     </form>
   );
 }
@@ -776,11 +893,13 @@ function FixtureEditor({
   onSaveFixture,
   onSaveSection,
   onSavePayload,
+  disabled,
 }: {
   detail: FixtureDetailAdmin;
   onSaveFixture: (event: FormEvent<HTMLFormElement>) => void;
-  onSaveSection: (url: string, form: HTMLFormElement, fields: FieldConfig[], successMessage: string, method?: string) => Promise<void>;
-  onSavePayload: (url: string, body: Record<string, unknown>, successMessage: string, method?: string) => Promise<void>;
+  onSaveSection: (fixtureId: number, url: string, form: HTMLFormElement, fields: FieldConfig[], successMessage: string, method?: string) => Promise<void>;
+  onSavePayload: (fixtureId: number, url: string, body: Record<string, unknown>, successMessage: string, method?: string) => Promise<void>;
+  disabled?: boolean;
 }) {
   const fixtureId = detail.fixture.fixtureId;
   const [addingEvent, setAddingEvent] = useState(false);
@@ -803,10 +922,11 @@ function FixtureEditor({
           value={detail.fixture}
           submitLabel="Save Fixture"
           onSubmit={onSaveFixture}
+          disabled={disabled}
         />
       </NestedAdminSection>
       <NestedAdminSection title="Events" count={detail.events.length}>
-        <button type="button" className="admin-add-button" onClick={() => setAddingEvent((current) => !current)}>
+        <button type="button" className="admin-add-button" onClick={() => setAddingEvent((current) => !current)} disabled={disabled}>
           {addingEvent ? "Cancel New Event" : "Add Event"}
         </button>
         {addingEvent ? (
@@ -819,12 +939,14 @@ function FixtureEditor({
               submitLabel="Create Event"
               onSubmit={(body) => {
                 void onSavePayload(
+                  fixtureId,
                   `/api/v1/admin/fixtures/${fixtureId}/events`,
                   body,
                   "이벤트를 추가했습니다.",
                   "POST",
                 ).then(() => setAddingEvent(false));
               }}
+              disabled={disabled}
             />
           </details>
         ) : null}
@@ -838,11 +960,13 @@ function FixtureEditor({
               submitLabel="Save Event"
               onSubmit={(body) => {
                 void onSavePayload(
+                  fixtureId,
                   `/api/v1/admin/fixtures/${fixtureId}/events/${event.eventSequence}`,
                   body,
                   "이벤트를 저장했습니다.",
                 );
               }}
+              disabled={disabled}
             />
           </details>
         ))}
@@ -859,12 +983,14 @@ function FixtureEditor({
             onSubmit={(submitEvent) => {
               submitEvent.preventDefault();
               void onSaveSection(
+                fixtureId,
                 `/api/v1/admin/fixtures/${fixtureId}/lineups/${lineup.teamId}/${lineup.playerId}`,
                 submitEvent.currentTarget,
                 lineupFields,
                 "라인업을 저장했습니다.",
               );
             }}
+            disabled={disabled}
             />
           </details>
         ))}
@@ -881,12 +1007,14 @@ function FixtureEditor({
             onSubmit={(submitEvent) => {
               submitEvent.preventDefault();
               void onSaveSection(
+                fixtureId,
                 `/api/v1/admin/fixtures/${fixtureId}/team-stats/${stat.teamId}`,
                 submitEvent.currentTarget,
                 teamStatFields,
                 "팀 경기 통계를 저장했습니다.",
               );
             }}
+            disabled={disabled}
             />
           </details>
         ))}
@@ -903,12 +1031,14 @@ function FixtureEditor({
             onSubmit={(submitEvent) => {
               submitEvent.preventDefault();
               void onSaveSection(
+                fixtureId,
                 `/api/v1/admin/fixtures/${fixtureId}/player-stats/${stat.playerId}`,
                 submitEvent.currentTarget,
                 playerStatFields,
                 "선수 경기 통계를 저장했습니다.",
               );
             }}
+            disabled={disabled}
             />
           </details>
         ))}
@@ -935,12 +1065,14 @@ function EventAdminForm({
   value,
   submitLabel,
   onSubmit,
+  disabled,
 }: {
   title: string;
   detail: FixtureDetailAdmin;
   value: Record<string, unknown>;
   submitLabel: string;
   onSubmit: (body: Record<string, unknown>) => void;
+  disabled?: boolean;
 }) {
   const [draft, setDraft] = useState(() => eventDraftValue(value));
 
@@ -989,7 +1121,7 @@ function EventAdminForm({
           />
         ))}
       </div>
-      <button type="submit">{submitLabel}</button>
+      <button type="submit" disabled={disabled}>{submitLabel}</button>
     </form>
   );
 }
