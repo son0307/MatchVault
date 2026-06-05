@@ -30,6 +30,11 @@ public class AdminController {
         return adminService.searchTeams(keyword);
     }
 
+    @GetMapping("/teams/{teamId}")
+    public ResponseEntity<AdminDto.TeamAdminResponse> getTeam(@PathVariable Long teamId) {
+        return ResponseEntity.ok(adminService.getTeamAdminDetail(teamId));
+    }
+
     @PutMapping("/teams/{teamId}")
     public ResponseEntity<AdminDto.TeamAdminResponse> updateTeam(
             @AuthenticationPrincipal AuthUserDetails userDetails,
@@ -59,6 +64,11 @@ public class AdminController {
     @GetMapping("/players")
     public List<AdminDto.PlayerAdminResponse> searchPlayers(@RequestParam(defaultValue = "") String keyword) {
         return adminService.searchPlayers(keyword);
+    }
+
+    @GetMapping("/players/{playerId}")
+    public ResponseEntity<AdminDto.PlayerAdminResponse> getPlayer(@PathVariable Long playerId) {
+        return ResponseEntity.ok(adminService.getPlayerAdminDetail(playerId));
     }
 
     @GetMapping("/fixtures")
@@ -237,4 +247,5 @@ public class AdminController {
     ) {
         return ResponseEntity.ok(adminService.getSyncStatuses(season));
     }
+
 }

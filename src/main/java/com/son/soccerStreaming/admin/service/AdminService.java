@@ -141,12 +141,26 @@ public class AdminService {
     }
 
     @Transactional(readOnly = true)
+    public AdminDto.TeamAdminResponse getTeamAdminDetail(Long teamId) {
+        Team team = teamRepository.findByTeamId(teamId)
+                .orElseThrow(() -> new CustomException(ErrorCode.TEAM_NOT_FOUND));
+        return toTeamResponse(team);
+    }
+
+    @Transactional(readOnly = true)
     public List<AdminDto.PlayerAdminResponse> searchPlayers(String keyword) {
         String search = adminSearchKeyword(keyword);
         return playerRepository.findTop20ByNameContainingIgnoreCaseOrderByNameAsc(search)
                 .stream()
                 .map(this::toPlayerResponse)
                 .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public AdminDto.PlayerAdminResponse getPlayerAdminDetail(Long playerId) {
+        Player player = playerRepository.findByPlayerId(playerId)
+                .orElseThrow(() -> new CustomException(ErrorCode.PLAYER_NOT_FOUND));
+        return toPlayerResponse(player);
     }
 
     @Transactional(readOnly = true)

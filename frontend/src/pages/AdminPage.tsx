@@ -39,10 +39,22 @@ type TeamAdmin = Record<string, unknown> & {
   manualOverrides?: AdminOverride[];
 };
 
+type TeamSelectionState = {
+  teamId: number | null;
+  status: "idle" | "loading" | "ready" | "error";
+  detail: TeamAdmin | null;
+};
+
 type PlayerAdmin = Record<string, unknown> & {
   playerId: number;
   name: string | null;
   manualOverrides?: AdminOverride[];
+};
+
+type PlayerSelectionState = {
+  playerId: number | null;
+  status: "idle" | "loading" | "ready" | "error";
+  detail: PlayerAdmin | null;
 };
 
 type FixtureSummaryAdmin = {
@@ -63,6 +75,12 @@ type FixtureDetailAdmin = {
   lineups: FixtureLineupAdmin[];
   teamStats: FixtureTeamStatAdmin[];
   playerStats: FixturePlayerStatAdmin[];
+};
+
+type FixtureSelectionState = {
+  fixtureId: number | null;
+  status: "idle" | "loading" | "ready" | "error";
+  detail: FixtureDetailAdmin | null;
 };
 
 type FixtureAdmin = Record<string, unknown> & {
@@ -154,8 +172,8 @@ const playerFields: FieldConfig[] = [
   { name: "birthPlace", label: "Birth Place" },
   { name: "birthCountry", label: "Birth Country" },
   { name: "nationality", label: "Nationality" },
-  { name: "height", label: "Height" },
-  { name: "weight", label: "Weight" },
+  { name: "height", label: "Height", kind: "number" },
+  { name: "weight", label: "Weight", kind: "number" },
   { name: "position", label: "Position" },
   { name: "number", label: "Number", kind: "number" },
   { name: "photoUrl", label: "Photo URL" },
@@ -285,15 +303,25 @@ export function AdminPage({ authState }: AdminPageProps) {
   const [activeTab, setActiveTab] = useState<AdminTab>("team");
   const [teamKeyword, setTeamKeyword] = useState("");
   const [teams, setTeams] = useState<TeamAdmin[]>([]);
-  const [selectedTeam, setSelectedTeam] = useState<TeamAdmin | null>(null);
+  const [teamSelection, setTeamSelection] = useState<TeamSelectionState>({
+    teamId: null,
+    status: "idle",
+    detail: null,
+  });
   const [playerKeyword, setPlayerKeyword] = useState("");
   const [players, setPlayers] = useState<PlayerAdmin[]>([]);
-  const [selectedPlayer, setSelectedPlayer] = useState<PlayerAdmin | null>(null);
+  const [playerSelection, setPlayerSelection] = useState<PlayerSelectionState>({
+    playerId: null,
+    status: "idle",
+    detail: null,
+  });
   const [fixtureKeyword, setFixtureKeyword] = useState("");
   const [fixtures, setFixtures] = useState<FixtureSummaryAdmin[]>([]);
-  const [selectedFixture, setSelectedFixture] = useState<FixtureDetailAdmin | null>(null);
-  const [editingFixtureId, setEditingFixtureId] = useState<number | null>(null);
-  const [loadingFixtureId, setLoadingFixtureId] = useState<number | null>(null);
+  const [fixtureSelection, setFixtureSelection] = useState<FixtureSelectionState>({
+    fixtureId: null,
+    status: "idle",
+    detail: null,
+  });
   const [savingKey, setSavingKey] = useState<string | null>(null);
   const [syncFixtureId, setSyncFixtureId] = useState("");
   const [syncMessage, setSyncMessage] = useState("");
@@ -309,7 +337,15 @@ export function AdminPage({ authState }: AdminPageProps) {
   const [auditTotalElements, setAuditTotalElements] = useState(0);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const teamRequestIdRef = useRef(0);
+  const playerRequestIdRef = useRef(0);
   const fixtureRequestIdRef = useRef(0);
+  const selectedTeam = teamSelection.status === "ready" ? teamSelection.detail : null;
+  const loadingTeamId = teamSelection.status === "loading" ? teamSelection.teamId : null;
+  const selectedPlayer = playerSelection.status === "ready" ? playerSelection.detail : null;
+  const loadingPlayerId = playerSelection.status === "loading" ? playerSelection.playerId : null;
+  const selectedFixture = fixtureSelection.status === "ready" ? fixtureSelection.detail : null;
+  const loadingFixtureId = fixtureSelection.status === "loading" ? fixtureSelection.fixtureId : null;
 
   useEffect(() => {
     if (authState.authStatus === "authenticated" && authState.currentUser?.role === "ADMIN") {
@@ -343,12 +379,56 @@ export function AdminPage({ authState }: AdminPageProps) {
     });
   }
 
+  async function selectTeam(teamId: number) {
+    if (savingKey !== null) {
+      return;
+    }
+    const requestId = teamRequestIdRef.current + 1;
+    teamRequestIdRef.current = requestId;
+    setTeamSelection({ teamId, status: "loading", detail: null });
+    setError("");
+    setMessage("");
+    try {
+      const detail = await adminGet<TeamAdmin>(`/api/v1/admin/teams/${teamId}`);
+      if (teamRequestIdRef.current === requestId && detail.teamId === teamId) {
+        setTeamSelection({ teamId, status: "ready", detail });
+      }
+    } catch (nextError) {
+      if (teamRequestIdRef.current === requestId) {
+        setTeamSelection({ teamId, status: "error", detail: null });
+        setError(nextError instanceof Error ? nextError.message : "팀 정보를 불러오지 못했습니다.");
+      }
+    }
+  }
+
   async function searchPlayers(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     await runRequest(async () => {
       const result = await adminGet<PlayerAdmin[]>(`/api/v1/admin/players?keyword=${encodeURIComponent(playerKeyword)}`);
       setPlayers(result);
     });
+  }
+
+  async function selectPlayer(playerId: number) {
+    if (savingKey !== null) {
+      return;
+    }
+    const requestId = playerRequestIdRef.current + 1;
+    playerRequestIdRef.current = requestId;
+    setPlayerSelection({ playerId, status: "loading", detail: null });
+    setError("");
+    setMessage("");
+    try {
+      const detail = await adminGet<PlayerAdmin>(`/api/v1/admin/players/${playerId}`);
+      if (playerRequestIdRef.current === requestId && detail.playerId === playerId) {
+        setPlayerSelection({ playerId, status: "ready", detail });
+      }
+    } catch (nextError) {
+      if (playerRequestIdRef.current === requestId) {
+        setPlayerSelection({ playerId, status: "error", detail: null });
+        setError(nextError instanceof Error ? nextError.message : "선수 정보를 불러오지 못했습니다.");
+      }
+    }
   }
 
   async function searchFixtures(event: FormEvent<HTMLFormElement>) {
@@ -367,23 +447,18 @@ export function AdminPage({ authState }: AdminPageProps) {
     }
     const requestId = fixtureRequestIdRef.current + 1;
     fixtureRequestIdRef.current = requestId;
-    setEditingFixtureId(fixtureId);
-    setSelectedFixture(null);
-    setLoadingFixtureId(fixtureId);
+    setFixtureSelection({ fixtureId, status: "loading", detail: null });
     setError("");
     setMessage("");
     try {
       const detail = await adminGet<FixtureDetailAdmin>(`/api/v1/admin/fixtures/${fixtureId}`);
       if (fixtureRequestIdRef.current === requestId && detail.fixture.fixtureId === fixtureId) {
-        setSelectedFixture(detail);
+        setFixtureSelection({ fixtureId, status: "ready", detail });
       }
     } catch (nextError) {
       if (fixtureRequestIdRef.current === requestId) {
+        setFixtureSelection({ fixtureId, status: "error", detail: null });
         setError(nextError instanceof Error ? nextError.message : "경기 정보를 불러오지 못했습니다.");
-      }
-    } finally {
-      if (fixtureRequestIdRef.current === requestId) {
-        setLoadingFixtureId(null);
       }
     }
   }
@@ -402,7 +477,7 @@ export function AdminPage({ authState }: AdminPageProps) {
     await runSave(`team:${teamId}`, async () => {
       const updated = await adminJson<TeamAdmin>(`/api/v1/admin/teams/${teamId}`, "PUT", body);
       clearApiMemoryCache();
-      setSelectedTeam(updated);
+      setTeamSelection({ teamId, status: "ready", detail: updated });
       setMessage("팀 정보를 저장했습니다.");
       await reloadAuditLogs();
     });
@@ -418,7 +493,7 @@ export function AdminPage({ authState }: AdminPageProps) {
     await runSave(`player:${playerId}`, async () => {
       const updated = await adminJson<PlayerAdmin>(`/api/v1/admin/players/${playerId}`, "PUT", body);
       clearApiMemoryCache();
-      setSelectedPlayer(updated);
+      setPlayerSelection({ playerId, status: "ready", detail: updated });
       setMessage("선수 정보를 저장했습니다.");
       await reloadAuditLogs();
     });
@@ -450,7 +525,7 @@ export function AdminPage({ authState }: AdminPageProps) {
       const updated = await adminJson<FixtureDetailAdmin>(url, method, body);
       clearApiMemoryCache();
       if (canSaveFixture(fixtureId) && updated.fixture.fixtureId === fixtureId) {
-        setSelectedFixture(updated);
+        setFixtureSelection({ fixtureId, status: "ready", detail: updated });
       }
       setMessage(successMessage);
       await reloadAuditLogs();
@@ -458,7 +533,9 @@ export function AdminPage({ authState }: AdminPageProps) {
   }
 
   function canSaveFixture(fixtureId: number) {
-    return loadingFixtureId === null && editingFixtureId === fixtureId && selectedFixture?.fixture.fixtureId === fixtureId;
+    return fixtureSelection.status === "ready"
+      && fixtureSelection.fixtureId === fixtureId
+      && fixtureSelection.detail?.fixture.fixtureId === fixtureId;
   }
 
   async function runSave(key: string, action: () => Promise<void>) {
@@ -621,9 +698,10 @@ export function AdminPage({ authState }: AdminPageProps) {
             items={teams}
             getKey={(team) => team.teamId}
             render={(team) => `${team.name ?? "-"} #${team.teamId}`}
-            onSelect={setSelectedTeam}
+            onSelect={(team) => void selectTeam(team.teamId)}
             disabled={savingKey !== null}
           />
+          {loadingTeamId !== null ? <p className="muted admin-sync-message">팀 정보를 불러오는 중입니다.</p> : null}
           {selectedTeam ? (
             <AdminForm
               title={selectedTeam.name ?? "Team"}
@@ -645,9 +723,10 @@ export function AdminPage({ authState }: AdminPageProps) {
             items={players}
             getKey={(player) => player.playerId}
             render={(player) => `${player.name ?? "-"} #${player.playerId}`}
-            onSelect={setSelectedPlayer}
+            onSelect={(player) => void selectPlayer(player.playerId)}
             disabled={savingKey !== null}
           />
+          {loadingPlayerId !== null ? <p className="muted admin-sync-message">선수 정보를 불러오는 중입니다.</p> : null}
           {selectedPlayer ? (
             <AdminForm
               title={selectedPlayer.name ?? "Player"}
@@ -903,16 +982,14 @@ function FixtureEditor({
 }) {
   const fixtureId = detail.fixture.fixtureId;
   const [addingEvent, setAddingEvent] = useState(false);
-  const newEventValue = {
-    teamId: detail.fixture.homeTeamId,
-    playerId: null,
-    assistPlayerId: null,
-    elapsed: 0,
-    extra: null,
-    eventType: "Goal",
-    eventDetail: "Normal Goal",
-    comments: "",
-  };
+  const [newEventValue, setNewEventValue] = useState(() => newFixtureEventValue(detail));
+
+  useEffect(() => {
+    if (!addingEvent) {
+      setNewEventValue(newFixtureEventValue(detail));
+    }
+  }, [addingEvent, detail]);
+
   return (
     <div className="fixture-admin-editor">
       <NestedAdminSection title="Fixture Info" count={1}>
@@ -1057,6 +1134,19 @@ function NestedAdminSection({ title, count, children }: { title: string; count?:
       <div className="nested-admin-grid">{children}</div>
     </details>
   );
+}
+
+function newFixtureEventValue(detail: FixtureDetailAdmin): Record<string, unknown> {
+  return {
+    teamId: detail.fixture.homeTeamId,
+    playerId: null,
+    assistPlayerId: null,
+    elapsed: 0,
+    extra: null,
+    eventType: "Goal",
+    eventDetail: "Normal Goal",
+    comments: "",
+  };
 }
 
 function EventAdminForm({

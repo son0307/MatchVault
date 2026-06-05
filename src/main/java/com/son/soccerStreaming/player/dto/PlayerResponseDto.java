@@ -32,8 +32,8 @@ public class PlayerResponseDto {
         private String birthPlace;
         private String birthCountry;
         private String nationality;
-        private String height;
-        private String weight;
+        private Integer height;
+        private Integer weight;
         private String position;
         private String photoUrl;
         private Long teamId;

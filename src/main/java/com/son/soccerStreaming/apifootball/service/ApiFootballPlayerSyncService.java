@@ -249,8 +249,8 @@ public class ApiFootballPlayerSyncService {
                 adminOverrideService.apiValueUnlessOverridden(overrides, "birthPlace", player.getBirthPlace(), birth != null ? birth.getPlace() : null),
                 adminOverrideService.apiValueUnlessOverridden(overrides, "birthCountry", player.getBirthCountry(), birth != null ? birth.getCountry() : null),
                 adminOverrideService.apiValueUnlessOverridden(overrides, "nationality", player.getNationality(), playerInfo.getNationality()),
-                adminOverrideService.apiValueUnlessOverridden(overrides, "height", player.getHeight(), playerInfo.getHeight()),
-                adminOverrideService.apiValueUnlessOverridden(overrides, "weight", player.getWeight(), playerInfo.getWeight()),
+                adminOverrideService.apiValueUnlessOverridden(overrides, "height", player.getHeight(), numericPrefix(playerInfo.getHeight())),
+                adminOverrideService.apiValueUnlessOverridden(overrides, "weight", player.getWeight(), numericPrefix(playerInfo.getWeight())),
                 adminOverrideService.apiValueUnlessOverridden(overrides, "position", player.getPosition(), position),
                 adminOverrideService.apiValueUnlessOverridden(overrides, "number", player.getNumber(), number != null ? number : player.getNumber()),
                 adminOverrideService.apiValueUnlessOverridden(overrides, "photoUrl", player.getPhotoUrl(), playerInfo.getPhoto())
@@ -438,6 +438,18 @@ public class ApiFootballPlayerSyncService {
         }
         try {
             return Integer.parseInt(value);
+        } catch (NumberFormatException e) {
+            return null;
+        }
+    }
+
+    private Integer numericPrefix(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        String firstToken = value.trim().split("\\s+")[0];
+        try {
+            return Integer.parseInt(firstToken);
         } catch (NumberFormatException e) {
             return null;
         }
