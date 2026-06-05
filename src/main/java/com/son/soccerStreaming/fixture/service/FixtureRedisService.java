@@ -103,6 +103,12 @@ public class FixtureRedisService {
                 .orElseGet(() -> emptyTeamStat(teamId));
     }
 
+    public void evictFixtureCaches(Long fixtureId) {
+        redisTemplate.delete(latestEventKey(fixtureId));
+        redisTemplate.delete(liveSnapshotKey(fixtureId));
+        redisTemplate.delete(playerStatsKey(fixtureId));
+    }
+
     private FixtureStatResponseDto.TeamStatSummary findTeamStat(LiveFixtureSnapshotDto snapshot, Long teamId) {
         if (snapshot.getHomeTeamStat() != null && teamId.equals(snapshot.getHomeTeamStat().getTeamId())) {
             return snapshot.getHomeTeamStat();

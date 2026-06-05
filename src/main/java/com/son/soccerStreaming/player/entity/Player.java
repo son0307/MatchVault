@@ -31,11 +31,9 @@ public class Player {
     private String nationality;
 
     // 신체 정보
-    @Column(length = 20)
-    private String height;
+    private Integer height;
 
-    @Column(length = 20)
-    private String weight;
+    private Integer weight;
 
     // 포지션 및 기본 등번호
     private String position;
@@ -47,7 +45,7 @@ public class Player {
     // 선수 정보 업데이트(Sync)를 위한 편의 메서드
     public void updateProfile(String name, String firstname, String lastname, Integer age,
                               LocalDate birthDate, String birthPlace, String birthCountry,
-                              String nationality, String height, String weight,
+                              String nationality, Integer height, Integer weight,
                               String position, Integer number, String photoUrl) {
         this.name = name;
         this.firstname = firstname;

@@ -70,7 +70,7 @@ public class ApiFootballTeamSyncService {
         }
 
         log.info("API-Football team sync completed. league={}, season={}, count={}", league, season, syncedCount);
-        apiFootballSyncStatusService.recordSuccess("teams", "Teams");
+        apiFootballSyncStatusService.recordSuccess("teams", "Teams", season);
         return syncedCount;
     }
 

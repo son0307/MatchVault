@@ -12,6 +12,10 @@ public enum ErrorCode {
     INVALID_AUTH_REQUEST(HttpStatus.BAD_REQUEST, "이메일, 비밀번호, 닉네임을 확인해 주세요. 비밀번호는 8자 이상이어야 합니다."),
     INVALID_CURRENT_PASSWORD(HttpStatus.BAD_REQUEST, "현재 비밀번호가 일치하지 않습니다."),
     INVALID_ADMIN_OVERRIDE_FIELD(HttpStatus.BAD_REQUEST, "Invalid admin override field."),
+    INVALID_ADMIN_EVENT_FIELD(HttpStatus.BAD_REQUEST, "Invalid admin event field."),
+    INVALID_ADMIN_SEARCH_KEYWORD(HttpStatus.BAD_REQUEST, "Admin search keyword is too long."),
+    INVALID_ADMIN_SYNC_COVERAGE(HttpStatus.BAD_REQUEST, "This season does not support the requested API-Football data."),
+    ADMIN_SYNC_TOO_FREQUENT(HttpStatus.TOO_MANY_REQUESTS, "Manual sync was requested too frequently. Please wait before retrying."),
 
     // 401 UNAUTHORIZED
     LOGIN_FAILED(HttpStatus.UNAUTHORIZED, "이메일 또는 비밀번호가 올바르지 않습니다."),

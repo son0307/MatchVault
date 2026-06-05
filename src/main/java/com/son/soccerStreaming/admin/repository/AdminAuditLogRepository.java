@@ -1,13 +1,13 @@
 package com.son.soccerStreaming.admin.repository;
 
 import com.son.soccerStreaming.admin.entity.AdminAuditLog;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
-
-import java.util.List;
 
 public interface AdminAuditLogRepository extends JpaRepository<AdminAuditLog, Long> {
 
     @EntityGraph(attributePaths = "adminUser")
-    List<AdminAuditLog> findTop50ByOrderByCreatedAtDesc();
+    Page<AdminAuditLog> findAllByOrderByCreatedAtDesc(Pageable pageable);
 }

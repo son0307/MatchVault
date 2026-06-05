@@ -19,14 +19,28 @@ public class ApiFootballSyncStatusService {
 
     @Transactional
     public void recordSuccess(String syncKey, String displayName) {
+        recordSuccess(syncKey, displayName, null);
+    }
+
+    @Transactional
+    public void recordSuccess(String syncKey, String displayName, Integer season) {
         LocalDateTime now = LocalDateTime.now(KOREA_ZONE);
-        ApiFootballSyncStatus status = apiFootballSyncStatusRepository.findById(syncKey)
+        String seasonKey = syncKey(syncKey, season);
+        ApiFootballSyncStatus status = apiFootballSyncStatusRepository.findById(seasonKey)
                 .orElseGet(() -> ApiFootballSyncStatus.builder()
-                        .syncKey(syncKey)
-                        .displayName(displayName)
+                        .syncKey(seasonKey)
+                        .displayName(displayName(displayName, season))
                         .lastSyncedAt(now)
                         .build());
-        status.recordSuccess(displayName, now);
+        status.recordSuccess(displayName(displayName, season), now);
         apiFootballSyncStatusRepository.save(status);
+    }
+
+    private String syncKey(String syncKey, Integer season) {
+        return season == null ? syncKey : "%s:%d".formatted(syncKey, season);
+    }
+
+    private String displayName(String displayName, Integer season) {
+        return season == null ? displayName : "%s %d".formatted(displayName, season);
     }
 }

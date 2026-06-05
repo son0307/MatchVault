@@ -67,7 +67,7 @@ public class ApiFootballPlayerSyncService {
 
         log.info("API-Football registered players sync completed. league={}, season={}, count={}",
                 league, season, syncedCount);
-        apiFootballSyncStatusService.recordSuccess("players", "Players");
+        apiFootballSyncStatusService.recordSuccess("players", "Players", season);
         return syncedCount;
     }
 
@@ -249,8 +249,8 @@ public class ApiFootballPlayerSyncService {
                 adminOverrideService.apiValueUnlessOverridden(overrides, "birthPlace", player.getBirthPlace(), birth != null ? birth.getPlace() : null),
                 adminOverrideService.apiValueUnlessOverridden(overrides, "birthCountry", player.getBirthCountry(), birth != null ? birth.getCountry() : null),
                 adminOverrideService.apiValueUnlessOverridden(overrides, "nationality", player.getNationality(), playerInfo.getNationality()),
-                adminOverrideService.apiValueUnlessOverridden(overrides, "height", player.getHeight(), playerInfo.getHeight()),
-                adminOverrideService.apiValueUnlessOverridden(overrides, "weight", player.getWeight(), playerInfo.getWeight()),
+                adminOverrideService.apiValueUnlessOverridden(overrides, "height", player.getHeight(), numericPrefix(playerInfo.getHeight())),
+                adminOverrideService.apiValueUnlessOverridden(overrides, "weight", player.getWeight(), numericPrefix(playerInfo.getWeight())),
                 adminOverrideService.apiValueUnlessOverridden(overrides, "position", player.getPosition(), position),
                 adminOverrideService.apiValueUnlessOverridden(overrides, "number", player.getNumber(), number != null ? number : player.getNumber()),
                 adminOverrideService.apiValueUnlessOverridden(overrides, "photoUrl", player.getPhotoUrl(), playerInfo.getPhoto())
@@ -315,9 +315,13 @@ public class ApiFootballPlayerSyncService {
         ApiFootballPlayerDto.Fouls fouls = stat.getFouls();
         ApiFootballPlayerDto.Cards cards = stat.getCards();
         ApiFootballPlayerDto.Penalty penalty = stat.getPenalty();
+        Integer backNumber = games != null ? games.getNumber() : null;
+        if (backNumber == null) {
+            backNumber = latestLineupNumber(player, team, season);
+        }
 
         entity.updateSeasonStat(
-                games != null ? games.getNumber() : null,
+                backNumber,
                 games != null ? games.getPosition() : null,
                 games != null ? games.getAppearences() : null,
                 games != null ? games.getLineups() : null,
@@ -356,6 +360,20 @@ public class ApiFootballPlayerSyncService {
                 penalty != null ? penalty.getSaved() : null
         );
         playerTeamSeasonStatRepository.save(entity);
+    }
+
+    private Integer latestLineupNumber(Player player, Team team, Integer season) {
+        if (player == null || team == null || season == null) {
+            return null;
+        }
+        return fixtureLineupRepository.findLineupNumbersByPlayerTeamAndSeason(
+                        player.getPlayerId(),
+                        team.getTeamId(),
+                        season
+                )
+                .stream()
+                .findFirst()
+                .orElse(null);
     }
 
     private Long leagueIdOf(ApiFootballPlayerDto.PlayerStatistics statistics, Integer fallbackLeague) {
@@ -420,6 +438,18 @@ public class ApiFootballPlayerSyncService {
         }
         try {
             return Integer.parseInt(value);
+        } catch (NumberFormatException e) {
+            return null;
+        }
+    }
+
+    private Integer numericPrefix(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        String firstToken = value.trim().split("\\s+")[0];
+        try {
+            return Integer.parseInt(firstToken);
         } catch (NumberFormatException e) {
             return null;
         }

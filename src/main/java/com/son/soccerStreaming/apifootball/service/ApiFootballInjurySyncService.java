@@ -51,7 +51,7 @@ public class ApiFootballInjurySyncService {
         }
 
         log.info("API-Football injury sync completed. league={}, season={}, count={}", league, season, syncedCount);
-        apiFootballSyncStatusService.recordSuccess("injuries", "Injuries");
+        apiFootballSyncStatusService.recordSuccess("injuries", "Injuries", season);
         return syncedCount;
     }
 
