@@ -1,0 +1,16 @@
+[Unit]
+Description=Match Vault Spring Boot application
+After=network.target
+
+[Service]
+User=match-vault
+Group=match-vault
+WorkingDirectory=/opt/match-vault/current
+EnvironmentFile=/etc/match-vault/match-vault.env
+ExecStart=/usr/bin/java -jar /opt/match-vault/current/backend/app.jar
+SuccessExitStatus=143
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

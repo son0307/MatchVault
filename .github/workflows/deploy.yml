@@ -1,0 +1,130 @@
+name: Deploy Match Vault
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: match-vault-production
+  cancel-in-progress: false
+
+jobs:
+  backend:
+    name: Build backend
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: gradle
+
+      - name: Make Gradle wrapper executable
+        run: chmod +x ./gradlew
+
+      - name: Test backend
+        run: ./gradlew test
+
+      - name: Build backend jar
+        run: ./gradlew bootJar
+
+      - name: Upload backend artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: match-vault-backend
+          path: build/libs/*.jar
+          if-no-files-found: error
+
+  frontend:
+    name: Build frontend
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: frontend
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Build frontend
+        run: npm run build
+
+      - name: Upload frontend artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: match-vault-frontend
+          path: frontend/dist
+          if-no-files-found: error
+
+  deploy:
+    name: Deploy production
+    runs-on: ubuntu-latest
+    needs:
+      - backend
+      - frontend
+    environment: production
+
+    env:
+      DEPLOY_PATH: ${{ secrets.DEPLOY_PATH || '/opt/match-vault' }}
+      SSH_PORT: ${{ secrets.SSH_PORT || '22' }}
+
+    steps:
+      - name: Checkout deploy scripts
+        uses: actions/checkout@v4
+
+      - name: Download backend artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: match-vault-backend
+          path: artifacts/backend
+
+      - name: Download frontend artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: match-vault-frontend
+          path: artifacts/frontend
+
+      - name: Prepare release bundle
+        run: |
+          mkdir -p release/backend release/frontend
+          cp artifacts/backend/*.jar release/backend/app.jar
+          cp -R artifacts/frontend/. release/frontend/
+          tar -czf match-vault-release.tar.gz -C release .
+
+      - name: Configure SSH
+        run: |
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          printf '%s\n' "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/match-vault_deploy_key
+          chmod 600 ~/.ssh/match-vault_deploy_key
+          ssh-keyscan -p "$SSH_PORT" "${{ secrets.SSH_HOST }}" >> ~/.ssh/known_hosts
+
+      - name: Upload release bundle
+        run: |
+          ssh -i ~/.ssh/match-vault_deploy_key -p "$SSH_PORT" "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}" "mkdir -p '$DEPLOY_PATH/incoming'"
+          scp -i ~/.ssh/match-vault_deploy_key -P "$SSH_PORT" match-vault-release.tar.gz "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:$DEPLOY_PATH/incoming/${GITHUB_SHA}.tar.gz"
+
+      - name: Run remote deployment
+        run: |
+          ssh -i ~/.ssh/match-vault_deploy_key -p "$SSH_PORT" "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}" "bash -s" "$DEPLOY_PATH" "$GITHUB_SHA" < deploy/scripts/deploy-production.sh

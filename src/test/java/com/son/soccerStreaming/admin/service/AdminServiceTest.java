@@ -13,6 +13,8 @@ import com.son.soccerStreaming.admin.entity.AdminOverrideTargetType;
 import com.son.soccerStreaming.apifootball.repository.ApiFootballSyncStatusRepository;
 import com.son.soccerStreaming.auth.entity.AppUser;
 import com.son.soccerStreaming.global.exception.CustomException;
+import com.son.soccerStreaming.league.entity.LeagueSeasonCoverage;
+import com.son.soccerStreaming.league.repository.LeagueSeasonCoverageRepository;
 import com.son.soccerStreaming.player.entity.Player;
 import com.son.soccerStreaming.team.entity.Team;
 import com.son.soccerStreaming.admin.repository.AdminAuditLogRepository;
@@ -49,6 +51,8 @@ class AdminServiceTest {
     private AdminOverrideService adminOverrideService;
     @Mock
     private AdminAuditLogRepository adminAuditLogRepository;
+    @Mock
+    private LeagueSeasonCoverageRepository leagueSeasonCoverageRepository;
     @Mock
     private ApiFootballSyncStatusRepository apiFootballSyncStatusRepository;
     @Mock
@@ -119,6 +123,14 @@ class AdminServiceTest {
                 .build();
 
         when(appUserRepository.findById(1L)).thenReturn(Optional.of(admin));
+        when(leagueSeasonCoverageRepository.findByLeagueIdAndSeasonYear(39, 2025)).thenReturn(Optional.of(
+                LeagueSeasonCoverage.builder()
+                        .leagueId(39)
+                        .leagueName("Premier League")
+                        .seasonYear(2025)
+                        .players(true)
+                        .build()
+        ));
 
         AdminDto.SyncResponse response = adminService.syncPlayers(1L, 39, 2025, 7000L);
 
@@ -128,8 +140,10 @@ class AdminServiceTest {
                 eq(1L),
                 eq("players"),
                 eq("PLAYER"),
-                eq(null),
-                any(AdminSyncTaskRunner.SyncTask.class)
+                eq((Long) null),
+                eq("league=39; season=2025"),
+                any(AdminSyncTaskRunner.SyncTask.class),
+                any(Runnable.class)
         );
     }
 
