@@ -53,7 +53,17 @@ SPRING_DATA_REDIS_PORT=6379
 API_FOOTBALL_KEY=change-me
 API_FOOTBALL_HOST=
 LIVE_SYNC_ENABLED=false
+
+API_FOOTBALL_LEAGUE_SEASONS_SYNC_RUN_ON_STARTUP=false
+API_FOOTBALL_TEAMS_SYNC_RUN_ON_STARTUP=false
+API_FOOTBALL_STANDINGS_SYNC_RUN_ON_STARTUP=false
+API_FOOTBALL_FIXTURES_SYNC_RUN_ON_STARTUP=false
+API_FOOTBALL_FIXTURE_DETAILS_SYNC_RUN_ON_STARTUP=false
+API_FOOTBALL_PLAYERS_REGISTERED_SYNC_RUN_ON_STARTUP=false
+API_FOOTBALL_INJURIES_SYNC_RUN_ON_STARTUP=false
 ```
+
+운영 배포 안정성을 위해 startup sync는 기본적으로 꺼두는 것을 권장합니다. 외부 API가 503을 반환하거나 응답이 느린 경우, 앱 재시작과 GitHub Actions 헬스체크가 외부 API 상태에 영향을 받을 수 있습니다. 초기 데이터 적재가 필요하면 배포가 끝난 뒤 관리자 기능이나 별도 수동 작업으로 실행합니다.
 
 환경 변수 파일을 작성한 뒤 권한을 제한합니다.
 
@@ -97,6 +107,17 @@ deploy ALL=(root) NOPASSWD: /usr/bin/systemctl daemon-reload, /usr/bin/systemctl
 ```
 
 위 예시의 `deploy` 사용자명과 `systemctl` 경로는 서버 환경에 맞게 조정합니다.
+
+## 헬스체크 대기 시간 조정
+
+배포 스크립트는 `systemctl restart` 직후 앱이 바로 준비되었다고 가정하지 않습니다. 기본적으로 10초 대기한 뒤 최대 10분 동안 `/actuator/health`를 확인합니다.
+
+필요하면 GitHub Actions의 remote deployment 단계나 서버 환경에서 아래 환경 변수로 조정할 수 있습니다.
+
+- `HEALTH_URL`: 헬스체크 URL. 기본값은 `http://127.0.0.1:8080/actuator/health`.
+- `HEALTH_INITIAL_DELAY_SECONDS`: 첫 헬스체크 전 대기 시간. 기본값은 `10`.
+- `HEALTH_TIMEOUT_SECONDS`: 전체 헬스체크 최대 대기 시간. 기본값은 `600`.
+- `HEALTH_INTERVAL_SECONDS`: 헬스체크 반복 간격. 기본값은 `5`.
 
 ## 배포 후 검증
 

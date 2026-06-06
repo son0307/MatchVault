@@ -8,6 +8,9 @@ INCOMING_ARCHIVE="$DEPLOY_PATH/incoming/$RELEASE_ID.tar.gz"
 RELEASE_DIR="$DEPLOY_PATH/releases/$RELEASE_ID"
 CURRENT_LINK="$DEPLOY_PATH/current"
 HEALTH_URL="${HEALTH_URL:-http://127.0.0.1:8080/actuator/health}"
+HEALTH_INITIAL_DELAY_SECONDS="${HEALTH_INITIAL_DELAY_SECONDS:-10}"
+HEALTH_TIMEOUT_SECONDS="${HEALTH_TIMEOUT_SECONDS:-600}"
+HEALTH_INTERVAL_SECONDS="${HEALTH_INTERVAL_SECONDS:-5}"
 
 if [ ! -f "$INCOMING_ARCHIVE" ]; then
   echo "Release archive not found: $INCOMING_ARCHIVE" >&2
@@ -43,15 +46,32 @@ ln -s "$RELEASE_DIR" "$CURRENT_LINK"
 sudo systemctl daemon-reload
 sudo systemctl restart "$SERVICE_NAME"
 
-for attempt in $(seq 1 30); do
-  if curl --fail --silent --show-error "$HEALTH_URL" > /dev/null; then
+echo "Service restart requested. Waiting ${HEALTH_INITIAL_DELAY_SECONDS}s before health checks."
+sleep "$HEALTH_INITIAL_DELAY_SECONDS"
+
+HEALTH_DEADLINE=$((SECONDS + HEALTH_TIMEOUT_SECONDS))
+attempt=1
+
+while [ "$SECONDS" -lt "$HEALTH_DEADLINE" ]; do
+  service_state="$(sudo systemctl is-active "$SERVICE_NAME" || true)"
+  if [ "$service_state" = "failed" ] || [ "$service_state" = "inactive" ]; then
+    echo "Service is $service_state before becoming healthy." >&2
+    sudo journalctl -u "$SERVICE_NAME" -n 200 --no-pager >&2
+    exit 1
+  fi
+
+  http_status="$(curl --silent --show-error --output /tmp/match-vault-health-response --write-out '%{http_code}' "$HEALTH_URL" || true)"
+  if [ "$http_status" = "200" ]; then
     echo "Deployment succeeded: $RELEASE_ID"
     exit 0
   fi
 
-  echo "Waiting for health check... ($attempt/30)"
-  sleep 2
+  remaining=$((HEALTH_DEADLINE - SECONDS))
+  echo "Waiting for health check... attempt=$attempt status=$http_status service=$service_state remaining=${remaining}s"
+  attempt=$((attempt + 1))
+  sleep "$HEALTH_INTERVAL_SECONDS"
 done
 
-echo "Health check failed after deployment. Check: sudo journalctl -u $SERVICE_NAME -n 200 --no-pager" >&2
+echo "Health check failed after ${HEALTH_TIMEOUT_SECONDS}s. Last service logs:" >&2
+sudo journalctl -u "$SERVICE_NAME" -n 200 --no-pager >&2
 exit 1
