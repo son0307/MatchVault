@@ -30,7 +30,15 @@ if [ ! -f "$RELEASE_DIR/frontend/index.html" ]; then
   exit 1
 fi
 
-ln -sfn "$RELEASE_DIR" "$CURRENT_LINK"
+if [ -L "$CURRENT_LINK" ]; then
+  rm "$CURRENT_LINK"
+elif [ -e "$CURRENT_LINK" ]; then
+  LEGACY_CURRENT_BACKUP="$DEPLOY_PATH/current.backup-before-symlink-$(date +%Y%m%d%H%M%S)"
+  echo "Existing current path is not a symlink. Moving it to $LEGACY_CURRENT_BACKUP"
+  mv "$CURRENT_LINK" "$LEGACY_CURRENT_BACKUP"
+fi
+
+ln -s "$RELEASE_DIR" "$CURRENT_LINK"
 
 sudo systemctl daemon-reload
 sudo systemctl restart "$SERVICE_NAME"
