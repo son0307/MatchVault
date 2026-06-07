@@ -8,6 +8,7 @@ import com.son.soccerStreaming.global.exception.CustomException;
 import com.son.soccerStreaming.global.exception.ErrorCode;
 import com.son.soccerStreaming.fixture.repository.FixtureEventRepository;
 import com.son.soccerStreaming.fixture.repository.FixtureRepository;
+import com.son.soccerStreaming.media.service.MediaUrlService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -20,6 +21,7 @@ public class FixtureEventService {
 
     private final FixtureRepository fixtureRepository;
     private final FixtureEventRepository fixtureEventRepository;
+    private final MediaUrlService mediaUrlService;
 
     @Transactional(readOnly = true)
     public FixtureEventResponseDto getFixtureEvents(Long fixtureId) {
@@ -63,7 +65,7 @@ public class FixtureEventService {
         return FixtureEventResponseDto.TeamInfo.builder()
                 .id(team.getTeamId())
                 .name(team.getName())
-                .logo(team.getLogoUrl())
+                .logo(mediaUrlService.teamLogoUrl(team))
                 .build();
     }
 

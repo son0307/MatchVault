@@ -3,6 +3,7 @@ package com.son.soccerStreaming.team.service;
 import com.son.soccerStreaming.apifootball.service.ApiFootballStandingLocalUpdateService;
 import com.son.soccerStreaming.fixture.entity.Fixture;
 import com.son.soccerStreaming.fixture.repository.FixtureRepository;
+import com.son.soccerStreaming.media.service.MediaUrlService;
 import com.son.soccerStreaming.team.entity.Team;
 import com.son.soccerStreaming.team.entity.TeamStanding;
 import com.son.soccerStreaming.team.repository.TeamStandingRepository;
@@ -27,6 +28,8 @@ class TeamStandingServiceTest {
     private ApiFootballStandingLocalUpdateService apiFootballStandingLocalUpdateService;
     @Mock
     private FixtureRepository fixtureRepository;
+    @Mock
+    private MediaUrlService mediaUrlService;
 
     @InjectMocks
     private TeamStandingService teamStandingService;

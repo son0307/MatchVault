@@ -4,6 +4,8 @@ import jakarta.persistence.*;
 import lombok.*;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.util.Objects;
 
 @Entity
 @Getter
@@ -41,6 +43,10 @@ public class Player {
 
     // 이미지 정보
     private String photoUrl;
+    private String photoObjectKey;
+    private LocalDateTime photoCachedAt;
+    private LocalDateTime photoCacheFailedAt;
+    private String photoCacheFailureReason;
 
     // 선수 정보 업데이트(Sync)를 위한 편의 메서드
     public void updateProfile(String name, String firstname, String lastname, Integer age,
@@ -59,12 +65,34 @@ public class Player {
         this.weight = weight;
         this.position = position;
         this.number = number;
-        this.photoUrl = photoUrl;
+        updatePhotoUrl(photoUrl);
     }
 
     public void updateNumber(Integer number) {
         if (number != null) {
             this.number = number;
         }
+    }
+
+    public void updatePhotoUrl(String photoUrl) {
+        if (!Objects.equals(this.photoUrl, photoUrl)) {
+            this.photoObjectKey = null;
+            this.photoCachedAt = null;
+            this.photoCacheFailedAt = null;
+            this.photoCacheFailureReason = null;
+        }
+        this.photoUrl = photoUrl;
+    }
+
+    public void markPhotoCached(String objectKey, LocalDateTime cachedAt) {
+        this.photoObjectKey = objectKey;
+        this.photoCachedAt = cachedAt;
+        this.photoCacheFailedAt = null;
+        this.photoCacheFailureReason = null;
+    }
+
+    public void markPhotoCacheFailed(LocalDateTime failedAt, String failureReason) {
+        this.photoCacheFailedAt = failedAt;
+        this.photoCacheFailureReason = failureReason;
     }
 }

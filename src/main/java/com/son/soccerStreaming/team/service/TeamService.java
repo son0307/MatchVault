@@ -1,6 +1,7 @@
 package com.son.soccerStreaming.team.service;
 
 import com.son.soccerStreaming.player.dto.PlayerResponseDto;
+import com.son.soccerStreaming.media.service.MediaUrlService;
 import com.son.soccerStreaming.team.dto.TeamResponseDto;
 import com.son.soccerStreaming.player.entity.PlayerTeamSeasonStat;
 import com.son.soccerStreaming.team.entity.Team;
@@ -27,6 +28,7 @@ public class TeamService {
     private final TeamRepository teamRepository;
     private final PlayerTeamSeasonStatRepository playerTeamSeasonStatRepository;
     private final PlayerFixtureStatRepository playerFixtureStatRepository;
+    private final MediaUrlService mediaUrlService;
 
     public List<TeamResponseDto.Summary> getTeams() {
         return teamRepository.findAllByOrderByNameAsc().stream()
@@ -44,7 +46,7 @@ public class TeamService {
                 .code(team.getCode())
                 .country(team.getCountry())
                 .founded(team.getFounded())
-                .logoUrl(team.getLogoUrl())
+                .logoUrl(mediaUrlService.teamLogoUrl(team))
                 .venue(toVenueInfo(team.getVenue()))
                 .build();
     }
@@ -107,7 +109,7 @@ public class TeamService {
                 .playerName(stat.getPlayer().getName())
                 .backNumber(stat.getBackNumber())
                 .position(stat.getPosition() != null ? stat.getPosition() : stat.getPlayer().getPosition())
-                .photoUrl(stat.getPlayer().getPhotoUrl())
+                .photoUrl(mediaUrlService.playerPhotoUrl(stat.getPlayer()))
                 .build();
     }
 
@@ -115,7 +117,7 @@ public class TeamService {
         return TeamResponseDto.PlayerRanking.builder()
                 .playerId(stat.getPlayer().getPlayerId())
                 .playerName(stat.getPlayer().getName())
-                .photoUrl(stat.getPlayer().getPhotoUrl())
+                .photoUrl(mediaUrlService.playerPhotoUrl(stat.getPlayer()))
                 .position(stat.getPosition() != null ? stat.getPosition() : stat.getPlayer().getPosition())
                 .goals(valueOf(stat.getGoals()))
                 .assists(valueOf(stat.getAssists()))
@@ -129,7 +131,7 @@ public class TeamService {
                 .teamId(team.getTeamId())
                 .teamName(team.getName())
                 .code(team.getCode())
-                .logoUrl(team.getLogoUrl())
+                .logoUrl(mediaUrlService.teamLogoUrl(team))
                 .build();
     }
 
@@ -145,7 +147,7 @@ public class TeamService {
                 .venueCity(venue.getVenueCity())
                 .capacity(venue.getCapacity())
                 .surface(venue.getSurface())
-                .venueImageUrl(venue.getVenueImageUrl())
+                .venueImageUrl(mediaUrlService.venueImageUrl(venue))
                 .build();
     }
 

@@ -8,6 +8,7 @@ import com.son.soccerStreaming.fixture.repository.FixtureRepository;
 import com.son.soccerStreaming.global.exception.CustomException;
 import com.son.soccerStreaming.global.exception.ErrorCode;
 import com.son.soccerStreaming.global.util.DateTimeUtils;
+import com.son.soccerStreaming.media.service.MediaUrlService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -25,6 +26,7 @@ public class FixtureService {
     private static final ZoneId KOREA_ZONE = ZoneId.of("Asia/Seoul");
 
     private final FixtureRepository fixtureRepository;
+    private final MediaUrlService mediaUrlService;
 
     @Transactional(readOnly = true)
     public FixtureResponseDto.Summary getFixture(Long fixtureId) {
@@ -87,8 +89,8 @@ public class FixtureService {
                 .awayTeamId(fixture.getAwayTeam().getTeamId())
                 .homeTeamName(fixture.getHomeTeam().getName())
                 .awayTeamName(fixture.getAwayTeam().getName())
-                .homeTeamLogoUrl(fixture.getHomeTeam().getLogoUrl())
-                .awayTeamLogoUrl(fixture.getAwayTeam().getLogoUrl())
+                .homeTeamLogoUrl(mediaUrlService.teamLogoUrl(fixture.getHomeTeam()))
+                .awayTeamLogoUrl(mediaUrlService.teamLogoUrl(fixture.getAwayTeam()))
                 .homeScore(valueOf(fixture.getHomeScore()))
                 .awayScore(valueOf(fixture.getAwayScore()))
                 .homeWinner(fixture.getHomeWinner())

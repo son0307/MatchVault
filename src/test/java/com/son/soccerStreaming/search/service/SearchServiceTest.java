@@ -2,6 +2,7 @@ package com.son.soccerStreaming.search.service;
 
 import com.son.soccerStreaming.fixture.entity.Fixture;
 import com.son.soccerStreaming.fixture.repository.FixtureRepository;
+import com.son.soccerStreaming.media.service.MediaUrlService;
 import com.son.soccerStreaming.player.entity.Player;
 import com.son.soccerStreaming.player.repository.PlayerRepository;
 import com.son.soccerStreaming.search.dto.SearchResponseDto;
@@ -32,6 +33,8 @@ class SearchServiceTest {
     private PlayerRepository playerRepository;
     @Mock
     private FixtureRepository fixtureRepository;
+    @Mock
+    private MediaUrlService mediaUrlService;
 
     @InjectMocks
     private SearchService searchService;

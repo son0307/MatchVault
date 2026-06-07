@@ -9,6 +9,7 @@ import com.son.soccerStreaming.favorite.repository.FavoriteTeamRepository;
 import com.son.soccerStreaming.fixture.entity.Fixture;
 import com.son.soccerStreaming.fixture.repository.FixtureRepository;
 import com.son.soccerStreaming.fixture.repository.PlayerFixtureStatRepository;
+import com.son.soccerStreaming.media.service.MediaUrlService;
 import com.son.soccerStreaming.player.entity.Player;
 import com.son.soccerStreaming.player.entity.PlayerTeamSeasonStat;
 import com.son.soccerStreaming.player.repository.PlayerRepository;
@@ -52,6 +53,8 @@ class FavoriteServiceTest {
     private PlayerFixtureStatRepository playerFixtureStatRepository;
     @Mock
     private PlayerTeamSeasonStatRepository playerTeamSeasonStatRepository;
+    @Mock
+    private MediaUrlService mediaUrlService;
 
     @InjectMocks
     private FavoriteService favoriteService;

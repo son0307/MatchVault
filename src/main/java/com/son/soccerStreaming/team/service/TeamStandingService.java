@@ -4,6 +4,7 @@ import com.son.soccerStreaming.apifootball.service.ApiFootballStandingLocalUpdat
 import com.son.soccerStreaming.apifootball.service.ApiFootballStandingLocalUpdateService.LiveStandingImpact;
 import com.son.soccerStreaming.fixture.entity.Fixture;
 import com.son.soccerStreaming.fixture.repository.FixtureRepository;
+import com.son.soccerStreaming.media.service.MediaUrlService;
 import com.son.soccerStreaming.team.dto.TeamStandingResponseDto;
 import com.son.soccerStreaming.team.entity.Team;
 import com.son.soccerStreaming.team.entity.TeamStanding;
@@ -32,10 +33,11 @@ public class TeamStandingService {
     private final TeamStandingRepository teamStandingRepository;
     private final ApiFootballStandingLocalUpdateService apiFootballStandingLocalUpdateService;
     private final FixtureRepository fixtureRepository;
+    private final MediaUrlService mediaUrlService;
 
     public List<TeamStandingResponseDto> getStandings(Integer season) {
         List<StandingProjection> projections = teamStandingRepository.findAllBySeason(season).stream()
-                .map(StandingProjection::from)
+                .map(standing -> StandingProjection.from(standing, mediaUrlService))
                 .toList();
 
         applyLiveImpacts(projections, apiFootballStandingLocalUpdateService.findImpacts(season));
@@ -212,13 +214,13 @@ public class TeamStandingService {
         private Integer awayGoalsAgainst;
         private LocalDateTime updatedAt;
 
-        private StandingProjection(TeamStanding standing) {
+        private StandingProjection(TeamStanding standing, MediaUrlService mediaUrlService) {
             Team team = standing.getTeam();
             this.season = standing.getSeason();
             this.rank = standing.getRank();
             this.teamId = team.getTeamId();
             this.teamName = team.getName();
-            this.teamLogoUrl = team.getLogoUrl();
+            this.teamLogoUrl = mediaUrlService.teamLogoUrl(team);
             this.points = standing.getPoints();
             this.goalsDiff = standing.getGoalsDiff();
             this.group = standing.getGroup();
@@ -246,8 +248,8 @@ public class TeamStandingService {
             this.updatedAt = standing.getApiUpdatedAt();
         }
 
-        static StandingProjection from(TeamStanding standing) {
-            return new StandingProjection(standing);
+        static StandingProjection from(TeamStanding standing, MediaUrlService mediaUrlService) {
+            return new StandingProjection(standing, mediaUrlService);
         }
 
         void applyMatchResult(boolean homeSide, int goalsFor, int goalsAgainst, LocalDateTime updatedAt) {

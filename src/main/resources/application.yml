@@ -26,6 +26,27 @@ live:
     failure-threshold: ${LIVE_SYNC_FAILURE_THRESHOLD:3}
     failure-cooldown-ms: ${LIVE_SYNC_FAILURE_COOLDOWN_MS:60000}
 
+media:
+  public-base-url: ${MEDIA_PUBLIC_BASE_URL:}
+  r2:
+    enabled: ${MEDIA_R2_ENABLED:false}
+    endpoint: ${MEDIA_R2_ENDPOINT:}
+    bucket: ${MEDIA_R2_BUCKET:}
+    region: ${MEDIA_R2_REGION:auto}
+    access-key: ${MEDIA_R2_ACCESS_KEY:}
+    secret-key: ${MEDIA_R2_SECRET_KEY:}
+  cache:
+    enabled: ${MEDIA_CACHE_ENABLED:false}
+    allowed-hosts: ${MEDIA_CACHE_ALLOWED_HOSTS:media.api-sports.io}
+    max-bytes: ${MEDIA_CACHE_MAX_BYTES:2097152}
+    connect-timeout: ${MEDIA_CACHE_CONNECT_TIMEOUT:3s}
+    request-timeout: ${MEDIA_CACHE_REQUEST_TIMEOUT:5s}
+    failure-cooldown: ${MEDIA_CACHE_FAILURE_COOLDOWN:6h}
+    scheduler:
+      enabled: ${MEDIA_CACHE_SCHEDULER_ENABLED:false}
+      cron: ${MEDIA_CACHE_SCHEDULER_CRON:0 30 * * * *}
+      batch-size: ${MEDIA_CACHE_SCHEDULER_BATCH_SIZE:50}
+
 api-football:
   sync:
     failure-retry:
