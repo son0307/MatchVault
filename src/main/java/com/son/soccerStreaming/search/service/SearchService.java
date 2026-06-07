@@ -3,6 +3,7 @@ package com.son.soccerStreaming.search.service;
 import com.son.soccerStreaming.fixture.entity.Fixture;
 import com.son.soccerStreaming.fixture.repository.FixtureRepository;
 import com.son.soccerStreaming.global.util.DateTimeUtils;
+import com.son.soccerStreaming.media.service.MediaUrlService;
 import com.son.soccerStreaming.player.entity.Player;
 import com.son.soccerStreaming.player.repository.PlayerRepository;
 import com.son.soccerStreaming.search.dto.SearchResponseDto;
@@ -25,6 +26,7 @@ public class SearchService {
     private final TeamRepository teamRepository;
     private final PlayerRepository playerRepository;
     private final FixtureRepository fixtureRepository;
+    private final MediaUrlService mediaUrlService;
 
     @Transactional(readOnly = true)
     public SearchResponseDto search(String keyword) {
@@ -86,7 +88,7 @@ public class SearchService {
                 .teamId(team.getTeamId())
                 .teamName(team.getName())
                 .code(team.getCode())
-                .logoUrl(team.getLogoUrl())
+                .logoUrl(mediaUrlService.teamLogoUrl(team))
                 .build();
     }
 
@@ -95,7 +97,7 @@ public class SearchService {
                 .playerId(player.getPlayerId())
                 .playerName(player.getName())
                 .position(player.getPosition())
-                .photoUrl(player.getPhotoUrl())
+                .photoUrl(mediaUrlService.playerPhotoUrl(player))
                 .build();
     }
 

@@ -4,6 +4,7 @@ import com.son.soccerStreaming.apifootball.client.ApiFootballClient;
 import com.son.soccerStreaming.apifootball.dto.ApiFootballPlayerDto;
 import com.son.soccerStreaming.admin.entity.AdminOverrideTargetType;
 import com.son.soccerStreaming.fixture.entity.Fixture;
+import com.son.soccerStreaming.media.service.ImageCacheService;
 import com.son.soccerStreaming.player.entity.Player;
 import com.son.soccerStreaming.player.entity.PlayerTeamSeasonStat;
 import com.son.soccerStreaming.team.entity.Team;
@@ -22,6 +23,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.LocalDate;
 import java.time.format.DateTimeParseException;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -40,6 +42,7 @@ public class ApiFootballPlayerSyncService {
     private final TransactionTemplate transactionTemplate;
     private final EntityManager entityManager;
     private final ApiFootballSyncStatusService apiFootballSyncStatusService;
+    private final ImageCacheService imageCacheService;
     private static final List<String> PROFILE_OVERRIDE_FIELDS = List.of(
             "name", "firstname", "lastname", "age", "birthDate", "birthPlace", "birthCountry",
             "nationality", "height", "weight", "position", "number", "photoUrl"
@@ -51,9 +54,12 @@ public class ApiFootballPlayerSyncService {
     public int syncRegisteredPlayers(Integer league, Integer season, Long delayMs) {
         int syncedCount = 0;
         List<Long> failedTeamIds = new java.util.ArrayList<>();
+        Set<Long> syncedPlayerIds = new LinkedHashSet<>();
         for (Team team : teamRepository.findAllByOrderByNameAsc()) {
             try {
-                syncedCount += syncRegisteredPlayersByTeam(team, league, season, delayMs);
+                RegisteredPlayerSyncResult result = syncRegisteredPlayersByTeamInternal(team, league, season, delayMs);
+                syncedCount += result.syncedCount();
+                syncedPlayerIds.addAll(result.playerIds());
             } catch (Exception e) {
                 failedTeamIds.add(team.getTeamId());
                 log.error("API-Football registered players team sync failed. teamId={}, season={}",
@@ -68,6 +74,7 @@ public class ApiFootballPlayerSyncService {
         log.info("API-Football registered players sync completed. league={}, season={}, count={}",
                 league, season, syncedCount);
         apiFootballSyncStatusService.recordSuccess("players", "Players", season);
+        imageCacheService.cachePlayerPhotos(syncedPlayerIds);
         return syncedCount;
     }
 
@@ -78,9 +85,16 @@ public class ApiFootballPlayerSyncService {
     }
 
     public int syncRegisteredPlayersByTeam(Team team, Integer league, Integer season, Long delayMs) {
+        RegisteredPlayerSyncResult result = syncRegisteredPlayersByTeamInternal(team, league, season, delayMs);
+        imageCacheService.cachePlayerPhotos(result.playerIds());
+        return result.syncedCount();
+    }
+
+    private RegisteredPlayerSyncResult syncRegisteredPlayersByTeamInternal(Team team, Integer league, Integer season, Long delayMs) {
         int page = 1;
         int totalPages = 1;
         int syncedCount = 0;
+        Set<Long> syncedPlayerIds = new LinkedHashSet<>();
 
         do {
             ApiFootballPlayerDto.ApiResponse<ApiFootballPlayerDto.RegisteredPlayerResponse> response =
@@ -89,7 +103,9 @@ public class ApiFootballPlayerSyncService {
             List<ApiFootballPlayerDto.RegisteredPlayerResponse> players = response.getResponse() != null
                     ? response.getResponse()
                     : List.of();
-            syncedCount += syncRegisteredPlayerPage(players, team.getTeamId(), league, season);
+            RegisteredPlayerPageSyncResult pageResult = syncRegisteredPlayerPage(players, team.getTeamId(), league, season);
+            syncedCount += pageResult.syncedCount();
+            syncedPlayerIds.addAll(pageResult.playerIds());
 
             totalPages = response.getPaging() != null && response.getPaging().getTotal() != null
                     ? response.getPaging().getTotal()
@@ -102,36 +118,39 @@ public class ApiFootballPlayerSyncService {
 
         log.info("API-Football registered players team sync completed. teamId={}, season={}, count={}",
                 team.getTeamId(), season, syncedCount);
-        return syncedCount;
+        return new RegisteredPlayerSyncResult(syncedCount, syncedPlayerIds);
     }
 
-    private int syncRegisteredPlayerPage(List<ApiFootballPlayerDto.RegisteredPlayerResponse> players,
-                                         Long requestedTeamId,
-                                         Integer league,
-                                         Integer season) {
-        Integer count = transactionTemplate.execute(status -> {
+    private RegisteredPlayerPageSyncResult syncRegisteredPlayerPage(List<ApiFootballPlayerDto.RegisteredPlayerResponse> players,
+                                                                    Long requestedTeamId,
+                                                                    Integer league,
+                                                                    Integer season) {
+        RegisteredPlayerPageSyncResult result = transactionTemplate.execute(status -> {
             Team managedTeam = teamRepository.findByTeamId(requestedTeamId).orElse(null);
             if (managedTeam == null) {
                 log.warn("Skip registered players page because team does not exist. teamId={}", requestedTeamId);
-                return 0;
+                return new RegisteredPlayerPageSyncResult(0, Set.of());
             }
 
             int syncedCount = 0;
+            Set<Long> playerIds = new LinkedHashSet<>();
             for (ApiFootballPlayerDto.RegisteredPlayerResponse playerResponse : players) {
-                if (upsertRegisteredPlayer(playerResponse, managedTeam, league, season)) {
+                Optional<Long> playerId = upsertRegisteredPlayer(playerResponse, managedTeam, league, season);
+                if (playerId.isPresent()) {
                     syncedCount++;
+                    playerIds.add(playerId.get());
                 }
             }
             // Bulk admin sync can run for a long time, so release managed entities after each API page.
             entityManager.flush();
             entityManager.clear();
-            return syncedCount;
+            return new RegisteredPlayerPageSyncResult(syncedCount, playerIds);
         });
-        return count != null ? count : 0;
+        return result != null ? result : new RegisteredPlayerPageSyncResult(0, Set.of());
     }
 
     @Transactional
-    public boolean upsertRegisteredPlayer(
+    public Optional<Long> upsertRegisteredPlayer(
             ApiFootballPlayerDto.RegisteredPlayerResponse playerResponse,
             Team requestedTeam,
             Integer requestedLeague,
@@ -139,7 +158,7 @@ public class ApiFootballPlayerSyncService {
     ) {
         if (playerResponse == null || playerResponse.getPlayer() == null
                 || playerResponse.getPlayer().getId() == null) {
-            return false;
+            return Optional.empty();
         }
 
         ApiFootballPlayerDto.PlayerStatistics statistics = statisticsForTeam(playerResponse.getStatistics(), requestedTeam)
@@ -155,7 +174,7 @@ public class ApiFootballPlayerSyncService {
                 games != null ? games.getPosition() : null
         );
         upsertTeamSeasonStat(player, team, leagueId, season, statistics);
-        return true;
+        return Optional.of(player.getPlayerId());
     }
 
     @Transactional
@@ -399,6 +418,12 @@ public class ApiFootballPlayerSyncService {
                 .photoUrl(photoUrl)
                 .build();
         return playerRepository.save(player);
+    }
+
+    private record RegisteredPlayerSyncResult(int syncedCount, Set<Long> playerIds) {
+    }
+
+    private record RegisteredPlayerPageSyncResult(int syncedCount, Set<Long> playerIds) {
     }
 
     private String nameOrFallback(String name, Long playerId) {

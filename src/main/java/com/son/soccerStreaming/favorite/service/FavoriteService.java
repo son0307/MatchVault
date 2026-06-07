@@ -13,6 +13,7 @@ import com.son.soccerStreaming.team.entity.TeamStanding;
 import com.son.soccerStreaming.global.exception.CustomException;
 import com.son.soccerStreaming.global.exception.ErrorCode;
 import com.son.soccerStreaming.global.util.DateTimeUtils;
+import com.son.soccerStreaming.media.service.MediaUrlService;
 import com.son.soccerStreaming.auth.repository.AppUserRepository;
 import com.son.soccerStreaming.favorite.repository.FavoritePlayerRepository;
 import com.son.soccerStreaming.favorite.repository.FavoriteTeamRepository;
@@ -44,6 +45,7 @@ public class FavoriteService {
     private final FixtureRepository fixtureRepository;
     private final PlayerFixtureStatRepository playerFixtureStatRepository;
     private final PlayerTeamSeasonStatRepository playerTeamSeasonStatRepository;
+    private final MediaUrlService mediaUrlService;
 
     @Transactional
     public FavoriteDashboardResponseDto addTeam(Long userId, Long teamId, Integer season) {
@@ -129,7 +131,7 @@ public class FavoriteService {
         return FavoriteDashboardResponseDto.TeamCard.builder()
                 .teamId(team.getTeamId())
                 .teamName(team.getName())
-                .logoUrl(team.getLogoUrl())
+                .logoUrl(mediaUrlService.teamLogoUrl(team))
                 .rank(standing != null ? standing.getRank() : null)
                 .points(standing != null ? standing.getPoints() : null)
                 .form(standing != null ? standing.getForm() : null)
@@ -179,7 +181,7 @@ public class FavoriteService {
         return FavoriteDashboardResponseDto.PlayerCard.builder()
                 .playerId(player.getPlayerId())
                 .playerName(player.getName())
-                .photoUrl(player.getPhotoUrl())
+                .photoUrl(mediaUrlService.playerPhotoUrl(player))
                 .position(player.getPosition())
                 .recentMatch(recentMatch != null ? toRecentPlayerMatch(recentMatch) : null)
                 .seasonStat(seasonStats.isEmpty() ? null : toPlayerSeasonStat(season, seasonStats))
@@ -225,7 +227,7 @@ public class FavoriteService {
         return FavoriteDashboardResponseDto.PlayerSeasonStat.builder()
                 .season(season)
                 .teamName(teamDisplayName(primaryStat, teamCount))
-                .teamLogoUrl(primaryStat != null ? primaryStat.getTeam().getLogoUrl() : null)
+                .teamLogoUrl(primaryStat != null ? mediaUrlService.teamLogoUrl(primaryStat.getTeam()) : null)
                 .teamCount((int) teamCount)
                 .aggregated(teamCount > 1)
                 .appearances(stats.stream().mapToInt(item -> valueOf(item.getAppearances())).sum())

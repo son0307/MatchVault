@@ -3,6 +3,7 @@ package com.son.soccerStreaming.apifootball.service;
 import com.son.soccerStreaming.apifootball.client.ApiFootballClient;
 import com.son.soccerStreaming.apifootball.dto.ApiFootballTeamDto;
 import com.son.soccerStreaming.admin.entity.AdminOverrideTargetType;
+import com.son.soccerStreaming.media.service.ImageCacheService;
 import com.son.soccerStreaming.team.entity.Team;
 import com.son.soccerStreaming.team.entity.Venue;
 import com.son.soccerStreaming.team.repository.TeamRepository;
@@ -24,6 +25,7 @@ public class ApiFootballTeamSyncService {
     private final TeamRepository teamRepository;
     private final AdminOverrideService adminOverrideService;
     private final ApiFootballSyncStatusService apiFootballSyncStatusService;
+    private final ImageCacheService imageCacheService;
     private static final List<String> OVERRIDE_FIELDS = List.of(
             "name", "code", "country", "founded", "logoUrl",
             "venueId", "venueName", "venueAddress", "venueCity", "capacity", "surface", "venueImageUrl"
@@ -65,7 +67,9 @@ public class ApiFootballTeamSyncService {
             );
             upsertVenue(team, response.getVenue(), overrides);
 
-            teamRepository.save(team);
+            Team savedTeam = teamRepository.save(team);
+            imageCacheService.requestTeamLogoCache(savedTeam);
+            imageCacheService.requestVenueImageCache(savedTeam.getVenue());
             syncedCount++;
         }
 

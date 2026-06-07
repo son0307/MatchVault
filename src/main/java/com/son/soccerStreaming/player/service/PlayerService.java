@@ -2,6 +2,7 @@ package com.son.soccerStreaming.player.service;
 
 import com.son.soccerStreaming.player.dto.PlayerResponseDto;
 import com.son.soccerStreaming.fixture.entity.Fixture;
+import com.son.soccerStreaming.media.service.MediaUrlService;
 import com.son.soccerStreaming.player.entity.Player;
 import com.son.soccerStreaming.fixture.entity.PlayerFixtureStat;
 import com.son.soccerStreaming.player.entity.PlayerTeamSeasonStat;
@@ -31,6 +32,7 @@ public class PlayerService {
     private final PlayerRepository playerRepository;
     private final PlayerFixtureStatRepository playerFixtureStatRepository;
     private final PlayerTeamSeasonStatRepository playerTeamSeasonStatRepository;
+    private final MediaUrlService mediaUrlService;
 
     @Transactional(readOnly = true)
     public PlayerResponseDto.Details getPlayerDetails(Long playerId) {
@@ -59,10 +61,10 @@ public class PlayerService {
                 .height(player.getHeight())
                 .weight(player.getWeight())
                 .position(player.getPosition())
-                .photoUrl(player.getPhotoUrl())
+                .photoUrl(mediaUrlService.playerPhotoUrl(player))
                 .teamId(latestTeam != null ? latestTeam.getTeamId() : null)
                 .teamName(latestTeam != null ? latestTeam.getName() : null)
-                .teamLogoUrl(latestTeam != null ? latestTeam.getLogoUrl() : null)
+                .teamLogoUrl(mediaUrlService.teamLogoUrl(latestTeam))
                 .build();
     }
 
@@ -218,7 +220,7 @@ public class PlayerService {
         return PlayerResponseDto.TeamSeasonSummary.builder()
                 .teamId(team.getTeamId())
                 .teamName(team.getName())
-                .teamLogoUrl(team.getLogoUrl())
+                .teamLogoUrl(mediaUrlService.teamLogoUrl(team))
                 .totalFixtures(valueOf(stats.getAppearances()))
                 .minutesPlayed(valueOf(stats.getMinutes()))
                 .averageRating(stats.getRating() != null ? roundToOneDecimal(stats.getRating()) : 0)

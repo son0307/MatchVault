@@ -3,6 +3,9 @@ package com.son.soccerStreaming.team.entity;
 import jakarta.persistence.*;
 import lombok.*;
 
+import java.time.LocalDateTime;
+import java.util.Objects;
+
 @Entity
 @Getter
 @Builder
@@ -22,6 +25,10 @@ public class Team {
     private String country;
     private Integer founded;
     private String logoUrl;
+    private String logoObjectKey;
+    private LocalDateTime logoCachedAt;
+    private LocalDateTime logoCacheFailedAt;
+    private String logoCacheFailureReason;
 
     @OneToOne(fetch = FetchType.LAZY, cascade = CascadeType.ALL, orphanRemoval = true)
     @JoinColumn(name = "venue_id")
@@ -32,10 +39,32 @@ public class Team {
         this.code = code;
         this.country = country;
         this.founded = founded;
-        this.logoUrl = logoUrl;
+        updateLogoUrl(logoUrl);
     }
 
     public void updateVenue(Venue venue) {
         this.venue = venue;
+    }
+
+    public void updateLogoUrl(String logoUrl) {
+        if (!Objects.equals(this.logoUrl, logoUrl)) {
+            this.logoObjectKey = null;
+            this.logoCachedAt = null;
+            this.logoCacheFailedAt = null;
+            this.logoCacheFailureReason = null;
+        }
+        this.logoUrl = logoUrl;
+    }
+
+    public void markLogoCached(String objectKey, LocalDateTime cachedAt) {
+        this.logoObjectKey = objectKey;
+        this.logoCachedAt = cachedAt;
+        this.logoCacheFailedAt = null;
+        this.logoCacheFailureReason = null;
+    }
+
+    public void markLogoCacheFailed(LocalDateTime failedAt, String failureReason) {
+        this.logoCacheFailedAt = failedAt;
+        this.logoCacheFailureReason = failureReason;
     }
 }

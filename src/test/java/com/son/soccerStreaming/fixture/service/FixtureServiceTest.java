@@ -3,6 +3,7 @@ package com.son.soccerStreaming.fixture.service;
 import com.son.soccerStreaming.fixture.entity.Fixture;
 import com.son.soccerStreaming.fixture.repository.FixtureRepository;
 import com.son.soccerStreaming.global.exception.CustomException;
+import com.son.soccerStreaming.media.service.MediaUrlService;
 import com.son.soccerStreaming.team.entity.Team;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -26,6 +27,8 @@ class FixtureServiceTest {
 
     @Mock
     private FixtureRepository fixtureRepository;
+    @Mock
+    private MediaUrlService mediaUrlService;
 
     @InjectMocks
     private FixtureService fixtureService;
@@ -55,6 +58,8 @@ class FixtureServiceTest {
                 .build();
 
         when(fixtureRepository.findByFixtureId(100L)).thenReturn(Optional.of(fixture));
+        when(mediaUrlService.teamLogoUrl(homeTeam)).thenReturn("home.png");
+        when(mediaUrlService.teamLogoUrl(awayTeam)).thenReturn("away.png");
 
         var response = fixtureService.getFixture(100L);
 

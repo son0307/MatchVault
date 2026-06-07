@@ -3,6 +3,7 @@ package com.son.soccerStreaming.player.service;
 import com.son.soccerStreaming.fixture.entity.Fixture;
 import com.son.soccerStreaming.fixture.entity.PlayerFixtureStat;
 import com.son.soccerStreaming.fixture.repository.PlayerFixtureStatRepository;
+import com.son.soccerStreaming.media.service.MediaUrlService;
 import com.son.soccerStreaming.player.dto.PlayerResponseDto;
 import com.son.soccerStreaming.player.entity.Player;
 import com.son.soccerStreaming.player.entity.PlayerTeamSeasonStat;
@@ -20,6 +21,7 @@ import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -31,6 +33,8 @@ class PlayerServiceTest {
     private PlayerFixtureStatRepository playerFixtureStatRepository;
     @Mock
     private PlayerTeamSeasonStatRepository playerTeamSeasonStatRepository;
+    @Mock
+    private MediaUrlService mediaUrlService;
 
     @InjectMocks
     private PlayerService playerService;
@@ -136,6 +140,8 @@ class PlayerServiceTest {
                         seasonStat(player, tottenham, 2025, 5, 320, 1),
                         seasonStat(player, crystalPalace, 2025, 7, 510, 3)
                 ));
+        when(mediaUrlService.teamLogoUrl(any(Team.class)))
+                .thenAnswer(invocation -> invocation.<Team>getArgument(0).getLogoUrl());
 
         PlayerResponseDto.Panel panel = playerService.getPlayerPanel(47L);
 
