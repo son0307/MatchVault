@@ -138,7 +138,7 @@ class FavoriteCardServiceTest {
                 .build();
 
         when(playerRepository.findByPlayerId(7L)).thenReturn(Optional.of(player));
-        when(playerFixtureStatRepository.findRecentFinishedByPlayerId(eq(7L), eq(List.of("FT", "AET", "PEN")), any(Pageable.class)))
+        when(playerFixtureStatRepository.findRecentFinishedByPlayerId(eq(7L), eq(2024), eq(List.of("FT", "AET", "PEN")), any(Pageable.class)))
                 .thenReturn(List.of());
         when(playerTeamSeasonStatRepository.findAllByPlayerPlayerIdAndSeason(7L, 2024))
                 .thenReturn(List.of(seasonStat));

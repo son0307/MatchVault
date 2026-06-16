@@ -100,7 +100,7 @@ public class FavoriteCardService {
         Player player = playerRepository.findByPlayerId(playerId)
                 .orElseThrow(() -> new CustomException(ErrorCode.PLAYER_NOT_FOUND));
         PlayerFixtureStat recentMatch = playerFixtureStatRepository
-                .findRecentFinishedByPlayerId(player.getPlayerId(), FINISHED_STATUS_SHORTS, PageRequest.of(0, 1))
+                .findRecentFinishedByPlayerId(player.getPlayerId(), season, FINISHED_STATUS_SHORTS, PageRequest.of(0, 1))
                 .stream()
                 .findFirst()
                 .orElse(null);

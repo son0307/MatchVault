@@ -13,6 +13,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -58,10 +59,10 @@ class TeamPlayerRankingServiceTest {
                 eq(List.of(10L, 20L)),
                 eq(2025)
         )).thenReturn(List.of(
-                latestTeam(10L, 47L),
-                latestTeam(10L, 52L),
-                latestTeam(20L, 52L),
-                latestTeam(20L, 47L)
+                latestTeam(10L, 52L, LocalDateTime.of(2025, 1, 10, 12, 0), 100L),
+                latestTeam(10L, 47L, LocalDateTime.of(2025, 2, 10, 12, 0), 101L),
+                latestTeam(20L, 47L, LocalDateTime.of(2025, 1, 10, 12, 0), 200L),
+                latestTeam(20L, 52L, LocalDateTime.of(2025, 2, 10, 12, 0), 201L)
         ));
 
         TeamResponseDto.PlayerRankings rankings = teamPlayerRankingService.getPlayerRankings(47L, 2025);
@@ -87,7 +88,12 @@ class TeamPlayerRankingServiceTest {
                 .build();
     }
 
-    private PlayerFixtureStatRepository.LatestPlayerTeam latestTeam(Long playerId, Long teamId) {
+    private PlayerFixtureStatRepository.LatestPlayerTeam latestTeam(
+            Long playerId,
+            Long teamId,
+            LocalDateTime fixtureDate,
+            Long fixtureId
+    ) {
         return new PlayerFixtureStatRepository.LatestPlayerTeam() {
             @Override
             public Long getPlayerId() {
@@ -97,6 +103,16 @@ class TeamPlayerRankingServiceTest {
             @Override
             public Long getTeamId() {
                 return teamId;
+            }
+
+            @Override
+            public LocalDateTime getFixtureDate() {
+                return fixtureDate;
+            }
+
+            @Override
+            public Long getFixtureId() {
+                return fixtureId;
             }
         };
     }

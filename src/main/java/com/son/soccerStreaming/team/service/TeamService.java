@@ -82,9 +82,39 @@ public class TeamService {
         return playerFixtureStatRepository.findTeamHistoryByPlayerIdsAndSeasonOrderByLatest(playerIds, season).stream()
                 .collect(Collectors.toMap(
                         PlayerFixtureStatRepository.LatestPlayerTeam::getPlayerId,
-                        PlayerFixtureStatRepository.LatestPlayerTeam::getTeamId,
-                        (existingTeamId, duplicateTeamId) -> existingTeamId
+                        item -> item,
+                        this::latestRecord
+                ))
+                .entrySet()
+                .stream()
+                .collect(Collectors.toMap(
+                        Map.Entry::getKey,
+                        entry -> entry.getValue().getTeamId()
                 ));
+    }
+
+    private PlayerFixtureStatRepository.LatestPlayerTeam latestRecord(
+            PlayerFixtureStatRepository.LatestPlayerTeam left,
+            PlayerFixtureStatRepository.LatestPlayerTeam right
+    ) {
+        int dateCompare = compareNullable(left.getFixtureDate(), right.getFixtureDate());
+        if (dateCompare != 0) {
+            return dateCompare >= 0 ? left : right;
+        }
+        return compareNullable(left.getFixtureId(), right.getFixtureId()) >= 0 ? left : right;
+    }
+
+    private <T extends Comparable<T>> int compareNullable(T left, T right) {
+        if (left == null && right == null) {
+            return 0;
+        }
+        if (left == null) {
+            return -1;
+        }
+        if (right == null) {
+            return 1;
+        }
+        return left.compareTo(right);
     }
 
     private boolean belongsToTeamByLatestMatch(
