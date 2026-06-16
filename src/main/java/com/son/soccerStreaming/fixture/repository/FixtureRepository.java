@@ -109,4 +109,17 @@ public interface FixtureRepository extends JpaRepository<Fixture, Long>, Fixture
             @Param("season") Integer season,
             org.springframework.data.domain.Pageable pageable
     );
+
+    @EntityGraph(attributePaths = {"homeTeam", "awayTeam"})
+    @Query("SELECT f FROM Fixture f " +
+            "WHERE f.season = :season " +
+            "AND (f.homeTeam.teamId = :teamId OR f.awayTeam.teamId = :teamId) " +
+            "AND (f.fixtureStatus = 'FINISHED' OR f.statusShort IN :finishedStatusShorts) " +
+            "ORDER BY f.fixtureDate DESC, f.fixtureId DESC")
+    List<Fixture> findRecentFinishedByTeam(
+            @Param("teamId") Long teamId,
+            @Param("season") Integer season,
+            @Param("finishedStatusShorts") Collection<String> finishedStatusShorts,
+            org.springframework.data.domain.Pageable pageable
+    );
 }

@@ -1,7 +1,9 @@
 package com.son.soccerStreaming.team.dto;
 
+import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
+import lombok.NoArgsConstructor;
 
 import java.util.List;
 
@@ -42,12 +44,16 @@ public class TeamResponseDto {
 
     @Getter
     @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
     public static class PlayerRankings {
         private List<PlayerRanking> rows;
     }
 
     @Getter
     @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
     public static class PlayerRanking {
         private Long playerId;
         private String playerName;

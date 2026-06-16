@@ -3,6 +3,7 @@ package com.son.soccerStreaming.apifootball.service;
 import com.son.soccerStreaming.apifootball.client.ApiFootballClient;
 import com.son.soccerStreaming.apifootball.dto.ApiFootballLiveDto;
 import com.son.soccerStreaming.fixture.entity.Fixture;
+import com.son.soccerStreaming.global.config.RedisCacheConfig;
 import com.son.soccerStreaming.player.entity.Player;
 import com.son.soccerStreaming.fixture.entity.PlayerFixtureStat;
 import com.son.soccerStreaming.team.entity.Team;
@@ -13,6 +14,8 @@ import com.son.soccerStreaming.fixture.repository.PlayerFixtureStatRepository;
 import com.son.soccerStreaming.team.repository.TeamRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Caching;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -30,6 +33,10 @@ public class ApiFootballFixturePlayerStatSyncService {
     private final TeamRepository teamRepository;
     private final ApiFootballPlayerSyncService apiFootballPlayerSyncService;
 
+    @Caching(evict = {
+            @CacheEvict(cacheNames = RedisCacheConfig.TEAM_PLAYER_RANKINGS_CACHE, allEntries = true),
+            @CacheEvict(cacheNames = RedisCacheConfig.FAVORITE_PLAYER_CARD_CACHE, allEntries = true)
+    })
     @Transactional
     public int syncPlayerStats(Long fixtureId) {
         Fixture fixture = fixtureRepository.findByFixtureId(fixtureId)
@@ -39,6 +46,10 @@ public class ApiFootballFixturePlayerStatSyncService {
         return syncPlayerStats(fixture, teamStats);
     }
 
+    @Caching(evict = {
+            @CacheEvict(cacheNames = RedisCacheConfig.TEAM_PLAYER_RANKINGS_CACHE, allEntries = true),
+            @CacheEvict(cacheNames = RedisCacheConfig.FAVORITE_PLAYER_CARD_CACHE, allEntries = true)
+    })
     @Transactional
     public int syncPlayerStats(Long fixtureId, List<ApiFootballLiveDto.FixturePlayersResponse> teamStats) {
         Fixture fixture = fixtureRepository.findByFixtureId(fixtureId)
@@ -46,6 +57,10 @@ public class ApiFootballFixturePlayerStatSyncService {
         return syncPlayerStats(fixture, teamStats);
     }
 
+    @Caching(evict = {
+            @CacheEvict(cacheNames = RedisCacheConfig.TEAM_PLAYER_RANKINGS_CACHE, allEntries = true),
+            @CacheEvict(cacheNames = RedisCacheConfig.FAVORITE_PLAYER_CARD_CACHE, allEntries = true)
+    })
     @Transactional
     public int syncPlayerStats(Fixture fixture, List<ApiFootballLiveDto.FixturePlayersResponse> teamStats) {
         if (teamStats == null || teamStats.isEmpty()) {
@@ -70,6 +85,10 @@ public class ApiFootballFixturePlayerStatSyncService {
         return syncedCount;
     }
 
+    @Caching(evict = {
+            @CacheEvict(cacheNames = RedisCacheConfig.TEAM_PLAYER_RANKINGS_CACHE, allEntries = true),
+            @CacheEvict(cacheNames = RedisCacheConfig.FAVORITE_PLAYER_CARD_CACHE, allEntries = true)
+    })
     @Transactional
     public int syncPlayerStats(List<Fixture> fixtures) {
         int syncedCount = 0;

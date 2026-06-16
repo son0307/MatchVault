@@ -1,6 +1,7 @@
 package com.son.soccerStreaming.global.config;
 
 import org.springframework.cache.annotation.EnableCaching;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.data.redis.cache.RedisCacheConfiguration;
@@ -12,13 +13,22 @@ import org.springframework.data.redis.serializer.StringRedisSerializer;
 import tools.jackson.databind.jsontype.BasicPolymorphicTypeValidator;
 
 import java.time.Duration;
+import java.util.Map;
 
 @EnableCaching
 @Configuration
 public class RedisCacheConfig {
 
+    public static final String TEAM_PLAYER_RANKINGS_CACHE = "teamPlayerRankings";
+    public static final String FAVORITE_TEAM_CARD_CACHE = "favoriteTeamCard";
+    public static final String FAVORITE_PLAYER_CARD_CACHE = "favoritePlayerCard";
+
     @Bean
-    public RedisCacheManager cacheManager(RedisConnectionFactory connectionFactory) {
+    public RedisCacheManager cacheManager(
+            RedisConnectionFactory connectionFactory,
+            @Value("${app.cache.team-player-rankings-ttl:10m}") Duration teamPlayerRankingsTtl,
+            @Value("${app.cache.favorite-card-ttl:30s}") Duration favoriteCardTtl
+    ) {
 
         BasicPolymorphicTypeValidator ptv = BasicPolymorphicTypeValidator.builder()
                 .allowIfBaseType(Object.class)
@@ -36,6 +46,11 @@ public class RedisCacheConfig {
 
         return RedisCacheManager.builder(connectionFactory)
                 .cacheDefaults(defaultConfig)
+                .withInitialCacheConfigurations(Map.of(
+                        TEAM_PLAYER_RANKINGS_CACHE, defaultConfig.entryTtl(teamPlayerRankingsTtl),
+                        FAVORITE_TEAM_CARD_CACHE, defaultConfig.entryTtl(favoriteCardTtl),
+                        FAVORITE_PLAYER_CARD_CACHE, defaultConfig.entryTtl(favoriteCardTtl)
+                ))
                 .build();
     }
 }

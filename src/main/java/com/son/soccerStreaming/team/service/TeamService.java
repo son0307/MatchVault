@@ -29,6 +29,7 @@ public class TeamService {
     private final PlayerTeamSeasonStatRepository playerTeamSeasonStatRepository;
     private final PlayerFixtureStatRepository playerFixtureStatRepository;
     private final MediaUrlService mediaUrlService;
+    private final TeamPlayerRankingService teamPlayerRankingService;
 
     public List<TeamResponseDto.Summary> getTeams() {
         return teamRepository.findAllByOrderByNameAsc().stream()
@@ -65,16 +66,7 @@ public class TeamService {
     public TeamResponseDto.PlayerRankings getPlayerRankings(Long teamId, Integer season) {
         Team team = teamRepository.findByTeamId(teamId)
                 .orElseThrow(() -> new CustomException(ErrorCode.TEAM_NOT_FOUND));
-        List<PlayerTeamSeasonStat> candidates = playerTeamSeasonStatRepository.findAllByTeamAndSeason(team.getTeamId(), season);
-        Map<Long, Long> latestTeamByPlayer = latestTeamByPlayer(candidates, season);
-        List<TeamResponseDto.PlayerRanking> rows = candidates.stream()
-                .filter(stat -> belongsToTeamByLatestMatch(stat, team.getTeamId(), latestTeamByPlayer))
-                .map(this::toPlayerRanking)
-                .collect(Collectors.toCollection(ArrayList::new));
-
-        return TeamResponseDto.PlayerRankings.builder()
-                .rows(rows)
-                .build();
+        return teamPlayerRankingService.getPlayerRankings(team.getTeamId(), season);
     }
 
     private Map<Long, Long> latestTeamByPlayer(List<PlayerTeamSeasonStat> candidates, Integer season) {
@@ -84,9 +76,10 @@ public class TeamService {
 
         List<Long> playerIds = candidates.stream()
                 .map(stat -> stat.getPlayer().getPlayerId())
+                .distinct()
                 .toList();
 
-        return playerFixtureStatRepository.findLatestTeamsByPlayerIdsAndSeason(playerIds, season).stream()
+        return playerFixtureStatRepository.findTeamHistoryByPlayerIdsAndSeasonOrderByLatest(playerIds, season).stream()
                 .collect(Collectors.toMap(
                         PlayerFixtureStatRepository.LatestPlayerTeam::getPlayerId,
                         PlayerFixtureStatRepository.LatestPlayerTeam::getTeamId,
@@ -110,19 +103,6 @@ public class TeamService {
                 .backNumber(stat.getBackNumber())
                 .position(stat.getPosition() != null ? stat.getPosition() : stat.getPlayer().getPosition())
                 .photoUrl(mediaUrlService.playerPhotoUrl(stat.getPlayer()))
-                .build();
-    }
-
-    private TeamResponseDto.PlayerRanking toPlayerRanking(PlayerTeamSeasonStat stat) {
-        return TeamResponseDto.PlayerRanking.builder()
-                .playerId(stat.getPlayer().getPlayerId())
-                .playerName(stat.getPlayer().getName())
-                .photoUrl(mediaUrlService.playerPhotoUrl(stat.getPlayer()))
-                .position(stat.getPosition() != null ? stat.getPosition() : stat.getPlayer().getPosition())
-                .goals(valueOf(stat.getGoals()))
-                .assists(valueOf(stat.getAssists()))
-                .rating(stat.getRating() != null ? roundToOneDecimal(stat.getRating()) : 0)
-                .minutes(valueOf(stat.getMinutes()))
                 .build();
     }
 
@@ -151,11 +131,4 @@ public class TeamService {
                 .build();
     }
 
-    private double roundToOneDecimal(double value) {
-        return Math.round(value * 10) / 10.0;
-    }
-
-    private int valueOf(Integer value) {
-        return value == null ? 0 : value;
-    }
 }
