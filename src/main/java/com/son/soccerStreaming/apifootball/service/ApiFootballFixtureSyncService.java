@@ -3,11 +3,13 @@ package com.son.soccerStreaming.apifootball.service;
 import com.son.soccerStreaming.apifootball.client.ApiFootballClient;
 import com.son.soccerStreaming.apifootball.dto.ApiFootballLiveDto;
 import com.son.soccerStreaming.fixture.entity.Fixture;
+import com.son.soccerStreaming.global.config.RedisCacheConfig;
 import com.son.soccerStreaming.team.entity.Team;
 import com.son.soccerStreaming.fixture.repository.FixtureRepository;
 import com.son.soccerStreaming.team.repository.TeamRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -29,6 +31,10 @@ public class ApiFootballFixtureSyncService {
     private final ApiFootballStandingLocalUpdateService apiFootballStandingLocalUpdateService;
     private final ApiFootballSyncStatusService apiFootballSyncStatusService;
 
+    @CacheEvict(cacheNames = {
+            RedisCacheConfig.FAVORITE_TEAM_CARD_CACHE,
+            RedisCacheConfig.FAVORITE_PLAYER_CARD_CACHE
+    }, allEntries = true)
     @Transactional
     public int syncSeasonFixtures(Integer league, Integer season) {
         int syncedCount = upsertFixtures(apiFootballClient.getFixtures(league, season), false);
@@ -36,6 +42,10 @@ public class ApiFootballFixtureSyncService {
         return syncedCount;
     }
 
+    @CacheEvict(cacheNames = {
+            RedisCacheConfig.FAVORITE_TEAM_CARD_CACHE,
+            RedisCacheConfig.FAVORITE_PLAYER_CARD_CACHE
+    }, allEntries = true)
     @Transactional
     public int syncLiveFixtures(Integer league, Integer season) {
         List<ApiFootballLiveDto.FixtureResponse> liveFixtures = apiFootballClient.getLiveFixtures(league).stream()
@@ -47,6 +57,10 @@ public class ApiFootballFixtureSyncService {
         return syncedCount;
     }
 
+    @CacheEvict(cacheNames = {
+            RedisCacheConfig.FAVORITE_TEAM_CARD_CACHE,
+            RedisCacheConfig.FAVORITE_PLAYER_CARD_CACHE
+    }, allEntries = true)
     @Transactional
     public Optional<Fixture> syncFixtureResponse(ApiFootballLiveDto.FixtureResponse response, boolean applyLiveStandingImpact) {
         Optional<Fixture> fixture = upsertFixture(response);

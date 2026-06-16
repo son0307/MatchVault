@@ -4,6 +4,7 @@ import com.son.soccerStreaming.apifootball.client.ApiFootballClient;
 import com.son.soccerStreaming.apifootball.dto.ApiFootballPlayerDto;
 import com.son.soccerStreaming.admin.entity.AdminOverrideTargetType;
 import com.son.soccerStreaming.fixture.entity.Fixture;
+import com.son.soccerStreaming.global.config.RedisCacheConfig;
 import com.son.soccerStreaming.media.service.ImageCacheService;
 import com.son.soccerStreaming.player.entity.Player;
 import com.son.soccerStreaming.player.entity.PlayerTeamSeasonStat;
@@ -16,6 +17,8 @@ import com.son.soccerStreaming.admin.service.AdminOverrideService;
 import jakarta.persistence.EntityManager;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Caching;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -51,6 +54,10 @@ public class ApiFootballPlayerSyncService {
     @Value("${api-football.sync.players.profile-fallback-enabled:false}")
     private boolean profileFallbackEnabled;
 
+    @Caching(evict = {
+            @CacheEvict(cacheNames = RedisCacheConfig.TEAM_PLAYER_RANKINGS_CACHE, allEntries = true),
+            @CacheEvict(cacheNames = RedisCacheConfig.FAVORITE_PLAYER_CARD_CACHE, allEntries = true)
+    })
     public int syncRegisteredPlayers(Integer league, Integer season, Long delayMs) {
         int syncedCount = 0;
         List<Long> failedTeamIds = new java.util.ArrayList<>();
@@ -84,6 +91,10 @@ public class ApiFootballPlayerSyncService {
         return syncRegisteredPlayersByTeam(team, league, season, delayMs);
     }
 
+    @Caching(evict = {
+            @CacheEvict(cacheNames = RedisCacheConfig.TEAM_PLAYER_RANKINGS_CACHE, allEntries = true),
+            @CacheEvict(cacheNames = RedisCacheConfig.FAVORITE_PLAYER_CARD_CACHE, allEntries = true)
+    })
     public int syncRegisteredPlayersByTeam(Team team, Integer league, Integer season, Long delayMs) {
         RegisteredPlayerSyncResult result = syncRegisteredPlayersByTeamInternal(team, league, season, delayMs);
         imageCacheService.cachePlayerPhotos(result.playerIds());

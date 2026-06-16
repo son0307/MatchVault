@@ -11,6 +11,11 @@ spring:
     username: ${DB_USERNAME}
     password: ${DB_PASSWORD}
 
+app:
+  cache:
+    team-player-rankings-ttl: ${TEAM_PLAYER_RANKINGS_CACHE_TTL:10m}
+    favorite-card-ttl: ${FAVORITE_CARD_CACHE_TTL:30s}
+
 live:
   api-football:
     base-url: ${LIVE_API_FOOTBALL_BASE_URL:https://v3.football.api-sports.io}

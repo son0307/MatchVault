@@ -1,13 +1,17 @@
 package com.son.soccerStreaming.favorite.dto;
 
+import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
+import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
 import java.util.List;
 
 @Getter
 @Builder
+@NoArgsConstructor
+@AllArgsConstructor
 public class FavoriteDashboardResponseDto {
 
     private List<TeamCard> teams;
@@ -22,6 +26,8 @@ public class FavoriteDashboardResponseDto {
 
     @Getter
     @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
     public static class TeamCard {
         private Long teamId;
         private String teamName;
@@ -36,6 +42,8 @@ public class FavoriteDashboardResponseDto {
 
     @Getter
     @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
     public static class TeamFixture {
         private Long fixtureId;
         private LocalDateTime fixtureDate;
@@ -49,6 +57,8 @@ public class FavoriteDashboardResponseDto {
 
     @Getter
     @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
     public static class LiveTeamFixture {
         private Long fixtureId;
         private LocalDateTime fixtureDate;
@@ -64,6 +74,8 @@ public class FavoriteDashboardResponseDto {
 
     @Getter
     @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
     public static class PlayerCard {
         private Long playerId;
         private String playerName;
@@ -75,6 +87,8 @@ public class FavoriteDashboardResponseDto {
 
     @Getter
     @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
     public static class RecentPlayerMatch {
         private Long fixtureId;
         private LocalDateTime fixtureDate;
@@ -90,6 +104,8 @@ public class FavoriteDashboardResponseDto {
 
     @Getter
     @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
     public static class PlayerSeasonStat {
         private Integer season;
         private String teamName;
