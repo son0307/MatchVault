@@ -93,12 +93,13 @@ public class PlayerFixtureStat {
                                Integer yellowCards, Integer redCards, Integer offsides,
                                Integer penaltyWon, Integer penaltyCommitted, Integer penaltyScored,
                                Integer penaltyMissed, Integer penaltySaved) {
-        this.minutesPlayed = minutesPlayed;
+        boolean appeared = hasAppearance(minutesPlayed);
+        this.minutesPlayed = normalizeMinutesPlayed(minutesPlayed);
         this.rating = rating;
         this.isCaptain = isCaptain;
         this.isSubstitute = isSubstitute;
-        this.goals = goals;
-        this.assists = assists;
+        this.goals = normalizeScoringStat(appeared, goals);
+        this.assists = normalizeScoringStat(appeared, assists);
         this.conceded = conceded;
         this.saves = saves;
         this.shotsTotal = shotsTotal;
@@ -117,13 +118,40 @@ public class PlayerFixtureStat {
         this.dribblesPast = dribblesPast;
         this.foulsDrawn = foulsDrawn;
         this.foulsCommitted = foulsCommitted;
-        this.yellowCards = yellowCards;
         this.redCards = redCards;
+        this.yellowCards = normalizeYellowCards(yellowCards, redCards);
         this.offsides = offsides;
         this.penaltyWon = penaltyWon;
         this.penaltyCommitted = penaltyCommitted;
         this.penaltyScored = penaltyScored;
         this.penaltyMissed = penaltyMissed;
         this.penaltySaved = penaltySaved;
+    }
+
+    public static Integer normalizeScoringStat(Integer minutesPlayed, Integer value) {
+        return normalizeScoringStat(hasAppearance(minutesPlayed), value);
+    }
+
+    public static Integer normalizeMinutesPlayed(Integer minutesPlayed) {
+        return hasAppearance(minutesPlayed) ? minutesPlayed : null;
+    }
+
+    public void normalizeCards() {
+        this.yellowCards = normalizeYellowCards(this.yellowCards, this.redCards);
+    }
+
+    public static Integer normalizeYellowCards(Integer yellowCards, Integer redCards) {
+        return redCards != null && redCards > 0 ? Integer.valueOf(0) : yellowCards;
+    }
+
+    private static Integer normalizeScoringStat(boolean appeared, Integer value) {
+        if (!appeared) {
+            return null;
+        }
+        return value != null ? value : 0;
+    }
+
+    private static boolean hasAppearance(Integer minutesPlayed) {
+        return minutesPlayed != null && minutesPlayed > 0;
     }
 }

@@ -35,7 +35,8 @@ public class ApiFootballFixturePlayerStatSyncService {
 
     @Caching(evict = {
             @CacheEvict(cacheNames = RedisCacheConfig.TEAM_PLAYER_RANKINGS_CACHE, allEntries = true),
-            @CacheEvict(cacheNames = RedisCacheConfig.FAVORITE_PLAYER_CARD_CACHE, allEntries = true)
+            @CacheEvict(cacheNames = RedisCacheConfig.FAVORITE_PLAYER_CARD_CACHE, allEntries = true),
+            @CacheEvict(cacheNames = RedisCacheConfig.LEAGUE_PLAYER_RANKINGS_CACHE, allEntries = true)
     })
     @Transactional
     public int syncPlayerStats(Long fixtureId) {
@@ -48,7 +49,8 @@ public class ApiFootballFixturePlayerStatSyncService {
 
     @Caching(evict = {
             @CacheEvict(cacheNames = RedisCacheConfig.TEAM_PLAYER_RANKINGS_CACHE, allEntries = true),
-            @CacheEvict(cacheNames = RedisCacheConfig.FAVORITE_PLAYER_CARD_CACHE, allEntries = true)
+            @CacheEvict(cacheNames = RedisCacheConfig.FAVORITE_PLAYER_CARD_CACHE, allEntries = true),
+            @CacheEvict(cacheNames = RedisCacheConfig.LEAGUE_PLAYER_RANKINGS_CACHE, allEntries = true)
     })
     @Transactional
     public int syncPlayerStats(Long fixtureId, List<ApiFootballLiveDto.FixturePlayersResponse> teamStats) {
@@ -59,7 +61,8 @@ public class ApiFootballFixturePlayerStatSyncService {
 
     @Caching(evict = {
             @CacheEvict(cacheNames = RedisCacheConfig.TEAM_PLAYER_RANKINGS_CACHE, allEntries = true),
-            @CacheEvict(cacheNames = RedisCacheConfig.FAVORITE_PLAYER_CARD_CACHE, allEntries = true)
+            @CacheEvict(cacheNames = RedisCacheConfig.FAVORITE_PLAYER_CARD_CACHE, allEntries = true),
+            @CacheEvict(cacheNames = RedisCacheConfig.LEAGUE_PLAYER_RANKINGS_CACHE, allEntries = true)
     })
     @Transactional
     public int syncPlayerStats(Fixture fixture, List<ApiFootballLiveDto.FixturePlayersResponse> teamStats) {
@@ -87,7 +90,8 @@ public class ApiFootballFixturePlayerStatSyncService {
 
     @Caching(evict = {
             @CacheEvict(cacheNames = RedisCacheConfig.TEAM_PLAYER_RANKINGS_CACHE, allEntries = true),
-            @CacheEvict(cacheNames = RedisCacheConfig.FAVORITE_PLAYER_CARD_CACHE, allEntries = true)
+            @CacheEvict(cacheNames = RedisCacheConfig.FAVORITE_PLAYER_CARD_CACHE, allEntries = true),
+            @CacheEvict(cacheNames = RedisCacheConfig.LEAGUE_PLAYER_RANKINGS_CACHE, allEntries = true)
     })
     @Transactional
     public int syncPlayerStats(List<Fixture> fixtures) {

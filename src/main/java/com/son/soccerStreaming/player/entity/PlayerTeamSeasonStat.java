@@ -155,6 +155,82 @@ public class PlayerTeamSeasonStat {
         this.penaltySaved = penaltySaved;
     }
 
+    public void replaceWithFixtureAggregate(
+            Integer backNumber,
+            String position,
+            Integer appearances,
+            Integer lineups,
+            Integer minutes,
+            Double rating,
+            Boolean captain,
+            Integer substitutesIn,
+            Integer substitutesBench,
+            Integer shotsTotal,
+            Integer shotsOnTarget,
+            Integer goals,
+            Integer conceded,
+            Integer assists,
+            Integer saves,
+            Integer passesTotal,
+            Integer passesKey,
+            Integer passAccuracy,
+            Integer tacklesTotal,
+            Integer blocks,
+            Integer interceptions,
+            Integer duelsTotal,
+            Integer duelsWon,
+            Integer dribblesAttempts,
+            Integer dribblesSuccess,
+            Integer dribblesPast,
+            Integer foulsDrawn,
+            Integer foulsCommitted,
+            Integer yellowCards,
+            Integer redCards,
+            Integer penaltyWon,
+            Integer penaltyCommitted,
+            Integer penaltyScored,
+            Integer penaltyMissed,
+            Integer penaltySaved
+    ) {
+        this.backNumber = backNumber;
+        this.position = position;
+        this.appearances = appearances;
+        this.lineups = lineups;
+        this.minutes = minutes;
+        this.rating = rating;
+        this.captain = captain;
+        this.substitutesIn = substitutesIn;
+        this.substitutesOut = null;
+        this.substitutesBench = substitutesBench;
+        this.shotsTotal = shotsTotal;
+        this.shotsOnTarget = shotsOnTarget;
+        this.goals = goals;
+        this.conceded = conceded;
+        this.assists = assists;
+        this.saves = saves;
+        this.passesTotal = passesTotal;
+        this.passesKey = passesKey;
+        this.passAccuracy = passAccuracy;
+        this.tacklesTotal = tacklesTotal;
+        this.blocks = blocks;
+        this.interceptions = interceptions;
+        this.duelsTotal = duelsTotal;
+        this.duelsWon = duelsWon;
+        this.dribblesAttempts = dribblesAttempts;
+        this.dribblesSuccess = dribblesSuccess;
+        this.dribblesPast = dribblesPast;
+        this.foulsDrawn = foulsDrawn;
+        this.foulsCommitted = foulsCommitted;
+        this.yellowCards = yellowCards;
+        this.yellowRedCards = null;
+        this.redCards = redCards;
+        this.penaltyWon = penaltyWon;
+        this.penaltyCommitted = penaltyCommitted;
+        this.penaltyScored = penaltyScored;
+        this.penaltyMissed = penaltyMissed;
+        this.penaltySaved = penaltySaved;
+    }
+
     // Fill missing season-specific squad number from lineup data.
     public void updateBackNumberFromLineup(Integer backNumber) {
         if (backNumber != null) {

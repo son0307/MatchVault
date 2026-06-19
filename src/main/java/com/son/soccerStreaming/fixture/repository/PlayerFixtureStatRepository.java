@@ -41,6 +41,16 @@ public interface PlayerFixtureStatRepository extends JpaRepository<PlayerFixture
 
     Optional<PlayerFixtureStat> findByFixtureFixtureIdAndPlayerPlayerId(Long fixtureId, Long playerId);
 
+    @EntityGraph(attributePaths = {"player", "team", "fixture"})
+    List<PlayerFixtureStat> findAllByFixtureSeason(Integer season);
+
+    @EntityGraph(attributePaths = {"player", "team", "fixture"})
+    List<PlayerFixtureStat> findAllByPlayerPlayerIdAndTeamTeamIdAndFixtureSeason(
+            Long playerId,
+            Long teamId,
+            Integer season
+    );
+
     @Query("SELECT s.player.playerId as playerId, s.team.teamId as teamId, " +
             "s.fixture.fixtureDate as fixtureDate, s.fixture.fixtureId as fixtureId " +
             "FROM PlayerFixtureStat s " +
@@ -52,10 +62,32 @@ public interface PlayerFixtureStatRepository extends JpaRepository<PlayerFixture
             @Param("season") Integer season
     );
 
+    @Query("SELECT s.player.playerId as playerId, " +
+            "SUM(CASE WHEN COALESCE(s.minutesPlayed, 0) > 0 AND COALESCE(s.goals, 0) > 0 THEN 1 ELSE 0 END) as goalMatches, " +
+            "SUM(CASE WHEN COALESCE(s.minutesPlayed, 0) > 0 AND COALESCE(s.assists, 0) > 0 THEN 1 ELSE 0 END) as assistMatches, " +
+            "SUM(CASE WHEN COALESCE(s.minutesPlayed, 0) > 0 " +
+            "AND (COALESCE(s.goals, 0) + COALESCE(s.assists, 0)) > 0 THEN 1 ELSE 0 END) as attackPointMatches, " +
+            "SUM(CASE WHEN COALESCE(s.minutesPlayed, 0) > 0 AND s.conceded = 0 THEN 1 ELSE 0 END) as cleanSheets " +
+            "FROM PlayerFixtureStat s " +
+            "WHERE s.player.playerId IN :playerIds AND s.fixture.season = :season " +
+            "GROUP BY s.player.playerId")
+    List<PlayerRankingMatchAggregate> findRankingMatchAggregates(
+            @Param("playerIds") List<Long> playerIds,
+            @Param("season") Integer season
+    );
+
     interface LatestPlayerTeam {
         Long getPlayerId();
         Long getTeamId();
         LocalDateTime getFixtureDate();
         Long getFixtureId();
+    }
+
+    interface PlayerRankingMatchAggregate {
+        Long getPlayerId();
+        Long getGoalMatches();
+        Long getAssistMatches();
+        Long getAttackPointMatches();
+        Long getCleanSheets();
     }
 }

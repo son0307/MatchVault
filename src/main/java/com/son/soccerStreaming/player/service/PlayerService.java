@@ -88,7 +88,8 @@ public class PlayerService {
         List<PlayerTeamSeasonStat> seasonStats = playerTeamSeasonStatRepository.findAllByPlayerPlayerIdOrderBySeasonDesc(playerId);
         List<PlayerResponseDto.SeasonSummary> seasons = aggregateSeasonSummaries(
                 seasonStats,
-                teamsBySeasonFromMatches(matches)
+                teamsBySeasonFromMatches(matches),
+                cleanSheetsBySeasonAndTeam(matchStats)
         );
 
         return PlayerResponseDto.Panel.builder()
@@ -102,15 +103,17 @@ public class PlayerService {
     public PlayerResponseDto.SeasonSummary getPlayerSeasonSummary(Long playerId, Integer season) {
         ensurePlayerExists(playerId);
 
-        List<PlayerResponseDto.MatchStat> matches = playerFixtureStatRepository
-                .findAllByPlayerPlayerIdAndFixtureSeasonOrderByFixtureFixtureDateDescFixtureFixtureIdDesc(playerId, season)
+        List<PlayerFixtureStat> matchStats = playerFixtureStatRepository
+                .findAllByPlayerPlayerIdAndFixtureSeasonOrderByFixtureFixtureDateDescFixtureFixtureIdDesc(playerId, season);
+        List<PlayerResponseDto.MatchStat> matches = matchStats
                 .stream()
                 .map(this::toMatchStat)
                 .toList();
         List<PlayerTeamSeasonStat> seasonStats = playerTeamSeasonStatRepository.findAllByPlayerPlayerIdAndSeason(playerId, season);
         List<PlayerResponseDto.SeasonSummary> summaries = aggregateSeasonSummaries(
                 seasonStats,
-                teamsBySeasonFromMatches(matches)
+                teamsBySeasonFromMatches(matches),
+                cleanSheetsBySeasonAndTeam(matchStats)
         );
 
         return summaries.stream()
@@ -150,7 +153,8 @@ public class PlayerService {
 
     private List<PlayerResponseDto.SeasonSummary> aggregateSeasonSummaries(
             List<PlayerTeamSeasonStat> stats,
-            Map<Integer, Set<Long>> teamsBySeasonFromMatches
+            Map<Integer, Set<Long>> teamsBySeasonFromMatches,
+            Map<Integer, Map<Long, Integer>> cleanSheetsBySeasonAndTeam
     ) {
         Map<Integer, List<PlayerTeamSeasonStat>> statsBySeason = new LinkedHashMap<>();
         for (PlayerTeamSeasonStat stat : stats) {
@@ -164,11 +168,19 @@ public class PlayerService {
 
         return statsBySeason.entrySet().stream()
                 .sorted(Map.Entry.<Integer, List<PlayerTeamSeasonStat>>comparingByKey(Comparator.nullsLast(Comparator.reverseOrder())))
-                .map(entry -> toSeasonSummary(entry.getKey(), entry.getValue()))
+                .map(entry -> toSeasonSummary(
+                        entry.getKey(),
+                        entry.getValue(),
+                        cleanSheetsBySeasonAndTeam.getOrDefault(entry.getKey(), Map.of())
+                ))
                 .toList();
     }
 
-    private PlayerResponseDto.SeasonSummary toSeasonSummary(Integer season, List<PlayerTeamSeasonStat> stats) {
+    private PlayerResponseDto.SeasonSummary toSeasonSummary(
+            Integer season,
+            List<PlayerTeamSeasonStat> stats,
+            Map<Long, Integer> cleanSheetsByTeam
+    ) {
         long totalFixtures = stats.stream().mapToLong(item -> valueOf(item.getAppearances())).sum();
         int weightedRatingFixtures = stats.stream()
                 .filter(item -> item.getRating() != null && valueOf(item.getAppearances()) > 0)
@@ -184,6 +196,9 @@ public class PlayerService {
                 .totalFixtures(totalFixtures)
                 .minutesPlayed(stats.stream().mapToInt(item -> valueOf(item.getMinutes())).sum())
                 .averageRating(weightedRatingFixtures > 0 ? roundToOneDecimal(weightedRating / weightedRatingFixtures) : 0)
+                .cleanSheets(cleanSheetsByTeam.values().stream().mapToInt(Integer::intValue).sum())
+                .conceded(stats.stream().mapToInt(item -> valueOf(item.getConceded())).sum())
+                .saves(stats.stream().mapToInt(item -> valueOf(item.getSaves())).sum())
                 .goals(stats.stream().mapToInt(item -> valueOf(item.getGoals())).sum())
                 .assists(stats.stream().mapToInt(item -> valueOf(item.getAssists())).sum())
                 .shots(stats.stream().mapToInt(item -> valueOf(item.getShotsTotal())).sum())
@@ -192,7 +207,10 @@ public class PlayerService {
                 .yellowCards(stats.stream().mapToInt(item -> valueOf(item.getYellowCards())).sum())
                 .redCards(stats.stream().mapToInt(item -> valueOf(item.getRedCards())).sum())
                 .teams(stats.stream()
-                        .map(this::toTeamSeasonSummary)
+                        .map(item -> toTeamSeasonSummary(
+                                item,
+                                cleanSheetsByTeam.getOrDefault(item.getTeam().getTeamId(), 0)
+                        ))
                         .toList())
                 .build();
     }
@@ -203,6 +221,9 @@ public class PlayerService {
                 .totalFixtures(0)
                 .minutesPlayed(0)
                 .averageRating(0)
+                .cleanSheets(0)
+                .conceded(0)
+                .saves(0)
                 .goals(0)
                 .assists(0)
                 .shots(0)
@@ -214,7 +235,7 @@ public class PlayerService {
                 .build();
     }
 
-    private PlayerResponseDto.TeamSeasonSummary toTeamSeasonSummary(PlayerTeamSeasonStat stats) {
+    private PlayerResponseDto.TeamSeasonSummary toTeamSeasonSummary(PlayerTeamSeasonStat stats, int cleanSheets) {
         Team team = stats.getTeam();
 
         return PlayerResponseDto.TeamSeasonSummary.builder()
@@ -224,6 +245,9 @@ public class PlayerService {
                 .totalFixtures(valueOf(stats.getAppearances()))
                 .minutesPlayed(valueOf(stats.getMinutes()))
                 .averageRating(stats.getRating() != null ? roundToOneDecimal(stats.getRating()) : 0)
+                .cleanSheets(cleanSheets)
+                .conceded(valueOf(stats.getConceded()))
+                .saves(valueOf(stats.getSaves()))
                 .goals(valueOf(stats.getGoals()))
                 .assists(valueOf(stats.getAssists()))
                 .shots(valueOf(stats.getShotsTotal()))
@@ -232,6 +256,24 @@ public class PlayerService {
                 .yellowCards(valueOf(stats.getYellowCards()))
                 .redCards(valueOf(stats.getRedCards()))
                 .build();
+    }
+
+    private Map<Integer, Map<Long, Integer>> cleanSheetsBySeasonAndTeam(List<PlayerFixtureStat> matchStats) {
+        Map<Integer, Map<Long, Integer>> cleanSheets = new HashMap<>();
+        for (PlayerFixtureStat stat : matchStats) {
+            Integer season = stat.getFixture().getSeason();
+            Long teamId = stat.getTeam().getTeamId();
+            if (season == null || teamId == null
+                    || valueOf(stat.getMinutesPlayed()) <= 0
+                    || stat.getConceded() == null
+                    || stat.getConceded() != 0) {
+                continue;
+            }
+            cleanSheets
+                    .computeIfAbsent(season, key -> new HashMap<>())
+                    .merge(teamId, 1, Integer::sum);
+        }
+        return cleanSheets;
     }
 
     private PlayerResponseDto.MatchStat toMatchStat(PlayerFixtureStat stat) {
@@ -256,10 +298,10 @@ public class PlayerService {
                 .awayTeamName(fixture.getAwayTeam().getName())
                 .homeScore(fixture.getHomeScore())
                 .awayScore(fixture.getAwayScore())
-                .minutesPlayed(stat.getMinutesPlayed())
+                .minutesPlayed(PlayerFixtureStat.normalizeMinutesPlayed(stat.getMinutesPlayed()))
                 .rating(stat.getRating() != null ? roundToOneDecimal(stat.getRating()) : null)
-                .goals(stat.getGoals())
-                .assists(stat.getAssists())
+                .goals(PlayerFixtureStat.normalizeScoringStat(stat.getMinutesPlayed(), stat.getGoals()))
+                .assists(PlayerFixtureStat.normalizeScoringStat(stat.getMinutesPlayed(), stat.getAssists()))
                 .build();
     }
 

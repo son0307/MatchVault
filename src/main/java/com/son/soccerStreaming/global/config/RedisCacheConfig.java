@@ -20,6 +20,7 @@ import java.util.Map;
 public class RedisCacheConfig {
 
     public static final String TEAM_PLAYER_RANKINGS_CACHE = "teamPlayerRankings";
+    public static final String LEAGUE_PLAYER_RANKINGS_CACHE = "leaguePlayerRankings";
     public static final String FAVORITE_TEAM_CARD_CACHE = "favoriteTeamCard";
     public static final String FAVORITE_PLAYER_CARD_CACHE = "favoritePlayerCard";
 
@@ -27,6 +28,7 @@ public class RedisCacheConfig {
     public RedisCacheManager cacheManager(
             RedisConnectionFactory connectionFactory,
             @Value("${app.cache.team-player-rankings-ttl:10m}") Duration teamPlayerRankingsTtl,
+            @Value("${app.cache.league-player-rankings-ttl:30s}") Duration leaguePlayerRankingsTtl,
             @Value("${app.cache.favorite-card-ttl:30s}") Duration favoriteCardTtl
     ) {
 
@@ -48,6 +50,7 @@ public class RedisCacheConfig {
                 .cacheDefaults(defaultConfig)
                 .withInitialCacheConfigurations(Map.of(
                         TEAM_PLAYER_RANKINGS_CACHE, defaultConfig.entryTtl(teamPlayerRankingsTtl),
+                        LEAGUE_PLAYER_RANKINGS_CACHE, defaultConfig.entryTtl(leaguePlayerRankingsTtl),
                         FAVORITE_TEAM_CARD_CACHE, defaultConfig.entryTtl(favoriteCardTtl),
                         FAVORITE_PLAYER_CARD_CACHE, defaultConfig.entryTtl(favoriteCardTtl)
                 ))
