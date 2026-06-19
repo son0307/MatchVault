@@ -5,10 +5,12 @@ import com.son.soccerStreaming.apifootball.dto.ApiFootballLiveDto;
 import com.son.soccerStreaming.fixture.dto.FixtureEventDto;
 import com.son.soccerStreaming.fixture.entity.Fixture;
 import com.son.soccerStreaming.fixture.repository.FixtureRepository;
+import com.son.soccerStreaming.player.event.PlayerSeasonStatRebuildRequested;
 import com.son.soccerStreaming.player.service.PlayerTeamSeasonStatAggregationService;
 import jakarta.persistence.EntityManager;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -31,6 +33,7 @@ public class ApiFootballFixtureDetailSyncService {
     private final ApiFootballFixtureStatSyncService apiFootballFixtureStatSyncService;
     private final ApiFootballFixturePlayerStatSyncService apiFootballFixturePlayerStatSyncService;
     private final PlayerTeamSeasonStatAggregationService playerTeamSeasonStatAggregationService;
+    private final ApplicationEventPublisher eventPublisher;
     private final FixtureRepository fixtureRepository;
     private final TransactionTemplate transactionTemplate;
     private final EntityManager entityManager;
@@ -88,13 +91,11 @@ public class ApiFootballFixtureDetailSyncService {
         stopWatch.stop();
 
         if (rebuildSeasonStats) {
-            stopWatch.start("seasonStats");
-            playerTeamSeasonStatAggregationService.rebuildForFixture(
+            eventPublisher.publishEvent(new PlayerSeasonStatRebuildRequested(
                     39,
                     fixture.get().getFixtureId(),
                     fixture.get().getSeason()
-            );
-            stopWatch.stop();
+            ));
         }
 
         log.info("API-Football fixture detail processed. fixtureId={}, totalMs={}, {}",

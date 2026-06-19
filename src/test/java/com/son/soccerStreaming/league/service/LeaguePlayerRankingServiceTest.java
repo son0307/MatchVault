@@ -20,6 +20,8 @@ import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -53,11 +55,10 @@ class LeaguePlayerRankingServiceTest {
                 .thenReturn(List.of(oldTeamStat, newTeamStat, rivalStat));
         when(playerFixtureStatRepository.findRankingMatchAggregates(eq(List.of(1L, 2L)), eq(2025)))
                 .thenReturn(List.of(aggregate(1L, 7, 3, 8, 0), aggregate(2L, 7, 3, 8, 0)));
-        when(playerFixtureStatRepository.findTeamHistoryByPlayerIdsAndSeasonOrderByLatest(
+        when(playerFixtureStatRepository.findLatestTeamByPlayerIdsAndSeason(
                 eq(List.of(1L, 2L)),
                 eq(2025)
         )).thenReturn(List.of(
-                latestTeam(1L, 42L, LocalDateTime.of(2025, 1, 1, 12, 0), 100L),
                 latestTeam(1L, 49L, LocalDateTime.of(2025, 2, 1, 12, 0), 101L),
                 latestTeam(2L, 40L, LocalDateTime.of(2025, 2, 1, 12, 0), 102L)
         ));
@@ -66,6 +67,8 @@ class LeaguePlayerRankingServiceTest {
 
         LeaguePlayerRankingResponseDto response = service.getRankings(39, 2025);
 
+        verify(playerFixtureStatRepository, never())
+                .findTeamHistoryByPlayerIdsAndSeasonOrderByLatest(eq(List.of(1L, 2L)), eq(2025));
         assertThat(response.getGoals())
                 .extracting(LeaguePlayerRankingResponseDto.Row::getPlayerId)
                 .containsExactly(2L, 1L);
@@ -104,7 +107,7 @@ class LeaguePlayerRankingServiceTest {
                         aggregate(30L, 0, 0, 0, 2),
                         aggregate(40L, 0, 0, 0, 8)
                 ));
-        when(playerFixtureStatRepository.findTeamHistoryByPlayerIdsAndSeasonOrderByLatest(
+        when(playerFixtureStatRepository.findLatestTeamByPlayerIdsAndSeason(
                 eq(List.of(10L, 20L, 30L, 40L)),
                 eq(2025)
         )).thenReturn(List.of(
@@ -157,7 +160,7 @@ class LeaguePlayerRankingServiceTest {
                         aggregate(13L, 0, 0, 0, 1),
                         aggregate(14L, 0, 0, 0, 10)
                 ));
-        when(playerFixtureStatRepository.findTeamHistoryByPlayerIdsAndSeasonOrderByLatest(
+        when(playerFixtureStatRepository.findLatestTeamByPlayerIdsAndSeason(
                 eq(List.of(11L, 12L, 13L, 14L)),
                 eq(2025)
         )).thenReturn(List.of());
@@ -185,7 +188,7 @@ class LeaguePlayerRankingServiceTest {
                 .thenReturn(List.of(secondStat, smallStat, firstStat));
         when(playerFixtureStatRepository.findRankingMatchAggregates(eq(List.of(200L, 300L, 100L)), eq(2025)))
                 .thenReturn(List.of());
-        when(playerFixtureStatRepository.findTeamHistoryByPlayerIdsAndSeasonOrderByLatest(
+        when(playerFixtureStatRepository.findLatestTeamByPlayerIdsAndSeason(
                 eq(List.of(200L, 300L, 100L)),
                 eq(2025)
         )).thenReturn(List.of());

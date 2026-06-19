@@ -62,6 +62,23 @@ public interface PlayerFixtureStatRepository extends JpaRepository<PlayerFixture
             @Param("season") Integer season
     );
 
+    @Query("SELECT s.player.playerId as playerId, s.team.teamId as teamId, " +
+            "s.fixture.fixtureDate as fixtureDate, s.fixture.fixtureId as fixtureId " +
+            "FROM PlayerFixtureStat s " +
+            "WHERE s.player.playerId IN :playerIds " +
+            "AND s.fixture.season = :season " +
+            "AND NOT EXISTS (" +
+            "SELECT newer.id FROM PlayerFixtureStat newer " +
+            "WHERE newer.player.playerId = s.player.playerId " +
+            "AND newer.fixture.season = :season " +
+            "AND (newer.fixture.fixtureDate > s.fixture.fixtureDate " +
+            "OR (newer.fixture.fixtureDate = s.fixture.fixtureDate " +
+            "AND newer.fixture.fixtureId > s.fixture.fixtureId)))")
+    List<LatestPlayerTeam> findLatestTeamByPlayerIdsAndSeason(
+            @Param("playerIds") List<Long> playerIds,
+            @Param("season") Integer season
+    );
+
     @Query("SELECT s.player.playerId as playerId, " +
             "SUM(CASE WHEN COALESCE(s.minutesPlayed, 0) > 0 AND COALESCE(s.goals, 0) > 0 THEN 1 ELSE 0 END) as goalMatches, " +
             "SUM(CASE WHEN COALESCE(s.minutesPlayed, 0) > 0 AND COALESCE(s.assists, 0) > 0 THEN 1 ELSE 0 END) as assistMatches, " +

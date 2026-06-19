@@ -15,6 +15,7 @@ import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Caching;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.annotation.Propagation;
 
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -63,7 +64,7 @@ public class PlayerTeamSeasonStatAggregationService {
             @CacheEvict(cacheNames = RedisCacheConfig.FAVORITE_PLAYER_CARD_CACHE, allEntries = true),
             @CacheEvict(cacheNames = RedisCacheConfig.LEAGUE_PLAYER_RANKINGS_CACHE, allEntries = true)
     })
-    @Transactional
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public int rebuildForFixture(Integer leagueId, Long fixtureId, Integer season) {
         Set<PlayerTeamSeasonKey> keys = new LinkedHashSet<>();
         playerFixtureStatRepository.findAllByFixtureFixtureId(fixtureId).forEach(stat ->

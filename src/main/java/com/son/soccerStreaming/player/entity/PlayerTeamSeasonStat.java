@@ -12,7 +12,8 @@ import lombok.*;
         },
         indexes = {
                 @Index(name = "idx_player_team_season_stat_player", columnList = "player_id"),
-                @Index(name = "idx_player_team_season_stat_team_season", columnList = "team_id, season")
+                @Index(name = "idx_player_team_season_stat_team_season", columnList = "team_id, season"),
+                @Index(name = "idx_player_team_season_stat_league_season", columnList = "league_id, season")
         })
 @Getter
 @Builder

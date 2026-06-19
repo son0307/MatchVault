@@ -17,7 +17,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
 import java.util.Comparator;
-import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -196,24 +195,11 @@ public class LeaguePlayerRankingService {
     }
 
     private Map<Long, Long> latestTeamByPlayer(List<Long> playerIds, Integer season) {
-        Map<Long, PlayerFixtureStatRepository.LatestPlayerTeam> latestRecords = new HashMap<>();
-        for (PlayerFixtureStatRepository.LatestPlayerTeam item :
-                playerFixtureStatRepository.findTeamHistoryByPlayerIdsAndSeasonOrderByLatest(playerIds, season)) {
-            latestRecords.merge(item.getPlayerId(), item, this::latestRecord);
-        }
-        return latestRecords.entrySet().stream()
-                .collect(Collectors.toMap(Map.Entry::getKey, entry -> entry.getValue().getTeamId()));
-    }
-
-    private PlayerFixtureStatRepository.LatestPlayerTeam latestRecord(
-            PlayerFixtureStatRepository.LatestPlayerTeam left,
-            PlayerFixtureStatRepository.LatestPlayerTeam right
-    ) {
-        int dateCompare = compareNullable(left.getFixtureDate(), right.getFixtureDate());
-        if (dateCompare != 0) {
-            return dateCompare >= 0 ? left : right;
-        }
-        return compareNullable(left.getFixtureId(), right.getFixtureId()) >= 0 ? left : right;
+        return playerFixtureStatRepository.findLatestTeamByPlayerIdsAndSeason(playerIds, season).stream()
+                .collect(Collectors.toMap(
+                        PlayerFixtureStatRepository.LatestPlayerTeam::getPlayerId,
+                        PlayerFixtureStatRepository.LatestPlayerTeam::getTeamId
+                ));
     }
 
     private List<LeaguePlayerRankingResponseDto.Row> rank(
@@ -365,19 +351,6 @@ public class LeaguePlayerRankingService {
 
     private int longValue(Long value) {
         return value != null ? Math.toIntExact(value) : 0;
-    }
-
-    private <T extends Comparable<T>> int compareNullable(T left, T right) {
-        if (left == null && right == null) {
-            return 0;
-        }
-        if (left == null) {
-            return -1;
-        }
-        if (right == null) {
-            return 1;
-        }
-        return left.compareTo(right);
     }
 
     private LeaguePlayerRankingResponseDto emptyResponse(Integer leagueId, Integer season) {
