@@ -56,6 +56,9 @@ public class PlayerResponseDto {
         private long totalFixtures;
         private int minutesPlayed;
         private double averageRating;
+        private int cleanSheets;
+        private int conceded;
+        private int saves;
         private int goals;
         private int assists;
         private int shots;
@@ -75,6 +78,9 @@ public class PlayerResponseDto {
         private long totalFixtures;
         private int minutesPlayed;
         private double averageRating;
+        private int cleanSheets;
+        private int conceded;
+        private int saves;
         private int goals;
         private int assists;
         private int shots;

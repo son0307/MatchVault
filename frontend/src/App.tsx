@@ -21,6 +21,7 @@ import { AdminPage } from "./pages/AdminPage";
 import { FixtureDetailPage } from "./pages/FixtureDetailPage";
 import { LeagueFixturesPage } from "./pages/LeagueFixturesPage";
 import { LeagueHomePage } from "./pages/LeagueHomePage";
+import { LeaguePlayerStatsPage } from "./pages/LeaguePlayerStatsPage";
 import { LeagueStandingsPage } from "./pages/LeagueStandingsPage";
 import { MyPage } from "./pages/MyPage";
 import { PlayerDetailPage } from "./pages/PlayerDetailPage";
@@ -47,7 +48,7 @@ const leagueTabs = [
   { label: "홈", to: "/league/overview", enabled: true },
   { label: "순위", to: "/league/standings", enabled: true },
   { label: "경기", to: "/league/fixtures", enabled: true },
-  { label: "플레이어 통계", to: "/league/player-stats", enabled: false },
+  { label: "플레이어 통계", to: "/league/player-stats", enabled: true },
   { label: "팀 통계", to: "/league/team-stats", enabled: false },
 ];
 
@@ -76,6 +77,10 @@ export function App() {
         <Route
           path="/league/fixtures"
           element={<LeagueLayout>{(authState) => <LeagueFixturesPage season={authState.season} />}</LeagueLayout>}
+        />
+        <Route
+          path="/league/player-stats"
+          element={<LeagueLayout>{(authState) => <LeaguePlayerStatsPage season={authState.season} />}</LeagueLayout>}
         />
         <Route
           path="/fixtures/:fixtureId"

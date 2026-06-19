@@ -15,7 +15,7 @@ import org.springframework.stereotype.Component;
 @Slf4j
 @Component
 @Profile("prod")
-@Order(5)
+@Order(4)
 @RequiredArgsConstructor
 @ConditionalOnProperty(name = "api-football.sync.fixture-details.run-on-startup", havingValue = "true")
 public class ApiFootballFixtureDetailStartupSyncRunner implements CommandLineRunner {

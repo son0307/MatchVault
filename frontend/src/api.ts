@@ -48,6 +48,49 @@ export type LeagueSeasonCoverageResponse = {
   seasons: LeagueSeasonCoverage[];
 };
 
+export type LeaguePlayerRankings = {
+  leagueId: number;
+  season: number;
+  goals: LeaguePlayerRankingRow[];
+  assists: LeaguePlayerRankingRow[];
+  attackPoints: LeaguePlayerRankingRow[];
+  ratings: LeaguePlayerRankingRow[];
+  minutes: LeaguePlayerRankingRow[];
+  yellowCards: LeaguePlayerRankingRow[];
+  redCards: LeaguePlayerRankingRow[];
+  saves: LeaguePlayerRankingRow[];
+  cleanSheets: LeaguePlayerRankingRow[];
+  savePercentages: LeaguePlayerRankingRow[];
+};
+
+export type LeaguePlayerRankingRow = {
+  rank: number;
+  playerId: number;
+  playerName: string | null;
+  photoUrl: string | null;
+  position: string | null;
+  teamId: number;
+  teamName: string | null;
+  teamLogoUrl: string | null;
+  teamRank: number | null;
+  appearances: number;
+  minutes: number;
+  rating: number;
+  goals: number;
+  penaltyGoals: number;
+  assists: number;
+  attackPoints: number;
+  goalMatches: number;
+  assistMatches: number;
+  attackPointMatches: number;
+  yellowCards: number;
+  redCards: number;
+  saves: number;
+  conceded: number;
+  cleanSheets: number;
+  savePercentage: number | null;
+};
+
 export type FixtureEventResponse = {
   fixtureId: number;
   events: FixtureEvent[];
@@ -422,6 +465,9 @@ export type PlayerSeasonSummary = {
   totalFixtures: number;
   minutesPlayed: number;
   averageRating: number;
+  cleanSheets: number;
+  conceded: number;
+  saves: number;
   goals: number;
   assists: number;
   shots: number;
@@ -439,6 +485,9 @@ export type PlayerTeamSeasonSummary = {
   totalFixtures: number;
   minutesPlayed: number;
   averageRating: number;
+  cleanSheets: number;
+  conceded: number;
+  saves: number;
   goals: number;
   assists: number;
   shots: number;
@@ -794,6 +843,17 @@ export async function fetchLeagueSeasons(leagueId = 39): Promise<LeagueSeasonCov
     `/api/v1/leagues/${leagueId}/seasons`,
     "시즌 정보를 불러오지 못했습니다.",
     DETAIL_CACHE_TTL_MS,
+  );
+}
+
+export async function fetchLeaguePlayerRankings(
+  season: number,
+  leagueId = 39,
+): Promise<LeaguePlayerRankings> {
+  return cachedGetJson<LeaguePlayerRankings>(
+    `/api/v1/leagues/${leagueId}/player-rankings?season=${normalizeSeason(season)}`,
+    "플레이어 통계 순위를 불러오지 못했습니다.",
+    SHORT_CACHE_TTL_MS,
   );
 }
 

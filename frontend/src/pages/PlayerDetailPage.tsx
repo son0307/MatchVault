@@ -253,7 +253,12 @@ export function PlayerDetailPage({ authStatus, season }: { authStatus: AuthStatu
         profile={profileState.data}
         seasonState={seasonState}
       />
-      <SeasonSummaryPanel onRetry={loadSeasonSummary} season={season} state={seasonState} />
+      <SeasonSummaryPanel
+        isGoalkeeper={isGoalkeeperPosition(profileState.data.position)}
+        onRetry={loadSeasonSummary}
+        season={season}
+        state={seasonState}
+      />
       <RecentMatchesPanel onRetry={loadRecentMatches} state={matchesState} />
     </section>
   );
@@ -399,10 +404,12 @@ function FavoriteToggleButton({
 }
 
 function SeasonSummaryPanel({
+  isGoalkeeper,
   season,
   state,
   onRetry,
 }: {
+  isGoalkeeper: boolean;
   season: number;
   state: LoadState<PlayerSeasonSummary>;
   onRetry: () => void;
@@ -441,16 +448,30 @@ function SeasonSummaryPanel({
       <div className="player-stat-chips">
         <StatChip label="경기" value={summary.totalFixtures} />
         <StatChip label="출전 시간" value={summary.minutesPlayed} />
-        <StatChip label="골" value={summary.goals} />
-        <StatChip label="도움" value={summary.assists} />
+        {isGoalkeeper ? (
+          <>
+            <StatChip label="클린시트" value={summary.cleanSheets} />
+            <StatChip label="실점" value={summary.conceded} />
+            <StatChip label="선방" value={summary.saves} />
+          </>
+        ) : (
+          <>
+            <StatChip label="골" value={summary.goals} />
+            <StatChip label="도움" value={summary.assists} />
+          </>
+        )}
         <StatChip label="평점" value={ratingText(summary.averageRating)} />
-        <StatChip label="슈팅" value={summary.shots} />
-        <StatChip label="유효 슈팅" value={summary.shotsOnTarget} />
-        <StatChip label="키패스" value={summary.keyPasses} />
+        {!isGoalkeeper ? (
+          <>
+            <StatChip label="슈팅" value={summary.shots} />
+            <StatChip label="유효 슈팅" value={summary.shotsOnTarget} />
+            <StatChip label="키패스" value={summary.keyPasses} />
+          </>
+        ) : null}
         <StatChip label="경고" value={summary.yellowCards} />
         <StatChip label="퇴장" value={summary.redCards} />
       </div>
-      <SeasonTeamStats teams={summary.teams ?? []} />
+      <SeasonTeamStats isGoalkeeper={isGoalkeeper} teams={summary.teams ?? []} />
     </article>
   );
 }
@@ -464,7 +485,13 @@ function StatChip({ label, value }: { label: string; value: number | string }) {
   );
 }
 
-function SeasonTeamStats({ teams }: { teams: PlayerTeamSeasonSummary[] }) {
+function SeasonTeamStats({
+  isGoalkeeper,
+  teams,
+}: {
+  isGoalkeeper: boolean;
+  teams: PlayerTeamSeasonSummary[];
+}) {
   if (!teams.length) {
     return null;
   }
@@ -483,15 +510,27 @@ function SeasonTeamStats({ teams }: { teams: PlayerTeamSeasonSummary[] }) {
               {team.teamName ?? "-"}
             </Link>
             <span>
-              {numberText(team.totalFixtures)}경기 · {numberText(team.goals)}G {numberText(team.assists)}A
+              {isGoalkeeper
+                ? `${numberText(team.totalFixtures)}경기 · ${numberText(team.cleanSheets)} 클린시트 · ${numberText(team.conceded)}실점`
+                : `${numberText(team.totalFixtures)}경기 · ${numberText(team.goals)}G ${numberText(team.assists)}A`}
             </span>
           </div>
           <div className="player-stat-chips">
             <StatChip label="출전 시간" value={team.minutesPlayed} />
             <StatChip label="평점" value={ratingText(team.averageRating)} />
-            <StatChip label="슈팅" value={team.shots} />
-            <StatChip label="유효 슈팅" value={team.shotsOnTarget} />
-            <StatChip label="키패스" value={team.keyPasses} />
+            {isGoalkeeper ? (
+              <>
+                <StatChip label="클린시트" value={team.cleanSheets} />
+                <StatChip label="실점" value={team.conceded} />
+                <StatChip label="선방" value={team.saves} />
+              </>
+            ) : (
+              <>
+                <StatChip label="슈팅" value={team.shots} />
+                <StatChip label="유효 슈팅" value={team.shotsOnTarget} />
+                <StatChip label="키패스" value={team.keyPasses} />
+              </>
+            )}
             <StatChip label="경고" value={team.yellowCards} />
             <StatChip label="퇴장" value={team.redCards} />
           </div>
@@ -499,6 +538,11 @@ function SeasonTeamStats({ teams }: { teams: PlayerTeamSeasonSummary[] }) {
       ))}
     </div>
   );
+}
+
+function isGoalkeeperPosition(position: string | null) {
+  const normalized = position?.trim().toUpperCase() ?? "";
+  return normalized === "GK" || normalized === "G" || normalized.includes("GOALKEEPER");
 }
 
 function RecentMatchesPanel({ state, onRetry }: { state: LoadState<PlayerMatchStat[]>; onRetry: () => void }) {

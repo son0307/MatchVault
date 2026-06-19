@@ -5,9 +5,12 @@ import com.son.soccerStreaming.apifootball.dto.ApiFootballLiveDto;
 import com.son.soccerStreaming.fixture.dto.FixtureEventDto;
 import com.son.soccerStreaming.fixture.entity.Fixture;
 import com.son.soccerStreaming.fixture.repository.FixtureRepository;
+import com.son.soccerStreaming.player.event.PlayerSeasonStatRebuildRequested;
+import com.son.soccerStreaming.player.service.PlayerTeamSeasonStatAggregationService;
 import jakarta.persistence.EntityManager;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -29,6 +32,8 @@ public class ApiFootballFixtureDetailSyncService {
     private final ApiFootballFixtureLineupSyncService apiFootballFixtureLineupSyncService;
     private final ApiFootballFixtureStatSyncService apiFootballFixtureStatSyncService;
     private final ApiFootballFixturePlayerStatSyncService apiFootballFixturePlayerStatSyncService;
+    private final PlayerTeamSeasonStatAggregationService playerTeamSeasonStatAggregationService;
+    private final ApplicationEventPublisher eventPublisher;
     private final FixtureRepository fixtureRepository;
     private final TransactionTemplate transactionTemplate;
     private final EntityManager entityManager;
@@ -52,6 +57,14 @@ public class ApiFootballFixtureDetailSyncService {
     @Transactional
     public FixtureDetailSyncResult syncFixtureDetail(ApiFootballLiveDto.FixtureResponse response,
                                                      boolean applyLiveStandingImpact) {
+        return syncFixtureDetail(response, applyLiveStandingImpact, true);
+    }
+
+    private FixtureDetailSyncResult syncFixtureDetail(
+            ApiFootballLiveDto.FixtureResponse response,
+            boolean applyLiveStandingImpact,
+            boolean rebuildSeasonStats
+    ) {
         StopWatch stopWatch = new StopWatch("fixture-detail-" + fixtureIdOf(response));
         stopWatch.start("fixture");
         Optional<Fixture> fixture = apiFootballFixtureSyncService.syncFixtureResponse(response, applyLiveStandingImpact);
@@ -77,6 +90,14 @@ public class ApiFootballFixtureDetailSyncService {
         int playerStats = apiFootballFixturePlayerStatSyncService.syncPlayerStats(fixture.get(), response.getPlayers());
         stopWatch.stop();
 
+        if (rebuildSeasonStats) {
+            eventPublisher.publishEvent(new PlayerSeasonStatRebuildRequested(
+                    39,
+                    fixture.get().getFixtureId(),
+                    fixture.get().getSeason()
+            ));
+        }
+
         log.info("API-Football fixture detail processed. fixtureId={}, totalMs={}, {}",
                 fixture.get().getFixtureId(),
                 stopWatch.getTotalTimeMillis(),
@@ -99,7 +120,7 @@ public class ApiFootballFixtureDetailSyncService {
         List<Long> fixtureIds = fixtures.stream()
                 .map(Fixture::getFixtureId)
                 .toList();
-        return syncFixtureDetailsByIdsWithResults(fixtureIds, applyLiveStandingImpact);
+        return syncFixtureDetailsByIdsWithResults(fixtureIds, applyLiveStandingImpact, true);
     }
 
     public int syncFixtureDetailsByIds(List<Long> fixtureIds, boolean applyLiveStandingImpact) {
@@ -107,6 +128,14 @@ public class ApiFootballFixtureDetailSyncService {
     }
 
     public List<FixtureDetailSyncResult> syncFixtureDetailsByIdsWithResults(List<Long> fixtureIds, boolean applyLiveStandingImpact) {
+        return syncFixtureDetailsByIdsWithResults(fixtureIds, applyLiveStandingImpact, true);
+    }
+
+    private List<FixtureDetailSyncResult> syncFixtureDetailsByIdsWithResults(
+            List<Long> fixtureIds,
+            boolean applyLiveStandingImpact,
+            boolean rebuildAffectedSeasonStats
+    ) {
         List<FixtureDetailSyncResult> results = new ArrayList<>();
         List<List<Long>> chunks = chunks(fixtureIds);
         List<List<Long>> failedChunks = new ArrayList<>();
@@ -125,7 +154,7 @@ public class ApiFootballFixtureDetailSyncService {
                 List<FixtureDetailSyncResult> chunkResults = transactionTemplate.execute(status -> {
                     List<FixtureDetailSyncResult> processed = new ArrayList<>();
                     for (ApiFootballLiveDto.FixtureResponse response : responses) {
-                        FixtureDetailSyncResult result = syncFixtureDetail(response, applyLiveStandingImpact);
+                        FixtureDetailSyncResult result = syncFixtureDetail(response, applyLiveStandingImpact, false);
                         if (result.fixtureId() != null) {
                             processed.add(result);
                         }
@@ -137,6 +166,17 @@ public class ApiFootballFixtureDetailSyncService {
                 });
                 results.addAll(chunkResults);
                 chunkWatch.stop();
+
+                if (rebuildAffectedSeasonStats) {
+                    for (FixtureDetailSyncResult result : chunkResults) {
+                        fixtureRepository.findByFixtureId(result.fixtureId()).ifPresent(fixture ->
+                                playerTeamSeasonStatAggregationService.rebuildForFixture(
+                                        39,
+                                        fixture.getFixtureId(),
+                                        fixture.getSeason()
+                                ));
+                    }
+                }
 
                 log.info("API-Football fixture detail chunk completed. chunk={}/{}, responseCount={}, totalMs={}, {}",
                         i + 1, chunks.size(), responses.size(), chunkWatch.getTotalTimeMillis(), shortSummary(chunkWatch));
@@ -155,7 +195,11 @@ public class ApiFootballFixtureDetailSyncService {
     }
 
     public int syncSeasonFixtureDetails(Integer season, boolean applyLiveStandingImpact) {
-        int syncedCount = syncFixtureDetails(fixtureRepository.findAllBySeasonOrderByFixtureDateAsc(season), applyLiveStandingImpact);
+        List<Long> fixtureIds = fixtureRepository.findAllBySeasonOrderByFixtureDateAsc(season).stream()
+                .map(Fixture::getFixtureId)
+                .toList();
+        int syncedCount = syncFixtureDetailsByIdsWithResults(fixtureIds, applyLiveStandingImpact, false).size();
+        playerTeamSeasonStatAggregationService.rebuildSeason(39, season);
         apiFootballSyncStatusService.recordSuccess("fixture-details", "Season Details", season);
         return syncedCount;
     }

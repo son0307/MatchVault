@@ -31,6 +31,16 @@ public interface PlayerTeamSeasonStatRepository extends JpaRepository<PlayerTeam
     @EntityGraph(attributePaths = "team")
     List<PlayerTeamSeasonStat> findAllByPlayerPlayerIdAndSeason(Long playerId, Integer season);
 
+    @Query("SELECT s FROM PlayerTeamSeasonStat s " +
+            "JOIN FETCH s.player p " +
+            "JOIN FETCH s.team t " +
+            "WHERE s.leagueId = :leagueId AND s.season = :season " +
+            "AND COALESCE(s.appearances, 0) > 0")
+    List<PlayerTeamSeasonStat> findAllForLeagueRankings(
+            @Param("leagueId") Long leagueId,
+            @Param("season") Integer season
+    );
+
     // Only expose players who appeared or were named on the bench at least once.
     @Query("SELECT s FROM PlayerTeamSeasonStat s " +
             "JOIN FETCH s.player p " +

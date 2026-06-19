@@ -1196,6 +1196,168 @@ h2 {
   text-align: left;
 }
 
+.player-rankings-page {
+  gap: 16px;
+}
+
+.player-rankings-heading {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.player-rankings-heading h2 {
+  margin: 2px 0 6px;
+}
+
+.player-rankings-heading p:last-child {
+  margin: 0;
+  color: #67746a;
+}
+
+.player-ranking-tabs {
+  padding-bottom: 4px;
+}
+
+.player-ranking-panel {
+  overflow: hidden;
+}
+
+.player-ranking-table-wrap {
+  width: 100%;
+}
+
+.player-ranking-table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+
+.player-ranking-table th,
+.player-ranking-table td {
+  height: 62px;
+  border-bottom: 1px solid #edf1eb;
+  padding: 0 12px;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.player-ranking-table th {
+  color: #67746a;
+  font-size: 0.78rem;
+  font-weight: 900;
+}
+
+.player-ranking-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.player-ranking-table tbody tr:hover {
+  background: #f8faf7;
+}
+
+.player-ranking-table th:first-child,
+.player-ranking-table td:first-child {
+  width: 64px;
+}
+
+.player-ranking-player-column {
+  width: 30%;
+}
+
+.player-ranking-team-column {
+  width: 24%;
+}
+
+.player-ranking-position-column {
+  width: 86px;
+}
+
+.player-ranking-player {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 10px;
+  text-align: left;
+}
+
+.player-ranking-player img,
+.player-ranking-photo-placeholder {
+  width: 38px;
+  height: 38px;
+  flex: 0 0 38px;
+  border-radius: 50%;
+  object-fit: cover;
+  background: #e4ebe2;
+}
+
+.player-ranking-player div {
+  min-width: 0;
+}
+
+.player-ranking-player a,
+.player-ranking-team {
+  color: #203a26;
+  font-weight: 900;
+  text-decoration: none;
+}
+
+.player-ranking-player a {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.player-ranking-player a:hover,
+.player-ranking-team:hover span {
+  text-decoration: underline;
+}
+
+.player-ranking-mobile-meta {
+  display: none;
+  margin-top: 3px;
+  overflow: hidden;
+  color: #7a867c;
+  font-size: 0.76rem;
+  font-weight: 700;
+  text-overflow: ellipsis;
+}
+
+.player-ranking-team {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 9px;
+  text-align: left;
+}
+
+.player-ranking-team img,
+.player-ranking-logo-placeholder {
+  width: 28px;
+  height: 28px;
+  flex: 0 0 28px;
+  object-fit: contain;
+  background: #edf1eb;
+  border-radius: 50%;
+}
+
+.player-ranking-team span:last-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.player-ranking-rank,
+.player-ranking-primary {
+  color: #203a26;
+  font-size: 1rem;
+  font-weight: 950;
+}
+
+.player-ranking-primary {
+  background: #f7faf5;
+}
+
 .team-cell {
   display: flex;
   align-items: center;
@@ -3121,9 +3283,55 @@ h2 {
   .top-bar,
   .league-hero,
   .standings-toolbar,
-  .fixtures-toolbar {
+  .fixtures-toolbar,
+  .player-rankings-heading {
     align-items: stretch;
     flex-direction: column;
+  }
+
+  .player-ranking-table {
+    table-layout: fixed;
+  }
+
+  .player-ranking-table th,
+  .player-ranking-table td {
+    height: 58px;
+    padding: 0 7px;
+  }
+
+  .player-ranking-table th:first-child,
+  .player-ranking-table td:first-child {
+    width: 44px;
+  }
+
+  .player-ranking-player-column {
+    width: auto;
+  }
+
+  .player-ranking-team-column,
+  .player-ranking-position-column,
+  .player-ranking-secondary-column {
+    display: none;
+  }
+
+  .player-ranking-primary-column,
+  .player-ranking-primary {
+    width: 78px;
+  }
+
+  .player-ranking-player {
+    gap: 8px;
+  }
+
+  .player-ranking-player img,
+  .player-ranking-photo-placeholder {
+    width: 34px;
+    height: 34px;
+    flex-basis: 34px;
+  }
+
+  .player-ranking-mobile-meta {
+    display: block;
   }
 
   .league-header-actions,
