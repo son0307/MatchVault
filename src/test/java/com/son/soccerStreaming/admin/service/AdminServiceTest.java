@@ -6,6 +6,7 @@ import com.son.soccerStreaming.apifootball.service.ApiFootballInjurySyncService;
 import com.son.soccerStreaming.apifootball.service.ApiFootballPlayerSyncService;
 import com.son.soccerStreaming.apifootball.service.ApiFootballStandingSyncService;
 import com.son.soccerStreaming.apifootball.service.ApiFootballTeamSyncService;
+import com.son.soccerStreaming.apifootball.service.LeagueSeasonCoverageSyncService;
 import com.son.soccerStreaming.admin.dto.AdminDto;
 import com.son.soccerStreaming.admin.entity.AdminAuditLog;
 import com.son.soccerStreaming.admin.entity.AdminAuditType;
@@ -68,10 +69,31 @@ class AdminServiceTest {
     @Mock
     private ApiFootballInjurySyncService apiFootballInjurySyncService;
     @Mock
+    private LeagueSeasonCoverageSyncService leagueSeasonCoverageSyncService;
+    @Mock
     private AdminSyncTaskRunner adminSyncTaskRunner;
 
     @InjectMocks
     private AdminService adminService;
+
+    @Test
+    void syncLeagueSeasonsRunsWithoutExistingCoverage() {
+        AppUser admin = adminUser();
+
+        when(appUserRepository.findById(1L)).thenReturn(Optional.of(admin));
+        when(leagueSeasonCoverageSyncService.syncLeagueSeasons(39)).thenReturn(15);
+
+        AdminDto.SyncResponse response = adminService.syncLeagueSeasons(1L, 39);
+
+        assertThat(response.isSuccess()).isTrue();
+        assertThat(response.getCount()).isEqualTo(15);
+        verify(leagueSeasonCoverageSyncService).syncLeagueSeasons(39);
+        ArgumentCaptor<AdminAuditLog> logCaptor = ArgumentCaptor.forClass(AdminAuditLog.class);
+        verify(adminAuditLogRepository).save(logCaptor.capture());
+        assertThat(logCaptor.getValue().getTargetType()).isEqualTo("LEAGUE");
+        assertThat(logCaptor.getValue().getTargetId()).isEqualTo(39L);
+        assertThat(logCaptor.getValue().getDetails()).isEqualTo("league=39");
+    }
 
     @Test
     @SuppressWarnings("unchecked")

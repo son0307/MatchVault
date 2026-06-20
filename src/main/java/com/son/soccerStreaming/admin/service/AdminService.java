@@ -6,6 +6,7 @@ import com.son.soccerStreaming.apifootball.service.ApiFootballInjurySyncService;
 import com.son.soccerStreaming.apifootball.service.ApiFootballPlayerSyncService;
 import com.son.soccerStreaming.apifootball.service.ApiFootballStandingSyncService;
 import com.son.soccerStreaming.apifootball.service.ApiFootballTeamSyncService;
+import com.son.soccerStreaming.apifootball.service.LeagueSeasonCoverageSyncService;
 import com.son.soccerStreaming.admin.dto.AdminDto;
 import com.son.soccerStreaming.admin.entity.AdminAuditLog;
 import com.son.soccerStreaming.admin.entity.AdminAuditType;
@@ -101,6 +102,7 @@ public class AdminService {
     private static final Pattern SUBSTITUTION_DETAIL_PATTERN = Pattern.compile("Substitution\\s+\\d+");
 
     private static final List<SyncStatusDefinition> SYNC_STATUS_DEFINITIONS = List.of(
+            new SyncStatusDefinition("seasons", "Seasons"),
             new SyncStatusDefinition("teams", "Teams"),
             new SyncStatusDefinition("standings", "Standings"),
             new SyncStatusDefinition("fixtures", "Fixtures"),
@@ -128,6 +130,7 @@ public class AdminService {
     private final ApiFootballFixtureDetailSyncService apiFootballFixtureDetailSyncService;
     private final ApiFootballPlayerSyncService apiFootballPlayerSyncService;
     private final ApiFootballInjurySyncService apiFootballInjurySyncService;
+    private final LeagueSeasonCoverageSyncService leagueSeasonCoverageSyncService;
     private final AdminSyncTaskRunner adminSyncTaskRunner;
     private final ConcurrentMap<String, ManualSyncState> manualSyncStates = new ConcurrentHashMap<>();
 
@@ -501,6 +504,17 @@ public class AdminService {
         long deletedCount = adminOverrideService.clearOverrides(AdminOverrideTargetType.PLAYER, player.getPlayerId());
         saveOverrideClearLog(adminUserId, "PLAYER", player.getPlayerId(), "ALL", deletedCount);
         return toPlayerResponse(player);
+    }
+
+    public AdminDto.SyncResponse syncLeagueSeasons(Long adminUserId, Integer league) {
+        return runSync(
+                adminUserId,
+                "seasons",
+                "LEAGUE",
+                league == null ? null : league.longValue(),
+                "league=" + league,
+                () -> leagueSeasonCoverageSyncService.syncLeagueSeasons(league)
+        );
     }
 
     public AdminDto.SyncResponse syncTeams(Long adminUserId, Integer league, Integer season) {
@@ -1190,6 +1204,9 @@ public class AdminService {
     }
 
     private String syncStatusKey(String task, Integer season) {
+        if ("seasons".equals(task)) {
+            return "league-seasons:39";
+        }
         return season == null ? task : "%s:%d".formatted(task, season);
     }
 

@@ -291,6 +291,7 @@ const playerStatFields: FieldConfig[] = [
 ];
 
 const syncTasks = [
+  { task: "seasons", label: "Seasons" },
   { task: "teams", label: "Teams" },
   { task: "standings", label: "Standings" },
   { task: "fixtures", label: "Fixtures" },
@@ -551,6 +552,9 @@ export function AdminPage({ authState }: AdminPageProps) {
   }
 
   function manualSyncCooldownKey(task: string) {
+    if (task === "seasons") {
+      return task;
+    }
     return `${task}:${authState.season}`;
   }
 
@@ -586,6 +590,7 @@ export function AdminPage({ authState }: AdminPageProps) {
     const league = 39;
     const season = authState.season;
     const urls: Record<string, string | null> = {
+      seasons: `/api/v1/admin/sync/seasons?league=${league}`,
       teams: `/api/v1/admin/sync/teams?league=${league}&season=${season}`,
       standings: `/api/v1/admin/sync/standings?league=${league}&season=${season}`,
       fixtures: `/api/v1/admin/sync/fixtures?league=${league}&season=${season}`,
@@ -605,6 +610,9 @@ export function AdminPage({ authState }: AdminPageProps) {
         const result = await adminJson<{ message: string }>(url, "POST");
         clearApiMemoryCache();
         setSyncMessage(result.message);
+        if (task === "seasons") {
+          await loadSeasonCoverages(setSeasonCoverages, setCoverageStatus);
+        }
         await loadSyncStatuses(authState.season, setSyncStatuses);
         await reloadAuditLogs();
       });
@@ -1505,6 +1513,9 @@ function syncAvailability(
   coverages: LeagueSeasonCoverage[],
   coverageStatus: CoverageStatus,
 ) {
+  if (task === "seasons") {
+    return { enabled: true, message: "" };
+  }
   if (coverageStatus === "loading") {
     return { enabled: false, message: "시즌 지원 범위를 확인 중입니다." };
   }

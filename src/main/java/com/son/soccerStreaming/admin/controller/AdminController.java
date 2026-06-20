@@ -180,6 +180,14 @@ public class AdminController {
         return ResponseEntity.ok(adminService.syncTeams(userDetails.getId(), league, season));
     }
 
+    @PostMapping("/sync/seasons")
+    public ResponseEntity<AdminDto.SyncResponse> syncLeagueSeasons(
+            @AuthenticationPrincipal AuthUserDetails userDetails,
+            @RequestParam(defaultValue = "39") Integer league
+    ) {
+        return ResponseEntity.ok(adminService.syncLeagueSeasons(userDetails.getId(), league));
+    }
+
     @PostMapping("/sync/standings")
     public ResponseEntity<AdminDto.SyncResponse> syncStandings(
             @AuthenticationPrincipal AuthUserDetails userDetails,
