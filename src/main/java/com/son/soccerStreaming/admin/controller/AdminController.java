@@ -79,6 +79,11 @@ public class AdminController {
         return adminService.searchFixtures(keyword, season);
     }
 
+    @GetMapping("/fixture-teams")
+    public List<AdminDto.FixtureTeamOptionResponse> getFixtureTeams(@RequestParam Integer season) {
+        return adminService.getFixtureTeams(season);
+    }
+
     @GetMapping("/fixtures/{fixtureId}")
     public ResponseEntity<AdminDto.FixtureAdminDetailResponse> getFixture(
             @PathVariable Long fixtureId

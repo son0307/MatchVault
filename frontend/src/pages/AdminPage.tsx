@@ -1,7 +1,7 @@
 import { FormEvent, useEffect, useRef, useState } from "react";
 import { LoaderCircle } from "lucide-react";
 import { Navigate } from "react-router-dom";
-import { clearApiMemoryCache, fetchLeagueSeasons, type LeagueSeasonCoverage } from "../api";
+import { clearApiMemoryCache, fetchFixtures, fetchLeagueSeasons, type LeagueSeasonCoverage } from "../api";
 import { type LeagueAuthState } from "../App";
 
 type AdminPageProps = {
@@ -81,6 +81,13 @@ type FixtureSelectionState = {
   fixtureId: number | null;
   status: "idle" | "loading" | "ready" | "error";
   detail: FixtureDetailAdmin | null;
+};
+
+type FixtureListStatus = "idle" | "loading" | "ready" | "error";
+
+type FixtureTeamOption = {
+  teamId: number;
+  name: string | null;
 };
 
 type FixtureAdmin = Record<string, unknown> & {
@@ -316,8 +323,11 @@ export function AdminPage({ authState }: AdminPageProps) {
     status: "idle",
     detail: null,
   });
-  const [fixtureKeyword, setFixtureKeyword] = useState("");
+  const [fixtureTeams, setFixtureTeams] = useState<FixtureTeamOption[]>([]);
+  const [fixtureTeamStatus, setFixtureTeamStatus] = useState<FixtureListStatus>("idle");
+  const [selectedFixtureTeamId, setSelectedFixtureTeamId] = useState<number | null>(null);
   const [fixtures, setFixtures] = useState<FixtureSummaryAdmin[]>([]);
+  const [fixtureListStatus, setFixtureListStatus] = useState<FixtureListStatus>("idle");
   const [fixtureSelection, setFixtureSelection] = useState<FixtureSelectionState>({
     fixtureId: null,
     status: "idle",
@@ -340,7 +350,10 @@ export function AdminPage({ authState }: AdminPageProps) {
   const [error, setError] = useState("");
   const teamRequestIdRef = useRef(0);
   const playerRequestIdRef = useRef(0);
+  const fixtureTeamRequestIdRef = useRef(0);
+  const fixtureListRequestIdRef = useRef(0);
   const fixtureRequestIdRef = useRef(0);
+  const fixtureEditorRef = useRef<HTMLDivElement>(null);
   const selectedTeam = teamSelection.status === "ready" ? teamSelection.detail : null;
   const loadingTeamId = teamSelection.status === "loading" ? teamSelection.teamId : null;
   const selectedPlayer = playerSelection.status === "ready" ? playerSelection.detail : null;
@@ -363,6 +376,26 @@ export function AdminPage({ authState }: AdminPageProps) {
     const timerId = window.setInterval(() => setSyncClock(Date.now()), 1000);
     return () => window.clearInterval(timerId);
   }, [syncCooldownUntil, syncClock]);
+
+  useEffect(() => {
+    if (
+      activeTab === "fixture"
+      && authState.authStatus === "authenticated"
+      && authState.currentUser?.role === "ADMIN"
+    ) {
+      void loadFixtureTeams(authState.season);
+    }
+  }, [activeTab, authState.authStatus, authState.currentUser?.role, authState.season]);
+
+  useEffect(() => {
+    if (fixtureSelection.status !== "ready") {
+      return;
+    }
+    const frameId = window.requestAnimationFrame(() => {
+      fixtureEditorRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+    return () => window.cancelAnimationFrame(frameId);
+  }, [fixtureSelection.status, fixtureSelection.fixtureId]);
 
   if (authState.authStatus === "checking") {
     return <section className="panel admin-page-panel">권한을 확인하는 중입니다.</section>;
@@ -432,14 +465,56 @@ export function AdminPage({ authState }: AdminPageProps) {
     }
   }
 
-  async function searchFixtures(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    await runRequest(async () => {
-      const result = await adminGet<FixtureSummaryAdmin[]>(
-        `/api/v1/admin/fixtures?keyword=${encodeURIComponent(fixtureKeyword)}&season=${authState.season}`,
-      );
-      setFixtures(result);
-    });
+  async function loadFixtureTeams(season: number) {
+    const requestId = fixtureTeamRequestIdRef.current + 1;
+    fixtureTeamRequestIdRef.current = requestId;
+    fixtureListRequestIdRef.current += 1;
+    fixtureRequestIdRef.current += 1;
+    setFixtureTeamStatus("loading");
+    setSelectedFixtureTeamId(null);
+    setFixtures([]);
+    setFixtureListStatus("idle");
+    setFixtureSelection({ fixtureId: null, status: "idle", detail: null });
+    try {
+      const result = await adminGet<FixtureTeamOption[]>(`/api/v1/admin/fixture-teams?season=${season}`);
+      if (fixtureTeamRequestIdRef.current === requestId) {
+        setFixtureTeams(result);
+        setFixtureTeamStatus("ready");
+      }
+    } catch (nextError) {
+      if (fixtureTeamRequestIdRef.current === requestId) {
+        setFixtureTeams([]);
+        setFixtureTeamStatus("error");
+        setError(nextError instanceof Error ? nextError.message : "시즌 참가 팀을 불러오지 못했습니다.");
+      }
+    }
+  }
+
+  async function selectFixtureTeam(teamId: number) {
+    if (savingKey !== null) {
+      return;
+    }
+    const requestId = fixtureListRequestIdRef.current + 1;
+    fixtureListRequestIdRef.current = requestId;
+    fixtureRequestIdRef.current += 1;
+    setSelectedFixtureTeamId(teamId);
+    setFixtures([]);
+    setFixtureListStatus("loading");
+    setFixtureSelection({ fixtureId: null, status: "idle", detail: null });
+    setError("");
+    setMessage("");
+    try {
+      const response = await fetchFixtures({ season: authState.season, teamId, size: 100 });
+      if (fixtureListRequestIdRef.current === requestId) {
+        setFixtures(response.content ?? []);
+        setFixtureListStatus("ready");
+      }
+    } catch (nextError) {
+      if (fixtureListRequestIdRef.current === requestId) {
+        setFixtureListStatus("error");
+        setError(nextError instanceof Error ? nextError.message : "팀 경기 목록을 불러오지 못했습니다.");
+      }
+    }
   }
 
   async function selectFixture(fixtureId: number) {
@@ -751,26 +826,75 @@ export function AdminPage({ authState }: AdminPageProps) {
 
       {activeTab === "fixture" ? (
       <EditorPanel title="Fixture Editor" eyebrow="Fixtures">
-        <SearchRow value={fixtureKeyword} placeholder="Search fixture ID or team" onChange={setFixtureKeyword} onSubmit={searchFixtures} />
-        <ResultList
-          items={fixtures}
-          getKey={(fixture) => fixture.fixtureId}
-          render={(fixture) =>
-            `${fixture.homeTeamName ?? "-"} vs ${fixture.awayTeamName ?? "-"} · ${fixture.fixtureStatus ?? "-"} · #${fixture.fixtureId}`
-          }
-          onSelect={(fixture) => void selectFixture(fixture.fixtureId)}
-          disabled={savingKey !== null}
-        />
+        <div className="admin-fixture-browser">
+          <div className="admin-fixture-browser-heading">
+            <div>
+              <strong>{authState.season} 시즌 경기 찾기</strong>
+              <span>팀을 선택하면 팀 정보 페이지와 같은 기준으로 경기 일정이 표시됩니다.</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => void loadFixtureTeams(authState.season)}
+              disabled={fixtureTeamStatus === "loading" || savingKey !== null}
+            >
+              새로고침
+            </button>
+          </div>
+          <label className="admin-fixture-team-select">
+            <span>팀</span>
+            <select
+              value={selectedFixtureTeamId ?? ""}
+              onChange={(event) => {
+                const teamId = Number(event.currentTarget.value);
+                if (Number.isFinite(teamId) && teamId > 0) {
+                  void selectFixtureTeam(teamId);
+                }
+              }}
+              disabled={fixtureTeamStatus !== "ready" || savingKey !== null}
+            >
+              <option value="">{fixtureTeamStatus === "loading" ? "팀 목록 불러오는 중..." : "팀을 선택하세요"}</option>
+              {fixtureTeams.map((team) => (
+                <option key={team.teamId} value={team.teamId}>{team.name ?? `#${team.teamId}`}</option>
+              ))}
+            </select>
+          </label>
+          {fixtureTeamStatus === "error" ? <p className="muted admin-sync-message">팀 목록을 불러오지 못했습니다. 새로고침을 눌러 다시 시도해주세요.</p> : null}
+          {fixtureListStatus === "loading" ? <p className="muted admin-sync-message">경기 목록을 불러오는 중입니다.</p> : null}
+          {fixtureListStatus === "ready" && fixtures.length === 0 ? <p className="muted admin-sync-message">선택한 팀의 경기가 없습니다.</p> : null}
+          {fixtures.length > 0 ? (
+            <div className="admin-fixture-list" aria-label="선택한 팀의 경기 목록">
+              {fixtures.map((fixture) => (
+                <button
+                  type="button"
+                  key={fixture.fixtureId}
+                  className={fixtureSelection.fixtureId === fixture.fixtureId ? "active" : ""}
+                  onClick={() => void selectFixture(fixture.fixtureId)}
+                  disabled={savingKey !== null}
+                >
+                  <span className="admin-fixture-list-meta">
+                    <time>{formatFixtureDate(fixture.fixtureDate)}</time>
+                    <span>{fixture.round ? `${fixture.round}R` : "라운드 미정"}</span>
+                    <span>{fixture.fixtureStatus ?? "-"}</span>
+                  </span>
+                  <strong>{fixture.homeTeamName ?? "-"} <em>{formatFixtureScore(fixture)}</em> {fixture.awayTeamName ?? "-"}</strong>
+                  <small>Fixture #{fixture.fixtureId}</small>
+                </button>
+              ))}
+            </div>
+          ) : null}
+        </div>
         {loadingFixtureId !== null ? <p className="muted admin-sync-message">경기 정보를 불러오는 중입니다.</p> : null}
         {selectedFixture ? (
-          <FixtureEditor
-            key={selectedFixture.fixture.fixtureId}
-            detail={selectedFixture}
-            onSaveFixture={saveFixture}
-            onSaveSection={saveFixtureSection}
-            onSavePayload={saveFixturePayload}
-            disabled={savingKey !== null}
-          />
+          <div ref={fixtureEditorRef}>
+            <FixtureEditor
+              key={selectedFixture.fixture.fixtureId}
+              detail={selectedFixture}
+              onSaveFixture={saveFixture}
+              onSaveSection={saveFixtureSection}
+              onSavePayload={saveFixturePayload}
+              disabled={savingKey !== null}
+            />
+          </div>
         ) : null}
       </EditorPanel>
       ) : null}
@@ -1596,6 +1720,30 @@ function formatDateTime(value: string | null) {
     dateStyle: "short",
     timeStyle: "short",
   }).format(date);
+}
+
+function formatFixtureDate(value: string | null) {
+  if (!value) {
+    return "일시 미정";
+  }
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+  return new Intl.DateTimeFormat("ko-KR", {
+    month: "short",
+    day: "numeric",
+    weekday: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(date);
+}
+
+function formatFixtureScore(fixture: FixtureSummaryAdmin) {
+  if (fixture.homeScore === null || fixture.awayScore === null) {
+    return "vs";
+  }
+  return `${fixture.homeScore} : ${fixture.awayScore}`;
 }
 
 function labelize(value: string) {

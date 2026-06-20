@@ -169,6 +169,17 @@ public class AdminService {
     }
 
     @Transactional(readOnly = true)
+    public List<AdminDto.FixtureTeamOptionResponse> getFixtureTeams(Integer season) {
+        return teamRepository.findAllWithFixtureInSeasonOrderByNameAsc(season)
+                .stream()
+                .map(team -> AdminDto.FixtureTeamOptionResponse.builder()
+                        .teamId(team.getTeamId())
+                        .name(team.getName())
+                        .build())
+                .toList();
+    }
+
+    @Transactional(readOnly = true)
     public List<AdminDto.FixtureAdminSummaryResponse> searchFixtures(String keyword, Integer season) {
         String search = adminSearchKeyword(keyword);
         return fixtureRepository.searchAdminFixtures(search, season, PageRequest.of(0, 20))

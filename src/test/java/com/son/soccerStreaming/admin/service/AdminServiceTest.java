@@ -77,6 +77,20 @@ class AdminServiceTest {
     private AdminService adminService;
 
     @Test
+    void getFixtureTeamsReturnsOnlyTeamsParticipatingInTheSeason() {
+        Team arsenal = Team.builder().teamId(42L).name("Arsenal").build();
+        Team chelsea = Team.builder().teamId(49L).name("Chelsea").build();
+        when(teamRepository.findAllWithFixtureInSeasonOrderByNameAsc(2025))
+                .thenReturn(List.of(arsenal, chelsea));
+
+        List<AdminDto.FixtureTeamOptionResponse> response = adminService.getFixtureTeams(2025);
+
+        assertThat(response).extracting(AdminDto.FixtureTeamOptionResponse::getTeamId)
+                .containsExactly(42L, 49L);
+        verify(teamRepository).findAllWithFixtureInSeasonOrderByNameAsc(2025);
+    }
+
+    @Test
     void syncLeagueSeasonsRunsWithoutExistingCoverage() {
         AppUser admin = adminUser();
 

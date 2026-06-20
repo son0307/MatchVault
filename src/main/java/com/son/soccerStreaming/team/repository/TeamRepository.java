@@ -5,6 +5,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -18,6 +19,19 @@ public interface TeamRepository extends JpaRepository<Team, Long> {
     List<Team> findAllByOrderByNameAsc();
 
     List<Team> findTop20ByNameContainingIgnoreCaseOrderByNameAsc(String keyword);
+
+    @Query("""
+            select t
+            from Team t
+            where exists (
+                select f.id
+                from Fixture f
+                where f.season = :season
+                  and (f.homeTeam = t or f.awayTeam = t)
+            )
+            order by t.name asc
+            """)
+    List<Team> findAllWithFixtureInSeasonOrderByNameAsc(@Param("season") Integer season);
 
     @Query("""
             select t.id

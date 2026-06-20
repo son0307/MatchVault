@@ -240,6 +240,13 @@ public class AdminDto {
 
     @Getter
     @Builder
+    public static class FixtureTeamOptionResponse {
+        private Long teamId;
+        private String name;
+    }
+
+    @Getter
+    @Builder
     public static class FixtureAdminDetailResponse {
         private FixtureAdminResponse fixture;
         private List<FixtureEventAdminResponse> events;
