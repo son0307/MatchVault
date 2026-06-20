@@ -20,10 +20,14 @@ public interface FixtureStatRepository extends JpaRepository<FixtureStat, Long> 
                    SUM(COALESCE(fs.yellowCards, 0)) AS yellowCards,
                    SUM(COALESCE(fs.redCards, 0)) AS redCards
             FROM FixtureStat fs
-            WHERE fs.fixture.season = :season
+            WHERE fs.fixture.leagueId = :leagueId
+              AND fs.fixture.season = :season
             GROUP BY fs.team.teamId
             """)
-    List<TeamSeasonStatAggregate> findTeamSeasonStatAggregates(@Param("season") Integer season);
+    List<TeamSeasonStatAggregate> findTeamSeasonStatAggregates(
+            @Param("leagueId") Integer leagueId,
+            @Param("season") Integer season
+    );
 
     interface TeamSeasonStatAggregate {
         Long getTeamId();

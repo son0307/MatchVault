@@ -20,7 +20,10 @@ import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "team_standing", uniqueConstraints = {
-        @UniqueConstraint(columnNames = {"team_id", "season"})
+        @UniqueConstraint(
+                name = "uk_team_standing_team_league_season",
+                columnNames = {"team_id", "league_id", "season"}
+        )
 })
 @Getter
 @Builder
@@ -35,6 +38,10 @@ public class TeamStanding {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "team_id", nullable = false)
     private Team team;
+
+    @Builder.Default
+    @Column(name = "league_id", nullable = false, columnDefinition = "int default 39")
+    private Integer leagueId = 39;
 
     @Column(nullable = false)
     private Integer season;

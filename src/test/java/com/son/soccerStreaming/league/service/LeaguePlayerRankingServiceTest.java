@@ -62,7 +62,7 @@ class LeaguePlayerRankingServiceTest {
                 latestTeam(1L, 49L, LocalDateTime.of(2025, 2, 1, 12, 0), 101L),
                 latestTeam(2L, 40L, LocalDateTime.of(2025, 2, 1, 12, 0), 102L)
         ));
-        when(teamStandingRepository.findAllBySeason(2025))
+        when(teamStandingRepository.findAllByLeagueIdAndSeason(39, 2025))
                 .thenReturn(List.of(standing(arsenal, 2), standing(chelsea, 4), standing(liverpool, 1)));
 
         LeaguePlayerRankingResponseDto response = service.getRankings(39, 2025);
@@ -116,7 +116,7 @@ class LeaguePlayerRankingServiceTest {
                 latestTeam(30L, 45L, LocalDateTime.of(2025, 2, 1, 12, 0), 203L),
                 latestTeam(40L, 45L, LocalDateTime.of(2025, 2, 1, 12, 0), 204L)
         ));
-        when(teamStandingRepository.findAllBySeason(2025)).thenReturn(List.of(standing(everton, 8)));
+        when(teamStandingRepository.findAllByLeagueIdAndSeason(39, 2025)).thenReturn(List.of(standing(everton, 8)));
 
         LeaguePlayerRankingResponseDto response = service.getRankings(39, 2025);
 
@@ -164,7 +164,7 @@ class LeaguePlayerRankingServiceTest {
                 eq(List.of(11L, 12L, 13L, 14L)),
                 eq(2025)
         )).thenReturn(List.of());
-        when(teamStandingRepository.findAllBySeason(2025)).thenReturn(List.of(standing(team, 10)));
+        when(teamStandingRepository.findAllByLeagueIdAndSeason(39, 2025)).thenReturn(List.of(standing(team, 10)));
 
         LeaguePlayerRankingResponseDto response = service.getRankings(39, 2025);
 
@@ -192,7 +192,7 @@ class LeaguePlayerRankingServiceTest {
                 eq(List.of(200L, 300L, 100L)),
                 eq(2025)
         )).thenReturn(List.of());
-        when(teamStandingRepository.findAllBySeason(2025)).thenReturn(List.of(standing(team, 5)));
+        when(teamStandingRepository.findAllByLeagueIdAndSeason(39, 2025)).thenReturn(List.of(standing(team, 5)));
 
         LeaguePlayerRankingResponseDto response = service.getRankings(39, 2025);
 
@@ -276,7 +276,7 @@ class LeaguePlayerRankingServiceTest {
     }
 
     private TeamStanding standing(Team team, int rank) {
-        return TeamStanding.builder().team(team).season(2025).rank(rank).build();
+        return TeamStanding.builder().team(team).leagueId(39).season(2025).rank(rank).build();
     }
 
     private PlayerFixtureStatRepository.LatestPlayerTeam latestTeam(

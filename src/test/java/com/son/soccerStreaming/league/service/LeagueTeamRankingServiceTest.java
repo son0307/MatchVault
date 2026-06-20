@@ -36,12 +36,12 @@ class LeagueTeamRankingServiceTest {
         Team chelsea = team(49L, "Chelsea");
         Team liverpool = team(40L, "Liverpool");
 
-        when(teamStandingRepository.findAllBySeason(2025)).thenReturn(List.of(
+        when(teamStandingRepository.findAllByLeagueIdAndSeason(39, 2025)).thenReturn(List.of(
                 standing(arsenal, 2, 10, 20, 8),
                 standing(chelsea, 1, 10, 20, 8),
                 standing(liverpool, 3, 0, 0, 5)
         ));
-        when(fixtureStatRepository.findTeamSeasonStatAggregates(2025)).thenReturn(List.of(
+        when(fixtureStatRepository.findTeamSeasonStatAggregates(39, 2025)).thenReturn(List.of(
                 aggregate(42L, 55.126, 14L, 1L),
                 aggregate(49L, 55.126, 12L, 3L)
         ));
@@ -82,7 +82,7 @@ class LeagueTeamRankingServiceTest {
 
     @Test
     void returnsEmptyCategoriesWhenStandingsAreMissing() {
-        when(teamStandingRepository.findAllBySeason(2024)).thenReturn(List.of());
+        when(teamStandingRepository.findAllByLeagueIdAndSeason(39, 2024)).thenReturn(List.of());
 
         LeagueTeamRankingResponseDto response = service.getRankings(39, 2024);
 
@@ -91,6 +91,28 @@ class LeagueTeamRankingServiceTest {
         assertThat(response.getPossession()).isEmpty();
         assertThat(response.getYellowCards()).isEmpty();
         assertThat(response.getRedCards()).isEmpty();
+    }
+
+    @Test
+    void returnsEveryTeamWithoutTopTwentyLimit() {
+        List<TeamStanding> standings = java.util.stream.IntStream.rangeClosed(1, 24)
+                .mapToObj(index -> standing(
+                        team((long) index, "Team " + index),
+                        index,
+                        10,
+                        100 - index,
+                        index
+                ))
+                .toList();
+        when(teamStandingRepository.findAllByLeagueIdAndSeason(39, 2025)).thenReturn(standings);
+        when(fixtureStatRepository.findTeamSeasonStatAggregates(39, 2025)).thenReturn(List.of());
+
+        LeagueTeamRankingResponseDto response = service.getRankings(39, 2025);
+
+        assertThat(response.getGoalsFor()).hasSize(24);
+        assertThat(response.getGoalsAgainst()).hasSize(24);
+        assertThat(response.getYellowCards()).hasSize(24);
+        assertThat(response.getRedCards()).hasSize(24);
     }
 
     private Team team(Long id, String name) {
@@ -106,6 +128,7 @@ class LeagueTeamRankingServiceTest {
     ) {
         return TeamStanding.builder()
                 .team(team)
+                .leagueId(39)
                 .season(2025)
                 .rank(rank)
                 .played(played)

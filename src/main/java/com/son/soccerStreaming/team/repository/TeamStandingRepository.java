@@ -10,7 +10,7 @@ import java.util.Optional;
 public interface TeamStandingRepository extends JpaRepository<TeamStanding, Long> {
 
     @EntityGraph(attributePaths = "team")
-    List<TeamStanding> findAllBySeason(Integer season);
+    List<TeamStanding> findAllByLeagueIdAndSeason(Integer leagueId, Integer season);
 
-    Optional<TeamStanding> findByTeamTeamIdAndSeason(Long teamId, Integer season);
+    Optional<TeamStanding> findByTeamTeamIdAndLeagueIdAndSeason(Long teamId, Integer leagueId, Integer season);
 }

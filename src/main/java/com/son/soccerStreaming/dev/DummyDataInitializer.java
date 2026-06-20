@@ -105,6 +105,7 @@ public class DummyDataInitializer implements CommandLineRunner {
 
             Fixture fixture = Fixture.builder()
                     .fixtureId(fixtureIdCounter++)
+                    .leagueId(39)
                     .homeTeam(homeTeam)
                     .awayTeam(awayTeam)
                     .fixtureDate(LocalDateTime.now().minusDays(random.nextInt(30)))
@@ -172,6 +173,7 @@ public class DummyDataInitializer implements CommandLineRunner {
             int[] record = records[i % records.length];
             standings.add(TeamStanding.builder()
                     .team(teams.get(i))
+                    .leagueId(39)
                     .season(2019)
                     .rank(record[0])
                     .points(record[1])

@@ -92,7 +92,8 @@ class FavoriteCardServiceTest {
                 .build();
 
         when(teamRepository.findByTeamId(47L)).thenReturn(Optional.of(favoriteTeam));
-        when(teamStandingRepository.findByTeamTeamIdAndSeason(47L, 2025)).thenReturn(Optional.empty());
+        when(teamStandingRepository.findByTeamTeamIdAndLeagueIdAndSeason(47L, 39, 2025))
+                .thenReturn(Optional.empty());
         when(fixtureRepository.findRecentFinishedByTeam(eq(47L), eq(2025), eq(List.of("FT", "AET", "PEN")), any(Pageable.class)))
                 .thenReturn(List.of(finishedFixture));
         when(fixtureRepository.findNextByTeam(eq(47L), eq(2025), any(LocalDateTime.class), any(Pageable.class)))

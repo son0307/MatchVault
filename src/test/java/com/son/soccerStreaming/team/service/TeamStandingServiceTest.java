@@ -41,7 +41,7 @@ class TeamStandingServiceTest {
         Team chelsea = team(49L, "Chelsea");
         Team spurs = team(47L, "Tottenham");
 
-        when(teamStandingRepository.findAllBySeason(2025)).thenReturn(List.of(
+        when(teamStandingRepository.findAllByLeagueIdAndSeason(39, 2025)).thenReturn(List.of(
                 standing(arsenal, 1, 80),
                 standing(city, 2, 78)
         ));

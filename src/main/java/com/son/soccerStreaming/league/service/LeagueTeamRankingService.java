@@ -23,25 +23,23 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class LeagueTeamRankingService {
 
-    private static final int TOP_LIMIT = 20;
-
     private final TeamStandingRepository teamStandingRepository;
     private final FixtureStatRepository fixtureStatRepository;
     private final MediaUrlService mediaUrlService;
 
     @Cacheable(
             cacheNames = RedisCacheConfig.LEAGUE_TEAM_RANKINGS_CACHE,
-            key = "'v1:league:' + #leagueId + ':season:' + #season",
+            key = "'v2:league:' + #leagueId + ':season:' + #season",
             sync = true
     )
     public LeagueTeamRankingResponseDto getRankings(Integer leagueId, Integer season) {
-        List<TeamStanding> standings = teamStandingRepository.findAllBySeason(season);
+        List<TeamStanding> standings = teamStandingRepository.findAllByLeagueIdAndSeason(leagueId, season);
         if (standings.isEmpty()) {
             return emptyResponse(leagueId, season);
         }
 
         Map<Long, FixtureStatRepository.TeamSeasonStatAggregate> statAggregates =
-                fixtureStatRepository.findTeamSeasonStatAggregates(season).stream()
+                fixtureStatRepository.findTeamSeasonStatAggregates(leagueId, season).stream()
                         .collect(Collectors.toMap(
                                 FixtureStatRepository.TeamSeasonStatAggregate::getTeamId,
                                 aggregate -> aggregate
@@ -94,7 +92,6 @@ public class LeagueTeamRankingService {
         List<LeagueTeamRankingResponseDto.Row> ranked = rows.stream()
                 .filter(filter)
                 .sorted(comparator)
-                .limit(TOP_LIMIT)
                 .toList();
         List<LeagueTeamRankingResponseDto.Row> result = new ArrayList<>(ranked.size());
         for (int index = 0; index < ranked.size(); index++) {

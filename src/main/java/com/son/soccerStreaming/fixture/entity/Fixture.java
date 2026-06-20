@@ -11,6 +11,7 @@ import java.util.regex.Pattern;
 
 @Entity
 @Table(indexes = {
+        @Index(name = "idx_fixture_league_season_date", columnList = "league_id, season, fixture_date"),
         @Index(name = "idx_fixture_season_date", columnList = "season, fixture_date"),
         @Index(name = "idx_fixture_season_status_date", columnList = "season, fixture_status, fixture_date"),
         @Index(name = "idx_fixture_home_season_date", columnList = "home_team_id, season, fixture_date"),
@@ -48,6 +49,11 @@ public class Fixture {
     private Long firstPeriod;
     private Long secondPeriod;
     private Integer round;
+
+    @Builder.Default
+    @Column(name = "league_id", nullable = false, columnDefinition = "int default 39")
+    private Integer leagueId = 39;
+
     private Integer season;
 
     // 경기장 정보
@@ -186,7 +192,10 @@ public class Fixture {
         return Integer.valueOf(matcher.group(1));
     }
 
-    public void updateSeason(Integer season) {
+    public void updateLeagueAndSeason(Integer leagueId, Integer season) {
+        if (leagueId != null) {
+            this.leagueId = leagueId;
+        }
         this.season = season;
     }
 

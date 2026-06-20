@@ -45,9 +45,10 @@ public class ApiFootballStandingSyncService {
             }
 
             Integer responseSeason = leagueInfo.getSeason() != null ? leagueInfo.getSeason() : season;
+            Integer responseLeagueId = leagueInfo.getId() != null ? Math.toIntExact(leagueInfo.getId()) : league;
             for (List<ApiFootballStandingDto.Standing> groupStandings : leagueInfo.getStandings()) {
                 for (ApiFootballStandingDto.Standing standingInfo : groupStandings) {
-                    if (upsertStanding(responseSeason, standingInfo)) {
+                    if (upsertStanding(responseLeagueId, responseSeason, standingInfo)) {
                         syncedCount++;
                     }
                 }
@@ -59,7 +60,7 @@ public class ApiFootballStandingSyncService {
         return syncedCount;
     }
 
-    private boolean upsertStanding(Integer season, ApiFootballStandingDto.Standing standingInfo) {
+    private boolean upsertStanding(Integer leagueId, Integer season, ApiFootballStandingDto.Standing standingInfo) {
         if (standingInfo == null || standingInfo.getTeam() == null || standingInfo.getTeam().getId() == null) {
             return false;
         }
@@ -71,9 +72,10 @@ public class ApiFootballStandingSyncService {
         }
 
         TeamStanding standing = teamStandingRepository
-                .findByTeamTeamIdAndSeason(team.get().getTeamId(), season)
+                .findByTeamTeamIdAndLeagueIdAndSeason(team.get().getTeamId(), leagueId, season)
                 .orElseGet(() -> TeamStanding.builder()
                         .team(team.get())
+                        .leagueId(leagueId)
                         .season(season)
                         .build());
 
