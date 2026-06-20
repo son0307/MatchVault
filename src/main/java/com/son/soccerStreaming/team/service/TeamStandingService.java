@@ -28,6 +28,7 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class TeamStandingService {
 
+    private static final int PREMIER_LEAGUE_ID = 39;
     private static final List<String> FINISHED_FIXTURE_STATUSES = List.of("FINISHED", "FT", "AET", "PEN");
 
     private final TeamStandingRepository teamStandingRepository;
@@ -36,7 +37,9 @@ public class TeamStandingService {
     private final MediaUrlService mediaUrlService;
 
     public List<TeamStandingResponseDto> getStandings(Integer season) {
-        List<StandingProjection> projections = teamStandingRepository.findAllBySeason(season).stream()
+        List<StandingProjection> projections = teamStandingRepository
+                .findAllByLeagueIdAndSeason(PREMIER_LEAGUE_ID, season)
+                .stream()
                 .map(standing -> StandingProjection.from(standing, mediaUrlService))
                 .toList();
 

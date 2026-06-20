@@ -33,6 +33,7 @@ import java.util.List;
 @RequiredArgsConstructor
 public class FavoriteCardService {
 
+    private static final int PREMIER_LEAGUE_ID = 39;
     private static final int RECENT_TEAM_FIXTURE_LIMIT = 5;
     private static final List<String> FINISHED_STATUS_SHORTS = List.of("FT", "AET", "PEN");
 
@@ -52,7 +53,8 @@ public class FavoriteCardService {
     public FavoriteDashboardResponseDto.TeamCard getTeamCard(Long teamId, Integer season) {
         Team team = teamRepository.findByTeamId(teamId)
                 .orElseThrow(() -> new CustomException(ErrorCode.TEAM_NOT_FOUND));
-        TeamStanding standing = teamStandingRepository.findByTeamTeamIdAndSeason(team.getTeamId(), season)
+        TeamStanding standing = teamStandingRepository
+                .findByTeamTeamIdAndLeagueIdAndSeason(team.getTeamId(), PREMIER_LEAGUE_ID, season)
                 .orElse(null);
         LocalDateTime now = LocalDateTime.now(ZoneOffset.UTC);
         List<FavoriteDashboardResponseDto.TeamFixture> recentFixtures = fixtureRepository

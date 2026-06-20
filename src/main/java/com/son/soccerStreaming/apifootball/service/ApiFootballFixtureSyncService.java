@@ -184,8 +184,11 @@ public class ApiFootballFixtureSyncService {
             fixture.updateRound(league.getRound());
         }
 
-        if (league != null && league.getSeason() != null) {
-            fixture.updateSeason(league.getSeason());
+        if (league != null && (league.getId() != null || league.getSeason() != null)) {
+            fixture.updateLeagueAndSeason(
+                    league.getId() != null ? Math.toIntExact(league.getId()) : fixture.getLeagueId(),
+                    league.getSeason() != null ? league.getSeason() : fixture.getSeason()
+            );
         }
     }
 

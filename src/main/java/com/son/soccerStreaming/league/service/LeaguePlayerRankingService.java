@@ -63,7 +63,7 @@ public class LeaguePlayerRankingService {
                                 item -> item
                         ));
         Map<Long, Long> latestTeamByPlayer = latestTeamByPlayer(playerIds, season);
-        Map<Long, Integer> teamRanks = teamStandingRepository.findAllBySeason(season).stream()
+        Map<Long, Integer> teamRanks = teamStandingRepository.findAllByLeagueIdAndSeason(leagueId, season).stream()
                 .collect(Collectors.toMap(
                         standing -> standing.getTeam().getTeamId(),
                         standing -> standing.getRank() != null ? standing.getRank() : Integer.MAX_VALUE,
