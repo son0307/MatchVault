@@ -7,6 +7,7 @@ import com.son.soccerStreaming.fixture.entity.FixtureStat;
 import com.son.soccerStreaming.team.entity.Team;
 import com.son.soccerStreaming.global.exception.CustomException;
 import com.son.soccerStreaming.global.exception.ErrorCode;
+import com.son.soccerStreaming.global.config.RedisCacheConfig;
 import com.son.soccerStreaming.fixture.repository.FixtureRepository;
 import com.son.soccerStreaming.fixture.repository.FixtureStatRepository;
 import com.son.soccerStreaming.team.repository.TeamRepository;
@@ -14,6 +15,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.cache.annotation.CacheEvict;
 
 import java.util.List;
 import java.util.Locale;
@@ -32,6 +34,7 @@ public class ApiFootballFixtureStatSyncService {
     private final TeamRepository teamRepository;
 
     @Transactional
+    @CacheEvict(cacheNames = RedisCacheConfig.LEAGUE_TEAM_RANKINGS_CACHE, allEntries = true)
     public int syncFixtureStats(Long fixtureId) {
         Fixture fixture = fixtureRepository.findByFixtureId(fixtureId)
                 .orElseThrow(() -> new CustomException(ErrorCode.FIXTURE_NOT_FOUND));
@@ -42,6 +45,7 @@ public class ApiFootballFixtureStatSyncService {
     }
 
     @Transactional
+    @CacheEvict(cacheNames = RedisCacheConfig.LEAGUE_TEAM_RANKINGS_CACHE, allEntries = true)
     public int syncFixtureStats(Long fixtureId, List<ApiFootballFixtureStatisticsDto.FixtureStatisticsResponse> teamStats) {
         Fixture fixture = fixtureRepository.findByFixtureId(fixtureId)
                 .orElseThrow(() -> new CustomException(ErrorCode.FIXTURE_NOT_FOUND));
@@ -49,6 +53,7 @@ public class ApiFootballFixtureStatSyncService {
     }
 
     @Transactional
+    @CacheEvict(cacheNames = RedisCacheConfig.LEAGUE_TEAM_RANKINGS_CACHE, allEntries = true)
     public int syncFixtureStats(Fixture fixture, List<ApiFootballFixtureStatisticsDto.FixtureStatisticsResponse> teamStats) {
         if (teamStats == null || teamStats.isEmpty()) {
             return 0;
@@ -72,6 +77,7 @@ public class ApiFootballFixtureStatSyncService {
     }
 
     @Transactional
+    @CacheEvict(cacheNames = RedisCacheConfig.LEAGUE_TEAM_RANKINGS_CACHE, allEntries = true)
     public int syncFixtureStats(List<Fixture> fixtures) {
         int syncedCount = 0;
         for (Fixture fixture : fixtures) {

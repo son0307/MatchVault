@@ -30,6 +30,7 @@ import com.son.soccerStreaming.team.entity.Team;
 import com.son.soccerStreaming.team.entity.Venue;
 import com.son.soccerStreaming.global.exception.CustomException;
 import com.son.soccerStreaming.global.exception.ErrorCode;
+import com.son.soccerStreaming.global.config.RedisCacheConfig;
 import com.son.soccerStreaming.admin.repository.AdminAuditLogRepository;
 import com.son.soccerStreaming.apifootball.repository.ApiFootballSyncStatusRepository;
 import com.son.soccerStreaming.auth.repository.AppUserRepository;
@@ -39,6 +40,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.cache.annotation.CacheEvict;
 
 import java.time.Duration;
 import java.time.Instant;
@@ -318,6 +320,7 @@ public class AdminService {
     }
 
     @Transactional
+    @CacheEvict(cacheNames = RedisCacheConfig.LEAGUE_TEAM_RANKINGS_CACHE, allEntries = true)
     public AdminDto.FixtureAdminDetailResponse updateFixtureTeamStat(
             Long adminUserId,
             Long fixtureId,

@@ -91,6 +91,32 @@ export type LeaguePlayerRankingRow = {
   savePercentage: number | null;
 };
 
+export type LeagueTeamRankings = {
+  leagueId: number;
+  season: number;
+  goalsFor: LeagueTeamRankingRow[];
+  goalsAgainst: LeagueTeamRankingRow[];
+  possession: LeagueTeamRankingRow[];
+  yellowCards: LeagueTeamRankingRow[];
+  redCards: LeagueTeamRankingRow[];
+};
+
+export type LeagueTeamRankingRow = {
+  rank: number;
+  teamId: number;
+  teamName: string | null;
+  teamLogoUrl: string | null;
+  teamRank: number | null;
+  played: number;
+  goalsFor: number;
+  goalsAgainst: number;
+  goalsForPerMatch: number;
+  goalsAgainstPerMatch: number;
+  averagePossession: number | null;
+  yellowCards: number;
+  redCards: number;
+};
+
 export type FixtureEventResponse = {
   fixtureId: number;
   events: FixtureEvent[];
@@ -853,6 +879,17 @@ export async function fetchLeaguePlayerRankings(
   return cachedGetJson<LeaguePlayerRankings>(
     `/api/v1/leagues/${leagueId}/player-rankings?season=${normalizeSeason(season)}`,
     "플레이어 통계 순위를 불러오지 못했습니다.",
+    SHORT_CACHE_TTL_MS,
+  );
+}
+
+export async function fetchLeagueTeamRankings(
+  season: number,
+  leagueId = 39,
+): Promise<LeagueTeamRankings> {
+  return cachedGetJson<LeagueTeamRankings>(
+    `/api/v1/leagues/${leagueId}/team-rankings?season=${normalizeSeason(season)}`,
+    "팀 통계 순위를 불러오지 못했습니다.",
     SHORT_CACHE_TTL_MS,
   );
 }

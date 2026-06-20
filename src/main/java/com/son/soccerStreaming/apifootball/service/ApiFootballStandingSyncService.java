@@ -29,7 +29,10 @@ public class ApiFootballStandingSyncService {
     private final TeamStandingRepository teamStandingRepository;
     private final ApiFootballSyncStatusService apiFootballSyncStatusService;
 
-    @CacheEvict(cacheNames = RedisCacheConfig.FAVORITE_TEAM_CARD_CACHE, allEntries = true)
+    @CacheEvict(cacheNames = {
+            RedisCacheConfig.FAVORITE_TEAM_CARD_CACHE,
+            RedisCacheConfig.LEAGUE_TEAM_RANKINGS_CACHE
+    }, allEntries = true)
     @Transactional
     public int syncStandings(Integer league, Integer season) {
         List<ApiFootballStandingDto.StandingResponse> responses = apiFootballClient.getStandings(league, season);

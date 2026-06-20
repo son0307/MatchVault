@@ -2,8 +2,10 @@ package com.son.soccerStreaming.league.controller;
 
 import com.son.soccerStreaming.league.dto.LeagueSeasonCoverageResponseDto;
 import com.son.soccerStreaming.league.dto.LeaguePlayerRankingResponseDto;
+import com.son.soccerStreaming.league.dto.LeagueTeamRankingResponseDto;
 import com.son.soccerStreaming.league.service.LeaguePlayerRankingService;
 import com.son.soccerStreaming.league.service.LeagueSeasonCoverageService;
+import com.son.soccerStreaming.league.service.LeagueTeamRankingService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -23,6 +25,7 @@ public class LeagueController {
 
     private final LeagueSeasonCoverageService leagueSeasonCoverageService;
     private final LeaguePlayerRankingService leaguePlayerRankingService;
+    private final LeagueTeamRankingService leagueTeamRankingService;
 
     @GetMapping("/{leagueId}/seasons")
     public ResponseEntity<LeagueSeasonCoverageResponseDto> getLeagueSeasons(@PathVariable Integer leagueId) {
@@ -37,6 +40,15 @@ public class LeagueController {
     ) {
         validateLeague(leagueId);
         return ResponseEntity.ok(leaguePlayerRankingService.getRankings(leagueId, season));
+    }
+
+    @GetMapping("/{leagueId}/team-rankings")
+    public ResponseEntity<LeagueTeamRankingResponseDto> getTeamRankings(
+            @PathVariable Integer leagueId,
+            @RequestParam(defaultValue = "2025") Integer season
+    ) {
+        validateLeague(leagueId);
+        return ResponseEntity.ok(leagueTeamRankingService.getRankings(leagueId, season));
     }
 
     private void validateLeague(Integer leagueId) {

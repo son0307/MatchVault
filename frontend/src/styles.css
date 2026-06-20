@@ -1358,6 +1358,45 @@ h2 {
   background: #f7faf5;
 }
 
+.team-ranking-table .player-ranking-player-column {
+  width: 42%;
+}
+
+.team-ranking-team {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 10px;
+  color: #203a26;
+  font-weight: 900;
+  text-align: left;
+  text-decoration: none;
+}
+
+.team-ranking-team img,
+.team-ranking-team .player-ranking-photo-placeholder {
+  width: 38px;
+  height: 38px;
+  flex: 0 0 38px;
+  border-radius: 50%;
+  object-fit: contain;
+  background: #e4ebe2;
+}
+
+.team-ranking-team div {
+  min-width: 0;
+}
+
+.team-ranking-team strong {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.team-ranking-team:hover strong {
+  text-decoration: underline;
+}
+
 .team-cell {
   display: flex;
   align-items: center;
@@ -3308,6 +3347,10 @@ h2 {
     width: auto;
   }
 
+  .team-ranking-table .player-ranking-player-column {
+    width: auto;
+  }
+
   .player-ranking-team-column,
   .player-ranking-position-column,
   .player-ranking-secondary-column {
@@ -3324,7 +3367,8 @@ h2 {
   }
 
   .player-ranking-player img,
-  .player-ranking-photo-placeholder {
+  .player-ranking-photo-placeholder,
+  .team-ranking-team img {
     width: 34px;
     height: 34px;
     flex-basis: 34px;
