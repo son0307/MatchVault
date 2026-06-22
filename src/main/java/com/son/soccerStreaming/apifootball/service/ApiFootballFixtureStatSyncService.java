@@ -34,7 +34,11 @@ public class ApiFootballFixtureStatSyncService {
     private final TeamRepository teamRepository;
 
     @Transactional
-    @CacheEvict(cacheNames = RedisCacheConfig.LEAGUE_TEAM_RANKINGS_CACHE, allEntries = true)
+    @CacheEvict(
+            cacheManager = RedisCacheConfig.RANKINGS_CACHE_MANAGER,
+            cacheNames = RedisCacheConfig.LEAGUE_TEAM_RANKINGS_CACHE,
+            allEntries = true
+    )
     public int syncFixtureStats(Long fixtureId) {
         Fixture fixture = fixtureRepository.findByFixtureId(fixtureId)
                 .orElseThrow(() -> new CustomException(ErrorCode.FIXTURE_NOT_FOUND));
@@ -45,7 +49,11 @@ public class ApiFootballFixtureStatSyncService {
     }
 
     @Transactional
-    @CacheEvict(cacheNames = RedisCacheConfig.LEAGUE_TEAM_RANKINGS_CACHE, allEntries = true)
+    @CacheEvict(
+            cacheManager = RedisCacheConfig.RANKINGS_CACHE_MANAGER,
+            cacheNames = RedisCacheConfig.LEAGUE_TEAM_RANKINGS_CACHE,
+            allEntries = true
+    )
     public int syncFixtureStats(Long fixtureId, List<ApiFootballFixtureStatisticsDto.FixtureStatisticsResponse> teamStats) {
         Fixture fixture = fixtureRepository.findByFixtureId(fixtureId)
                 .orElseThrow(() -> new CustomException(ErrorCode.FIXTURE_NOT_FOUND));
@@ -53,7 +61,11 @@ public class ApiFootballFixtureStatSyncService {
     }
 
     @Transactional
-    @CacheEvict(cacheNames = RedisCacheConfig.LEAGUE_TEAM_RANKINGS_CACHE, allEntries = true)
+    @CacheEvict(
+            cacheManager = RedisCacheConfig.RANKINGS_CACHE_MANAGER,
+            cacheNames = RedisCacheConfig.LEAGUE_TEAM_RANKINGS_CACHE,
+            allEntries = true
+    )
     public int syncFixtureStats(Fixture fixture, List<ApiFootballFixtureStatisticsDto.FixtureStatisticsResponse> teamStats) {
         if (teamStats == null || teamStats.isEmpty()) {
             return 0;
@@ -77,7 +89,11 @@ public class ApiFootballFixtureStatSyncService {
     }
 
     @Transactional
-    @CacheEvict(cacheNames = RedisCacheConfig.LEAGUE_TEAM_RANKINGS_CACHE, allEntries = true)
+    @CacheEvict(
+            cacheManager = RedisCacheConfig.RANKINGS_CACHE_MANAGER,
+            cacheNames = RedisCacheConfig.LEAGUE_TEAM_RANKINGS_CACHE,
+            allEntries = true
+    )
     public int syncFixtureStats(List<Fixture> fixtures) {
         int syncedCount = 0;
         for (Fixture fixture : fixtures) {

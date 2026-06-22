@@ -47,8 +47,7 @@ public class FavoriteCardService {
 
     @Cacheable(
             cacheNames = RedisCacheConfig.FAVORITE_TEAM_CARD_CACHE,
-            key = "'team:' + #teamId + ':season:' + #season",
-            sync = true
+            key = "'team:' + #teamId + ':season:' + #season"
     )
     public FavoriteDashboardResponseDto.TeamCard getTeamCard(Long teamId, Integer season) {
         Team team = teamRepository.findByTeamId(teamId)
@@ -95,8 +94,7 @@ public class FavoriteCardService {
 
     @Cacheable(
             cacheNames = RedisCacheConfig.FAVORITE_PLAYER_CARD_CACHE,
-            key = "'player:' + #playerId + ':season:' + #season",
-            sync = true
+            key = "'player:' + #playerId + ':season:' + #season"
     )
     public FavoriteDashboardResponseDto.PlayerCard getPlayerCard(Long playerId, Integer season) {
         Player player = playerRepository.findByPlayerId(playerId)

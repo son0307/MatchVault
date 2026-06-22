@@ -26,6 +26,7 @@ public class TeamPlayerRankingService {
     private final MediaUrlService mediaUrlService;
 
     @Cacheable(
+            cacheManager = RedisCacheConfig.RANKINGS_CACHE_MANAGER,
             cacheNames = RedisCacheConfig.TEAM_PLAYER_RANKINGS_CACHE,
             key = "'team:' + #teamId + ':season:' + #season",
             sync = true

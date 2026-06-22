@@ -31,10 +31,13 @@ public class ApiFootballFixtureSyncService {
     private final ApiFootballStandingLocalUpdateService apiFootballStandingLocalUpdateService;
     private final ApiFootballSyncStatusService apiFootballSyncStatusService;
 
-    @CacheEvict(cacheNames = {
-            RedisCacheConfig.FAVORITE_TEAM_CARD_CACHE,
-            RedisCacheConfig.FAVORITE_PLAYER_CARD_CACHE
-    }, allEntries = true)
+    @CacheEvict(
+            cacheNames = {
+                    RedisCacheConfig.FAVORITE_TEAM_CARD_CACHE,
+                    RedisCacheConfig.FAVORITE_PLAYER_CARD_CACHE
+            },
+            allEntries = true
+    )
     @Transactional
     public int syncSeasonFixtures(Integer league, Integer season) {
         int syncedCount = upsertFixtures(apiFootballClient.getFixtures(league, season), false);
@@ -42,10 +45,13 @@ public class ApiFootballFixtureSyncService {
         return syncedCount;
     }
 
-    @CacheEvict(cacheNames = {
-            RedisCacheConfig.FAVORITE_TEAM_CARD_CACHE,
-            RedisCacheConfig.FAVORITE_PLAYER_CARD_CACHE
-    }, allEntries = true)
+    @CacheEvict(
+            cacheNames = {
+                    RedisCacheConfig.FAVORITE_TEAM_CARD_CACHE,
+                    RedisCacheConfig.FAVORITE_PLAYER_CARD_CACHE
+            },
+            allEntries = true
+    )
     @Transactional
     public int syncLiveFixtures(Integer league, Integer season) {
         List<ApiFootballLiveDto.FixtureResponse> liveFixtures = apiFootballClient.getLiveFixtures(league).stream()
@@ -57,10 +63,13 @@ public class ApiFootballFixtureSyncService {
         return syncedCount;
     }
 
-    @CacheEvict(cacheNames = {
-            RedisCacheConfig.FAVORITE_TEAM_CARD_CACHE,
-            RedisCacheConfig.FAVORITE_PLAYER_CARD_CACHE
-    }, allEntries = true)
+    @CacheEvict(
+            cacheNames = {
+                    RedisCacheConfig.FAVORITE_TEAM_CARD_CACHE,
+                    RedisCacheConfig.FAVORITE_PLAYER_CARD_CACHE
+            },
+            allEntries = true
+    )
     @Transactional
     public Optional<Fixture> syncFixtureResponse(ApiFootballLiveDto.FixtureResponse response, boolean applyLiveStandingImpact) {
         Optional<Fixture> fixture = upsertFixture(response);

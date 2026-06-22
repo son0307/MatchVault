@@ -331,7 +331,11 @@ public class AdminService {
     }
 
     @Transactional
-    @CacheEvict(cacheNames = RedisCacheConfig.LEAGUE_TEAM_RANKINGS_CACHE, allEntries = true)
+    @CacheEvict(
+            cacheManager = RedisCacheConfig.RANKINGS_CACHE_MANAGER,
+            cacheNames = RedisCacheConfig.LEAGUE_TEAM_RANKINGS_CACHE,
+            allEntries = true
+    )
     public AdminDto.FixtureAdminDetailResponse updateFixtureTeamStat(
             Long adminUserId,
             Long fixtureId,

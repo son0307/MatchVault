@@ -56,9 +56,17 @@ public class ApiFootballPlayerSyncService {
     private boolean profileFallbackEnabled;
 
     @Caching(evict = {
-            @CacheEvict(cacheNames = RedisCacheConfig.TEAM_PLAYER_RANKINGS_CACHE, allEntries = true),
+            @CacheEvict(
+                    cacheManager = RedisCacheConfig.RANKINGS_CACHE_MANAGER,
+                    cacheNames = RedisCacheConfig.TEAM_PLAYER_RANKINGS_CACHE,
+                    allEntries = true
+            ),
             @CacheEvict(cacheNames = RedisCacheConfig.FAVORITE_PLAYER_CARD_CACHE, allEntries = true),
-            @CacheEvict(cacheNames = RedisCacheConfig.LEAGUE_PLAYER_RANKINGS_CACHE, allEntries = true)
+            @CacheEvict(
+                    cacheManager = RedisCacheConfig.RANKINGS_CACHE_MANAGER,
+                    cacheNames = RedisCacheConfig.LEAGUE_PLAYER_RANKINGS_CACHE,
+                    allEntries = true
+            )
     })
     public int syncRegisteredPlayers(Integer league, Integer season, Long delayMs) {
         int syncedCount = 0;
@@ -95,9 +103,17 @@ public class ApiFootballPlayerSyncService {
     }
 
     @Caching(evict = {
-            @CacheEvict(cacheNames = RedisCacheConfig.TEAM_PLAYER_RANKINGS_CACHE, allEntries = true),
+            @CacheEvict(
+                    cacheManager = RedisCacheConfig.RANKINGS_CACHE_MANAGER,
+                    cacheNames = RedisCacheConfig.TEAM_PLAYER_RANKINGS_CACHE,
+                    allEntries = true
+            ),
             @CacheEvict(cacheNames = RedisCacheConfig.FAVORITE_PLAYER_CARD_CACHE, allEntries = true),
-            @CacheEvict(cacheNames = RedisCacheConfig.LEAGUE_PLAYER_RANKINGS_CACHE, allEntries = true)
+            @CacheEvict(
+                    cacheManager = RedisCacheConfig.RANKINGS_CACHE_MANAGER,
+                    cacheNames = RedisCacheConfig.LEAGUE_PLAYER_RANKINGS_CACHE,
+                    allEntries = true
+            )
     })
     public int syncRegisteredPlayersByTeam(Team team, Integer league, Integer season, Long delayMs) {
         RegisteredPlayerSyncResult result = syncRegisteredPlayersByTeamInternal(team, league, season, delayMs);

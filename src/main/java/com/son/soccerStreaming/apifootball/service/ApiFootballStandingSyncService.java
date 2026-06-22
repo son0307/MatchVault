@@ -10,6 +10,7 @@ import com.son.soccerStreaming.team.repository.TeamStandingRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Caching;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -29,10 +30,17 @@ public class ApiFootballStandingSyncService {
     private final TeamStandingRepository teamStandingRepository;
     private final ApiFootballSyncStatusService apiFootballSyncStatusService;
 
-    @CacheEvict(cacheNames = {
-            RedisCacheConfig.FAVORITE_TEAM_CARD_CACHE,
-            RedisCacheConfig.LEAGUE_TEAM_RANKINGS_CACHE
-    }, allEntries = true)
+    @Caching(evict = {
+            @CacheEvict(
+                    cacheNames = RedisCacheConfig.FAVORITE_TEAM_CARD_CACHE,
+                    allEntries = true
+            ),
+            @CacheEvict(
+                    cacheManager = RedisCacheConfig.RANKINGS_CACHE_MANAGER,
+                    cacheNames = RedisCacheConfig.LEAGUE_TEAM_RANKINGS_CACHE,
+                    allEntries = true
+            )
+    })
     @Transactional
     public int syncStandings(Integer league, Integer season) {
         List<ApiFootballStandingDto.StandingResponse> responses = apiFootballClient.getStandings(league, season);

@@ -39,6 +39,7 @@ public class LeaguePlayerRankingService {
     private final MediaUrlService mediaUrlService;
 
     @Cacheable(
+            cacheManager = RedisCacheConfig.RANKINGS_CACHE_MANAGER,
             cacheNames = RedisCacheConfig.LEAGUE_PLAYER_RANKINGS_CACHE,
             key = "'v2:league:' + #leagueId + ':season:' + #season",
             sync = true

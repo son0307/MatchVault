@@ -37,9 +37,17 @@ public class PlayerTeamSeasonStatAggregationService {
     private final PlayerTeamSeasonStatRepository playerTeamSeasonStatRepository;
 
     @Caching(evict = {
-            @CacheEvict(cacheNames = RedisCacheConfig.TEAM_PLAYER_RANKINGS_CACHE, allEntries = true),
+            @CacheEvict(
+                    cacheManager = RedisCacheConfig.RANKINGS_CACHE_MANAGER,
+                    cacheNames = RedisCacheConfig.TEAM_PLAYER_RANKINGS_CACHE,
+                    allEntries = true
+            ),
             @CacheEvict(cacheNames = RedisCacheConfig.FAVORITE_PLAYER_CARD_CACHE, allEntries = true),
-            @CacheEvict(cacheNames = RedisCacheConfig.LEAGUE_PLAYER_RANKINGS_CACHE, allEntries = true)
+            @CacheEvict(
+                    cacheManager = RedisCacheConfig.RANKINGS_CACHE_MANAGER,
+                    cacheNames = RedisCacheConfig.LEAGUE_PLAYER_RANKINGS_CACHE,
+                    allEntries = true
+            )
     })
     @Transactional
     public int rebuildSeason(Integer leagueId, Integer season) {
@@ -60,9 +68,17 @@ public class PlayerTeamSeasonStatAggregationService {
     }
 
     @Caching(evict = {
-            @CacheEvict(cacheNames = RedisCacheConfig.TEAM_PLAYER_RANKINGS_CACHE, allEntries = true),
+            @CacheEvict(
+                    cacheManager = RedisCacheConfig.RANKINGS_CACHE_MANAGER,
+                    cacheNames = RedisCacheConfig.TEAM_PLAYER_RANKINGS_CACHE,
+                    allEntries = true
+            ),
             @CacheEvict(cacheNames = RedisCacheConfig.FAVORITE_PLAYER_CARD_CACHE, allEntries = true),
-            @CacheEvict(cacheNames = RedisCacheConfig.LEAGUE_PLAYER_RANKINGS_CACHE, allEntries = true)
+            @CacheEvict(
+                    cacheManager = RedisCacheConfig.RANKINGS_CACHE_MANAGER,
+                    cacheNames = RedisCacheConfig.LEAGUE_PLAYER_RANKINGS_CACHE,
+                    allEntries = true
+            )
     })
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public int rebuildForFixture(Integer leagueId, Long fixtureId, Integer season) {
