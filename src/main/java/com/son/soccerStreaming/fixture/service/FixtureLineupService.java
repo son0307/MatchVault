@@ -3,6 +3,7 @@ package com.son.soccerStreaming.fixture.service;
 import com.son.soccerStreaming.fixture.dto.FixtureLineupResponseDto;
 import com.son.soccerStreaming.fixture.entity.FixtureLineup;
 import com.son.soccerStreaming.fixture.entity.Fixture;
+import com.son.soccerStreaming.media.service.MediaUrlService;
 import com.son.soccerStreaming.player.entity.PlayerAbsence;
 import com.son.soccerStreaming.team.entity.Team;
 import com.son.soccerStreaming.global.exception.CustomException;
@@ -24,6 +25,7 @@ public class FixtureLineupService {
     private final FixtureLineupRepository fixtureLineupRepository;
     private final FixtureRepository fixtureRepository;
     private final PlayerAbsenceRepository playerAbsenceRepository;
+    private final MediaUrlService mediaUrlService;
 
     public FixtureLineupResponseDto.Lineup getFixtureLineups(Long fixtureId) {
         Fixture fixture = fixtureRepository.findByFixtureId(fixtureId)
@@ -131,6 +133,7 @@ public class FixtureLineupService {
         return FixtureLineupResponseDto.PlayerLineup.builder()
                 .playerId(lineup.getPlayer().getPlayerId())
                 .playerName(lineup.getPlayer().getName())
+                .photoUrl(mediaUrlService.playerPhotoUrl(lineup.getPlayer()))
                 .backNumber(lineup.getJerseyNumber())
                 .position(lineup.getPosition())
                 .grid(lineup.getGrid())

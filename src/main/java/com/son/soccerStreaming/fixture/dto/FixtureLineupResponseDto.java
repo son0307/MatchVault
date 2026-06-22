@@ -48,6 +48,7 @@ public class FixtureLineupResponseDto {
     public static class PlayerLineup {
         private Long playerId;
         private String playerName;
+        private String photoUrl;
         private Integer backNumber;
         private String position;
         private String grid;

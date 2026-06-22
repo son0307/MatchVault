@@ -1788,16 +1788,18 @@ h2 {
 .fixture-detail-hero {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 180px minmax(0, 1fr);
-  align-items: center;
+  align-items: start;
   gap: 18px;
-  padding: 20px;
+  min-height: 160px;
+  padding: 24px 20px;
 }
 
 .detail-team {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 12px;
   min-width: 0;
+  padding-top: 36px;
 }
 
 .detail-team.away {
@@ -1811,6 +1813,79 @@ h2 {
   text-overflow: ellipsis;
   white-space: nowrap;
   font-size: 1.08rem;
+}
+
+.detail-team-content {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+}
+
+.detail-team.away .detail-team-content {
+  justify-items: end;
+}
+
+.fixture-scorer-list {
+  display: grid;
+  gap: 4px;
+  color: #66756a;
+  font-size: 0.76rem;
+  font-weight: 800;
+}
+
+.fixture-scorer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.detail-team.away .fixture-scorer {
+  justify-content: flex-end;
+}
+
+.fixture-scorer-name {
+  color: #53665a;
+}
+
+.fixture-scorer-name a:hover {
+  color: #1b5e20;
+  text-decoration: underline;
+}
+
+.fixture-scorer.own-goal .fixture-scorer-name {
+  color: #dc2626;
+}
+
+.fixture-red-card-list {
+  display: grid;
+  gap: 4px;
+  color: #66756a;
+  font-size: 0.76rem;
+  font-weight: 800;
+}
+
+.fixture-red-card {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+}
+
+.detail-team.away .fixture-red-card {
+  justify-content: flex-end;
+}
+
+.fixture-red-card a:hover {
+  color: #b91c1c;
+  text-decoration: underline;
+}
+
+.fixture-red-card-icon {
+  width: 6px;
+  height: 12px;
+  border-radius: 1px;
+  background: #ef4444;
+  box-shadow: 0 0 0 1px #b91c1c;
 }
 
 .team-logo.large {
@@ -1908,12 +1983,24 @@ h2 {
   background: #00a86b;
 }
 
+.event-badge.own-goal {
+  background: #dc2626;
+}
+
+.event-badge.missed-penalty {
+  background: #dc2626;
+}
+
 .event-badge.substitution {
   background: #2563eb;
 }
 
 .event-badge.card {
   background: #f59e0b;
+}
+
+.event-badge.red-card {
+  background: #dc2626;
 }
 
 .event-badge.event {
@@ -1955,7 +2042,7 @@ h2 {
 
 .football-pitch {
   position: relative;
-  min-height: 420px;
+  min-height: 500px;
   overflow: hidden;
   border: 3px solid rgba(255, 255, 255, 0.92);
   border-radius: 8px;
@@ -2053,24 +2140,107 @@ h2 {
   position: absolute;
   z-index: 3;
   display: grid;
-  width: 58px;
+  width: 78px;
   gap: 3px;
   justify-items: center;
   transform: translate(-50%, -50%);
 }
 
-.pitch-player span {
+.pitch-player-visual {
+  position: relative;
   display: grid;
-  width: 34px;
-  height: 34px;
+  width: 42px;
+  height: 42px;
+  place-items: center;
+}
+
+.pitch-player-number {
+  position: absolute;
+  inset: 0;
+  display: grid;
   place-items: center;
   border: 2px solid var(--kit-border);
-  border-radius: 9px 9px 11px 11px;
+  border-radius: 50%;
   background: var(--kit-bg);
   color: var(--kit-fg);
   font-size: 0.78rem;
   font-weight: 900;
   box-shadow: 0 8px 18px rgba(0, 0, 0, 0.2);
+}
+
+.lineup-player-photo {
+  display: grid;
+  width: 36px;
+  height: 36px;
+  flex: 0 0 auto;
+  place-items: center;
+  border: 2px solid rgba(255, 255, 255, 0.8);
+  border-radius: 50%;
+  background: #dbe4da;
+  color: #53665a;
+  font-size: 0.72rem;
+  font-weight: 900;
+  object-fit: cover;
+}
+
+.pitch-player-visual .lineup-player-photo {
+  width: 42px;
+  height: 42px;
+  border-color: rgba(255, 255, 255, 0.88);
+  box-shadow: 0 7px 16px rgba(0, 0, 0, 0.28);
+}
+
+.lineup-rating {
+  display: inline-grid;
+  min-width: 28px;
+  min-height: 20px;
+  place-items: center;
+  border-radius: 999px;
+  padding: 1px 6px;
+  background: #f59e0b;
+  color: #1c1917;
+  font-size: 0.7rem;
+  font-weight: 950;
+  line-height: 1;
+}
+
+.lineup-rating.good {
+  background: #4ade80;
+  color: #052e16;
+}
+
+.lineup-rating.excellent {
+  background: #10b981;
+  color: #ffffff;
+}
+
+.lineup-rating.top-rated {
+  background: #1d9bf0;
+  color: #ffffff;
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.82);
+}
+
+.pitch-player-visual > .lineup-rating {
+  position: absolute;
+  top: -8px;
+  right: -18px;
+}
+
+.pitch-substitution-minute {
+  position: absolute;
+  top: -19px;
+  left: -20px;
+  color: #ffffff;
+  font-size: 0.62rem;
+  font-style: normal;
+  font-weight: 950;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
+  white-space: nowrap;
+}
+
+.pitch-substitution-minute.out::before {
+  color: #fb7185;
+  content: "↘ ";
 }
 
 .pitch-player strong {
@@ -2081,6 +2251,82 @@ h2 {
   text-overflow: ellipsis;
   text-shadow: 0 1px 3px rgba(0, 0, 0, 0.58);
   white-space: nowrap;
+}
+
+.lineup-event-badges {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 18px;
+}
+
+.lineup-event-badges.compact {
+  justify-content: center;
+  gap: 3px;
+  min-height: 15px;
+}
+
+.lineup-event-badge {
+  display: inline-flex;
+  min-width: 17px;
+  min-height: 17px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  padding: 1px 4px;
+  background: rgba(255, 255, 255, 0.9);
+  color: #162018;
+  font-size: 0.62rem;
+  font-weight: 950;
+  line-height: 1;
+}
+
+.lineup-event-badge.assist {
+  background: #dbeafe;
+  color: #1d4ed8;
+  font-family: "Segoe UI Emoji", "Apple Color Emoji", sans-serif;
+}
+
+.lineup-event-badge.own-goal {
+  gap: 2px;
+  border: 0;
+  background: rgba(255, 255, 255, 0.94);
+  color: #dc2626;
+}
+
+.own-goal-ball-icon {
+  width: 15px;
+  height: 15px;
+  overflow: visible;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.6;
+}
+
+.own-goal-ball-icon path:first-of-type {
+  fill: currentColor;
+}
+
+.lineup-event-badge.yellow,
+.lineup-event-badge.red {
+  min-width: 12px;
+  min-height: 15px;
+  border-radius: 3px;
+  padding: 0 2px;
+}
+
+.lineup-event-badge.yellow {
+  border: 1px solid #a16207;
+  background: #fde047;
+  color: #713f12;
+}
+
+.lineup-event-badge.red {
+  border: 1px solid #991b1b;
+  background: #ef4444;
+  color: #ffffff;
 }
 
 .lineup-detail-grid,
@@ -2113,6 +2359,28 @@ h2 {
   margin: 0;
 }
 
+.lineup-coach-row {
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  min-height: 48px;
+  border-bottom: 1px solid #edf1eb;
+  padding: 10px 16px;
+}
+
+.lineup-coach-row span {
+  color: #6b786d;
+  font-size: 0.8rem;
+  font-weight: 900;
+}
+
+.lineup-coach-row strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .lineup-list-block h3 {
   background: #f6f9f5;
   color: #53665a;
@@ -2126,10 +2394,10 @@ h2 {
 
 .lineup-list-row {
   display: grid;
-  grid-template-columns: 36px minmax(0, 1fr) minmax(54px, max-content) 34px;
+  grid-template-columns: 38px 24px minmax(0, 1fr) auto minmax(42px, max-content) 34px;
   align-items: center;
   gap: 10px;
-  min-height: 38px;
+  min-height: 58px;
   border-bottom: 1px solid #edf1eb;
   padding: 8px 16px;
 }
@@ -2138,16 +2406,26 @@ h2 {
   border-bottom: 0;
 }
 
-.lineup-list-row span {
+.lineup-shirt-number {
   color: #6b786d;
   font-weight: 900;
 }
 
-.lineup-list-row strong,
 .lineup-player-link {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.lineup-player-summary {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.lineup-player-summary small {
+  color: #7b877e;
+  font-size: 0.72rem;
 }
 
 .lineup-list-row em {
@@ -2156,9 +2434,29 @@ h2 {
   font-size: 0.84rem;
 }
 
+.lineup-substitution-minute {
+  color: #059669 !important;
+  font-weight: 950;
+  white-space: nowrap;
+}
+
+.lineup-substitution-minute::before {
+  content: "↗ ";
+}
+
 .lineup-list-row.empty {
   display: block;
   color: #6b786d;
+}
+
+.lineup-list-row.absence {
+  grid-template-columns: 24px minmax(0, 1fr) minmax(80px, max-content);
+  min-height: 42px;
+}
+
+.lineup-list-row.absence > span {
+  color: #6b786d;
+  font-weight: 900;
 }
 
 .detail-stats-stack {
@@ -3702,21 +4000,54 @@ h2 {
     text-align: left;
   }
 
+  .fixture-detail-hero {
+    min-height: 0;
+  }
+
+  .detail-team {
+    padding-top: 0;
+  }
+
+  .detail-team.away .detail-team-content {
+    justify-items: start;
+  }
+
+  .detail-team.away .fixture-scorer {
+    justify-content: flex-start;
+  }
+
+  .detail-team.away .fixture-red-card {
+    justify-content: flex-start;
+  }
+
   .detail-scoreboard {
     order: -1;
   }
 
   .football-pitch {
-    min-height: 560px;
+    min-height: 720px;
   }
 
   .pitch-player {
-    width: 46px;
+    width: 58px;
   }
 
-  .pitch-player span {
-    width: 30px;
-    height: 30px;
+  .pitch-player-visual {
+    width: 34px;
+    height: 34px;
+  }
+
+  .pitch-player-visual .lineup-player-photo {
+    width: 34px;
+    height: 34px;
+  }
+
+  .pitch-player-number {
+    font-size: 0.7rem;
+  }
+
+  .pitch-player-visual > .lineup-rating {
+    right: -16px;
   }
 
   .pitch-player strong {
@@ -3729,13 +4060,32 @@ h2 {
   }
 
   .lineup-list-row {
-    grid-template-columns: 30px minmax(0, 1fr) minmax(42px, max-content) 30px;
+    grid-template-columns: 34px 22px minmax(0, 1fr) auto 30px;
     gap: 7px;
     padding: 8px 12px;
   }
 
+  .lineup-list-row > .lineup-rating {
+    grid-column: 4;
+  }
+
   .lineup-list-row em {
+    grid-column: 3 / 5;
+    justify-self: start;
     font-size: 0.78rem;
+  }
+
+  .lineup-list-row .favorite-toggle-button {
+    grid-column: 5;
+    grid-row: 1 / span 2;
+  }
+
+  .lineup-list-row.absence {
+    grid-template-columns: 22px minmax(0, 1fr);
+  }
+
+  .lineup-list-row.absence em {
+    grid-column: 2;
   }
 
   .player-stat-table {

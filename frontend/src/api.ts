@@ -176,6 +176,7 @@ export type FixtureColorInfo = {
 export type FixtureLineupPlayer = {
   playerId: number;
   playerName: string | null;
+  photoUrl: string | null;
   backNumber: number | null;
   position: string | null;
   grid: string | null;
@@ -248,6 +249,7 @@ export type FixturePlayerStat = {
   passesTotal: number | null;
   passesKey: number | null;
   tacklesTotal: number | null;
+  foulsCommitted: number | null;
   yellowCards: number | null;
   redCards: number | null;
 };

@@ -357,9 +357,11 @@ export function FixtureDetailPage({ authStatus, season }: { authStatus: AuthStat
     <section className="league-content fixture-detail-page">
       <FixtureDetailHero
         awayTeamId={awayTeamId}
+        events={eventsState.data?.events ?? []}
         favoriteControls={favoriteControls}
         fixture={fixture}
         homeTeamId={homeTeamId}
+        lineups={lineupsState.data}
       />
       {favoritesError ? (
         <div className="notice error inline-retry">
@@ -393,7 +395,14 @@ export function FixtureDetailPage({ authStatus, season }: { authStatus: AuthStat
       ) : null}
 
       {activeTab === "events" ? <EventsPanel state={eventsState} fixture={fixture} /> : null}
-      {activeTab === "lineups" ? <LineupsPanel favoriteControls={favoriteControls} state={lineupsState} /> : null}
+      {activeTab === "lineups" ? (
+        <LineupsPanel
+          events={eventsState.data?.events ?? []}
+          favoriteControls={favoriteControls}
+          playerStats={playerStatsState.data}
+          state={lineupsState}
+        />
+      ) : null}
       {activeTab === "stats" ? (
         <StatsPanel
           favoriteControls={favoriteControls}
@@ -430,26 +439,40 @@ async function loadSection<T>(
 
 function FixtureDetailHero({
   awayTeamId,
+  events,
   favoriteControls,
   fixture,
   homeTeamId,
+  lineups,
 }: {
   awayTeamId: number | null;
+  events: FixtureEvent[];
   favoriteControls: FavoriteControls;
   fixture: FixtureSummary;
   homeTeamId: number | null;
+  lineups: FixtureLineupResponse | null;
 }) {
+  const playerTeamIds = lineupPlayerTeamIds(lineups);
+  const homeScorers = fixtureScorers(events, homeTeamId, fixture.homeTeamName, playerTeamIds);
+  const awayScorers = fixtureScorers(events, awayTeamId, fixture.awayTeamName, playerTeamIds);
+  const homeRedCards = fixtureRedCards(events, homeTeamId, fixture.homeTeamName);
+  const awayRedCards = fixtureRedCards(events, awayTeamId, fixture.awayTeamName);
+
   return (
     <article className="panel fixture-detail-hero">
       <div className="detail-team home">
         {fixture.homeTeamLogoUrl ? <img src={fixture.homeTeamLogoUrl} alt="" className="team-logo large" /> : null}
-        {homeTeamId ? (
-          <Link className="team-name-link" to={`/teams/${homeTeamId}`}>
-            {fixture.homeTeamName ?? "-"}
-          </Link>
-        ) : (
-          <strong>{fixture.homeTeamName ?? "-"}</strong>
-        )}
+        <div className="detail-team-content">
+          {homeTeamId ? (
+            <Link className="team-name-link" to={`/teams/${homeTeamId}`}>
+              {fixture.homeTeamName ?? "-"}
+            </Link>
+          ) : (
+            <strong>{fixture.homeTeamName ?? "-"}</strong>
+          )}
+          <FixtureScorerList scorers={homeScorers} />
+          <FixtureRedCardList redCards={homeRedCards} />
+        </div>
         {homeTeamId && favoriteControls.authStatus === "authenticated" ? (
           <FavoriteToggleButton
             isFavorite={favoriteControls.favoriteTeamIds.has(homeTeamId)}
@@ -469,13 +492,17 @@ function FixtureDetailHero({
       </div>
       <div className="detail-team away">
         {fixture.awayTeamLogoUrl ? <img src={fixture.awayTeamLogoUrl} alt="" className="team-logo large" /> : null}
-        {awayTeamId ? (
-          <Link className="team-name-link" to={`/teams/${awayTeamId}`}>
-            {fixture.awayTeamName ?? "-"}
-          </Link>
-        ) : (
-          <strong>{fixture.awayTeamName ?? "-"}</strong>
-        )}
+        <div className="detail-team-content">
+          {awayTeamId ? (
+            <Link className="team-name-link" to={`/teams/${awayTeamId}`}>
+              {fixture.awayTeamName ?? "-"}
+            </Link>
+          ) : (
+            <strong>{fixture.awayTeamName ?? "-"}</strong>
+          )}
+          <FixtureScorerList scorers={awayScorers} />
+          <FixtureRedCardList redCards={awayRedCards} />
+        </div>
         {awayTeamId && favoriteControls.authStatus === "authenticated" ? (
           <FavoriteToggleButton
             isFavorite={favoriteControls.favoriteTeamIds.has(awayTeamId)}
@@ -486,6 +513,175 @@ function FixtureDetailHero({
         ) : null}
       </div>
     </article>
+  );
+}
+
+type FixtureScorer = {
+  playerId: number | null;
+  playerName: string;
+  ownGoal: boolean;
+  minutes: string[];
+  firstMinute: number;
+};
+
+function fixtureScorers(
+  events: FixtureEvent[],
+  teamId: number | null,
+  teamName: string | null,
+  playerTeamIds: Map<number, number>,
+) {
+  const scorers = new Map<string, FixtureScorer>();
+
+  events
+    .filter((event) => isGoalEvent(event) || isOwnGoalEvent(event))
+    .filter((event) => {
+      if (isOwnGoalEvent(event)) {
+        const playerTeamId = event.player?.id ? playerTeamIds.get(event.player.id) : null;
+        if (teamId && playerTeamId) {
+          return playerTeamId !== teamId;
+        }
+        if (teamId && event.team?.id) {
+          return event.team.id !== teamId;
+        }
+        return Boolean(teamName && event.team?.name !== teamName);
+      }
+      if (teamId && event.team?.id) {
+        return event.team.id === teamId;
+      }
+      return Boolean(teamName && event.team?.name === teamName);
+    })
+    .forEach((event) => {
+      const ownGoal = isOwnGoalEvent(event);
+      const playerId = event.player?.id ?? null;
+      const playerName = event.player?.name ?? "선수 정보 없음";
+      const key = `${playerId ?? playerName}-${ownGoal ? "own" : "goal"}`;
+      const current = scorers.get(key);
+      const minute = eventMinute(event);
+      const elapsed = event.time?.elapsed ?? Number.MAX_SAFE_INTEGER;
+
+      if (current) {
+        current.minutes.push(minute);
+        current.firstMinute = Math.min(current.firstMinute, elapsed);
+      } else {
+        scorers.set(key, {
+          playerId,
+          playerName,
+          ownGoal,
+          minutes: [minute],
+          firstMinute: elapsed,
+        });
+      }
+    });
+
+  return [...scorers.values()].sort((left, right) => left.firstMinute - right.firstMinute);
+}
+
+function lineupPlayerTeamIds(lineups: FixtureLineupResponse | null) {
+  const playerTeamIds = new Map<number, number>();
+  [lineups?.homeTeam, lineups?.awayTeam].forEach((team) => {
+    [...(team?.starters ?? []), ...(team?.substitutes ?? [])].forEach((player) => {
+      if (team?.teamId) {
+        playerTeamIds.set(player.playerId, team.teamId);
+      }
+    });
+  });
+  return playerTeamIds;
+}
+
+function FixtureScorerList({ scorers }: { scorers: FixtureScorer[] }) {
+  if (!scorers.length) {
+    return null;
+  }
+
+  return (
+    <div className="fixture-scorer-list">
+      {scorers.map((scorer) => (
+        <div
+          className={scorer.ownGoal ? "fixture-scorer own-goal" : "fixture-scorer"}
+          key={`${scorer.playerId ?? scorer.playerName}-${scorer.ownGoal}`}
+        >
+          <span className="fixture-scorer-name">
+            {scorer.playerId ? (
+              <Link to={`/players/${scorer.playerId}`}>{scorer.playerName}</Link>
+            ) : (
+              scorer.playerName
+            )}
+            {scorer.ownGoal ? " (자책골)" : ""}
+          </span>
+          <span>{scorer.minutes.join(", ")}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+type FixtureRedCard = {
+  playerId: number | null;
+  playerName: string;
+  minutes: string[];
+  firstMinute: number;
+};
+
+function fixtureRedCards(
+  events: FixtureEvent[],
+  teamId: number | null,
+  teamName: string | null,
+) {
+  const redCards = new Map<string, FixtureRedCard>();
+
+  events
+    .filter(isRedCardEvent)
+    .filter((event) => {
+      if (teamId && event.team?.id) {
+        return event.team.id === teamId;
+      }
+      return Boolean(teamName && event.team?.name === teamName);
+    })
+    .forEach((event) => {
+      const playerId = event.player?.id ?? null;
+      const playerName = event.player?.name ?? "선수 정보 없음";
+      const key = `${playerId ?? playerName}`;
+      const current = redCards.get(key);
+      const minute = eventMinute(event);
+      const elapsed = event.time?.elapsed ?? Number.MAX_SAFE_INTEGER;
+
+      if (current) {
+        current.minutes.push(minute);
+        current.firstMinute = Math.min(current.firstMinute, elapsed);
+      } else {
+        redCards.set(key, {
+          playerId,
+          playerName,
+          minutes: [minute],
+          firstMinute: elapsed,
+        });
+      }
+    });
+
+  return [...redCards.values()].sort((left, right) => left.firstMinute - right.firstMinute);
+}
+
+function FixtureRedCardList({ redCards }: { redCards: FixtureRedCard[] }) {
+  if (!redCards.length) {
+    return null;
+  }
+
+  return (
+    <div className="fixture-red-card-list">
+      {redCards.map((redCard) => (
+        <div className="fixture-red-card" key={redCard.playerId ?? redCard.playerName}>
+          <span className="fixture-red-card-icon" aria-label="레드카드" />
+          <span>
+            {redCard.playerId ? (
+              <Link to={`/players/${redCard.playerId}`}>{redCard.playerName}</Link>
+            ) : (
+              redCard.playerName
+            )}
+          </span>
+          <span>{redCard.minutes.join(", ")}</span>
+        </div>
+      ))}
+    </div>
   );
 }
 
@@ -605,10 +801,14 @@ function EventPlayerLink({ player }: { player: { id: number; name: string | null
 }
 
 function LineupsPanel({
+  events,
   favoriteControls,
+  playerStats,
   state,
 }: {
+  events: FixtureEvent[];
   favoriteControls: FavoriteControls;
+  playerStats: FixturePlayerStatResponse | null;
   state: LoadState<FixtureLineupResponse>;
 }) {
   if (state.isLoading) {
@@ -623,14 +823,39 @@ function LineupsPanel({
     return <EmptyPanel message="저장된 라인업이 없습니다." />;
   }
 
+  const playerDetails = buildLineupPlayerDetails(events, playerStats);
+  const lineupPlayerIds = new Set(
+    [state.data.homeTeam, state.data.awayTeam]
+      .flatMap((team) => [...(team?.starters ?? []), ...(team?.substitutes ?? [])])
+      .map((player) => player.playerId),
+  );
+  const topRatedPlayerId = selectTopRatedPlayerId(playerStats, lineupPlayerIds);
+
   return (
     <>
       <article className="panel lineup-pitch-panel">
-        <FootballPitch homeTeam={state.data.homeTeam} awayTeam={state.data.awayTeam} />
+        <FootballPitch
+          homeTeam={state.data.homeTeam}
+          awayTeam={state.data.awayTeam}
+          playerDetails={playerDetails}
+          topRatedPlayerId={topRatedPlayerId}
+        />
       </article>
       <div className="lineup-detail-grid">
-        <LineupTeamCard favoriteControls={favoriteControls} side="home" team={state.data.homeTeam} />
-        <LineupTeamCard favoriteControls={favoriteControls} side="away" team={state.data.awayTeam} />
+        <LineupTeamCard
+          favoriteControls={favoriteControls}
+          playerDetails={playerDetails}
+          side="home"
+          team={state.data.homeTeam}
+          topRatedPlayerId={topRatedPlayerId}
+        />
+        <LineupTeamCard
+          favoriteControls={favoriteControls}
+          playerDetails={playerDetails}
+          side="away"
+          team={state.data.awayTeam}
+          topRatedPlayerId={topRatedPlayerId}
+        />
       </div>
     </>
   );
@@ -639,9 +864,13 @@ function LineupsPanel({
 function FootballPitch({
   homeTeam,
   awayTeam,
+  playerDetails,
+  topRatedPlayerId,
 }: {
   homeTeam: FixtureTeamLineup | null;
   awayTeam: FixtureTeamLineup | null;
+  playerDetails: Map<number, LineupPlayerDetail>;
+  topRatedPlayerId: number | null;
 }) {
   const homePlayers = useMemo(() => positionedPlayers(homeTeam, "home"), [homeTeam]);
   const awayPlayers = useMemo(() => positionedPlayers(awayTeam, "away"), [awayTeam]);
@@ -657,7 +886,12 @@ function FootballPitch({
       <FormationLabel side="home" team={homeTeam} />
       <FormationLabel side="away" team={awayTeam} />
       {[...homePlayers, ...awayPlayers].map((player) => (
-        <PitchPlayer player={player} key={`${player.side}-${player.player.playerId}`} />
+        <PitchPlayer
+          detail={playerDetails.get(player.player.playerId)}
+          isTopRated={player.player.playerId === topRatedPlayerId}
+          player={player}
+          key={`${player.side}-${player.player.playerId}`}
+        />
       ))}
     </div>
   );
@@ -672,7 +906,15 @@ function FormationLabel({ side, team }: { side: Side; team: FixtureTeamLineup | 
   );
 }
 
-function PitchPlayer({ player }: { player: PositionedPlayer }) {
+function PitchPlayer({
+  detail,
+  isTopRated,
+  player,
+}: {
+  detail?: LineupPlayerDetail;
+  isTopRated: boolean;
+  player: PositionedPlayer;
+}) {
   const colors = player.color;
   const style = {
     left: `${player.left}%`,
@@ -689,20 +931,36 @@ function PitchPlayer({ player }: { player: PositionedPlayer }) {
       title={player.player.playerName ?? undefined}
       to={`/players/${player.player.playerId}`}
     >
-      <span>{player.player.backNumber ?? "-"}</span>
+      <div className="pitch-player-visual">
+        <PlayerPhoto player={player.player} />
+        {!player.player.photoUrl ? <span className="pitch-player-number">{player.player.backNumber ?? "-"}</span> : null}
+        {detail?.rating ? (
+          <b className={ratingClassName(detail.rating, isTopRated)}>
+            {isTopRated ? "★ " : ""}{detail.rating.toFixed(1)}
+          </b>
+        ) : null}
+        {detail?.subbedOutMinute ? (
+          <small className="pitch-substitution-minute out">OUT {detail.subbedOutMinute}</small>
+        ) : null}
+      </div>
       <strong>{shortName(player.player.playerName)}</strong>
+      <LineupEventBadges detail={detail} compact />
     </Link>
   );
 }
 
 function LineupTeamCard({
   favoriteControls,
+  playerDetails,
   side,
   team,
+  topRatedPlayerId,
 }: {
   favoriteControls: FavoriteControls;
+  playerDetails: Map<number, LineupPlayerDetail>;
   side: Side;
   team: FixtureTeamLineup | null;
+  topRatedPlayerId: number | null;
 }) {
   if (!team) {
     return (
@@ -717,11 +975,20 @@ function LineupTeamCard({
       <div className="lineup-team-heading">
         <div>
           <h2>{team.teamName ?? "팀"}</h2>
-          <p className="muted">포메이션 {team.formation ?? "-"} · 감독 {team.coachName ?? "-"}</p>
+          <p className="muted">포메이션 {team.formation ?? "-"}</p>
         </div>
       </div>
-      <LineupList favoriteControls={favoriteControls} title="선발" players={team.starters ?? []} />
-      <LineupList favoriteControls={favoriteControls} title="교체" players={team.substitutes ?? []} />
+      <div className="lineup-coach-row">
+        <span>감독</span>
+        <strong>{team.coachName ?? "-"}</strong>
+      </div>
+      <LineupList
+        favoriteControls={favoriteControls}
+        playerDetails={playerDetails}
+        title="교체 명단"
+        players={team.substitutes ?? []}
+        topRatedPlayerId={topRatedPlayerId}
+      />
       <AbsenceList team={team} />
     </article>
   );
@@ -729,12 +996,16 @@ function LineupTeamCard({
 
 function LineupList({
   favoriteControls,
+  playerDetails,
   title,
   players,
+  topRatedPlayerId,
 }: {
   favoriteControls: FavoriteControls;
+  playerDetails: Map<number, LineupPlayerDetail>;
   title: string;
   players: FixtureLineupPlayer[];
+  topRatedPlayerId: number | null;
 }) {
   const sortedPlayers = sortLineupPlayers(players);
 
@@ -743,29 +1014,259 @@ function LineupList({
       <h3>{title}</h3>
       <div className="lineup-list">
         {sortedPlayers.length ? (
-          sortedPlayers.map((player) => (
-            <div className="lineup-list-row" key={`${title}-${player.playerId}`}>
-              <span>{player.backNumber ?? "-"}</span>
-              <Link className="lineup-player-link" to={`/players/${player.playerId}`}>
-                {player.playerName ?? "-"}
-              </Link>
-              <em>{player.position ?? "-"}</em>
-              {favoriteControls.authStatus === "authenticated" ? (
-                <FavoriteToggleButton
-                  isFavorite={favoriteControls.favoritePlayerIds.has(player.playerId)}
-                  isPending={favoriteControls.pendingFavoriteKey === `player-${player.playerId}`}
-                  label={`${player.playerName ?? "선수"} 즐겨찾기`}
-                  onClick={() => favoriteControls.onTogglePlayer(player.playerId)}
-                />
-              ) : null}
-            </div>
-          ))
+          sortedPlayers.map((player) => {
+            const detail = playerDetails.get(player.playerId);
+            return (
+              <div className="lineup-list-row" key={`${title}-${player.playerId}`}>
+                <PlayerPhoto player={player} />
+                <span className="lineup-shirt-number">{player.backNumber ?? "-"}</span>
+                <div className="lineup-player-summary">
+                  <Link className="lineup-player-link" to={`/players/${player.playerId}`}>
+                    {player.playerName ?? "-"}
+                  </Link>
+                  <small>{player.position ?? "-"}</small>
+                  <LineupEventBadges detail={detail} />
+                </div>
+                {detail?.rating ? (
+                  <b className={ratingClassName(detail.rating, player.playerId === topRatedPlayerId)}>
+                    {player.playerId === topRatedPlayerId ? "★ " : ""}{detail.rating.toFixed(1)}
+                  </b>
+                ) : null}
+                {detail?.subbedInMinute ? (
+                  <em className="lineup-substitution-minute">IN {detail.subbedInMinute}</em>
+                ) : (
+                  <em>-</em>
+                )}
+                {favoriteControls.authStatus === "authenticated" ? (
+                  <FavoriteToggleButton
+                    isFavorite={favoriteControls.favoritePlayerIds.has(player.playerId)}
+                    isPending={favoriteControls.pendingFavoriteKey === `player-${player.playerId}`}
+                    label={`${player.playerName ?? "선수"} 즐겨찾기`}
+                    onClick={() => favoriteControls.onTogglePlayer(player.playerId)}
+                  />
+                ) : null}
+              </div>
+            );
+          })
         ) : (
           <div className="lineup-list-row empty">정보 없음</div>
         )}
       </div>
     </div>
   );
+}
+
+type LineupPlayerDetail = {
+  rating: number | null;
+  goals: number;
+  ownGoals: number;
+  assists: number;
+  yellowCards: number;
+  redCards: number;
+  goalMinutes: string[];
+  ownGoalMinutes: string[];
+  assistMinutes: string[];
+  yellowCardMinutes: string[];
+  redCardMinutes: string[];
+  subbedInMinute: string | null;
+  subbedOutMinute: string | null;
+};
+
+function buildLineupPlayerDetails(
+  events: FixtureEvent[],
+  playerStats: FixturePlayerStatResponse | null,
+) {
+  const details = new Map<number, LineupPlayerDetail>();
+  const ensureDetail = (playerId: number) => {
+    const current = details.get(playerId);
+    if (current) {
+      return current;
+    }
+    const created: LineupPlayerDetail = {
+      rating: null,
+      goals: 0,
+      ownGoals: 0,
+      assists: 0,
+      yellowCards: 0,
+      redCards: 0,
+      goalMinutes: [],
+      ownGoalMinutes: [],
+      assistMinutes: [],
+      yellowCardMinutes: [],
+      redCardMinutes: [],
+      subbedInMinute: null,
+      subbedOutMinute: null,
+    };
+    details.set(playerId, created);
+    return created;
+  };
+
+  [playerStats?.homeTeam, playerStats?.awayTeam].forEach((team) => {
+    (team?.players ?? []).forEach((player) => {
+      const detail = ensureDetail(player.playerId);
+      detail.rating = player.rating && player.rating > 0 ? player.rating : null;
+      detail.goals = player.goals ?? 0;
+      detail.assists = player.assists ?? 0;
+      detail.yellowCards = player.yellowCards ?? 0;
+      detail.redCards = player.redCards ?? 0;
+    });
+  });
+
+  events.forEach((event) => {
+    const minute = eventMinute(event);
+    if (isSubstitutionEvent(event)) {
+      if (event.player?.id) {
+        ensureDetail(event.player.id).subbedOutMinute = minute;
+      }
+      if (event.assist?.id) {
+        ensureDetail(event.assist.id).subbedInMinute = minute;
+      }
+      return;
+    }
+
+    if (isOwnGoalEvent(event)) {
+      if (event.player?.id) {
+        ensureDetail(event.player.id).ownGoalMinutes.push(minute);
+      }
+      return;
+    }
+
+    if (isGoalEvent(event)) {
+      if (event.player?.id) {
+        ensureDetail(event.player.id).goalMinutes.push(minute);
+      }
+      if (event.assist?.id) {
+        ensureDetail(event.assist.id).assistMinutes.push(minute);
+      }
+      return;
+    }
+
+    if (isYellowCardEvent(event) && event.player?.id) {
+      ensureDetail(event.player.id).yellowCardMinutes.push(minute);
+    }
+    if (isRedCardEvent(event) && event.player?.id) {
+      ensureDetail(event.player.id).redCardMinutes.push(minute);
+    }
+  });
+
+  details.forEach((detail) => {
+    detail.goals = Math.max(detail.goals, detail.goalMinutes.length);
+    detail.ownGoals = detail.ownGoalMinutes.length;
+    detail.assists = Math.max(detail.assists, detail.assistMinutes.length);
+    detail.yellowCards = Math.max(detail.yellowCards, detail.yellowCardMinutes.length);
+    detail.redCards = Math.max(detail.redCards, detail.redCardMinutes.length);
+  });
+
+  return details;
+}
+
+function selectTopRatedPlayerId(
+  playerStats: FixturePlayerStatResponse | null,
+  lineupPlayerIds: Set<number>,
+) {
+  const players = [playerStats?.homeTeam, playerStats?.awayTeam]
+    .flatMap((team) => team?.players ?? [])
+    .filter((player) => lineupPlayerIds.has(player.playerId) && player.rating !== null && player.rating > 0)
+    .sort(compareTopRatedPlayers);
+  return players[0]?.playerId ?? null;
+}
+
+function compareTopRatedPlayers(left: FixturePlayerStat, right: FixturePlayerStat) {
+  return (
+    compareNumberDescending(left.rating, right.rating) ||
+    compareNumberDescending(left.goals, right.goals) ||
+    compareNumberDescending(left.assists, right.assists) ||
+    compareNumberDescending(left.passesKey, right.passesKey) ||
+    compareNumberDescending(left.passesTotal, right.passesTotal) ||
+    compareNumberDescending(left.shotsTotal, right.shotsTotal) ||
+    compareNumberAscending(left.foulsCommitted, right.foulsCommitted) ||
+    compareNumberAscending(left.yellowCards, right.yellowCards) ||
+    left.playerId - right.playerId
+  );
+}
+
+function compareNumberDescending(left: number | null, right: number | null) {
+  return (right ?? 0) - (left ?? 0);
+}
+
+function compareNumberAscending(left: number | null, right: number | null) {
+  return (left ?? 0) - (right ?? 0);
+}
+
+function PlayerPhoto({ player }: { player: FixtureLineupPlayer }) {
+  const [imageFailed, setImageFailed] = useState(false);
+  if (!player.photoUrl || imageFailed) {
+    return <span className="lineup-player-photo placeholder" aria-hidden="true">{shortName(player.playerName).slice(0, 1)}</span>;
+  }
+  return (
+    <img
+      alt=""
+      className="lineup-player-photo"
+      onError={() => setImageFailed(true)}
+      src={player.photoUrl}
+    />
+  );
+}
+
+function LineupEventBadges({ compact = false, detail }: { compact?: boolean; detail?: LineupPlayerDetail }) {
+  if (!detail) {
+    return null;
+  }
+
+  const badges = [
+    detail.goals > 0 ? { className: "goal", label: `⚽${detail.goals > 1 ? ` ${detail.goals}` : ""}`, title: eventTitle("골", detail.goalMinutes) } : null,
+    detail.ownGoals > 0 ? { className: "own-goal", label: detail.ownGoals > 1 ? `${detail.ownGoals}` : "", title: eventTitle("자책골", detail.ownGoalMinutes), icon: "own-goal" } : null,
+    detail.assists > 0 ? { className: "assist", label: `👟${detail.assists > 1 ? ` ${detail.assists}` : ""}`, title: eventTitle("도움", detail.assistMinutes) } : null,
+    detail.yellowCards > 0 ? { className: "yellow", label: detail.yellowCards > 1 ? `${detail.yellowCards}` : "", title: eventTitle("경고", detail.yellowCardMinutes) } : null,
+    detail.redCards > 0 ? { className: "red", label: detail.redCards > 1 ? `${detail.redCards}` : "", title: eventTitle("퇴장", detail.redCardMinutes) } : null,
+  ].filter(Boolean) as Array<{ className: string; icon?: "own-goal"; label: string; title: string }>;
+
+  if (!badges.length) {
+    return null;
+  }
+
+  return (
+    <span className={`lineup-event-badges${compact ? " compact" : ""}`}>
+      {badges.map((badge) => (
+        <span className={`lineup-event-badge ${badge.className}`} key={badge.className} title={badge.title}>
+          {badge.icon === "own-goal" ? <OwnGoalBallIcon /> : null}
+          {badge.label}
+        </span>
+      ))}
+    </span>
+  );
+}
+
+function OwnGoalBallIcon() {
+  return (
+    <svg
+      aria-hidden="true"
+      className="own-goal-ball-icon"
+      viewBox="0 0 24 24"
+    >
+      <circle cx="12" cy="12" r="9.25" />
+      <path d="m12 7.2 3 2.2-1.15 3.5h-3.7L9 9.4l3-2.2Z" />
+      <path d="m12 2.75 0 4.45M3.3 9.2 9 9.4M5.55 18.7l4.6-5.8M18.45 18.7l-4.6-5.8M20.7 9.2 15 9.4" />
+      <path d="m6.7 4.55 2.3 4.85M17.3 4.55 15 9.4M2.95 14.75l7.2-1.85M21.05 14.75l-7.2-1.85M9.35 21l.8-8.1M14.65 21l-.8-8.1" />
+    </svg>
+  );
+}
+
+function eventTitle(label: string, minutes: string[]) {
+  return minutes.length ? `${label} ${minutes.join(", ")}` : label;
+}
+
+function ratingClassName(rating: number, isTopRated = false) {
+  if (isTopRated) {
+    return "lineup-rating top-rated";
+  }
+  if (rating >= 7.5) {
+    return "lineup-rating excellent";
+  }
+  if (rating >= 7) {
+    return "lineup-rating good";
+  }
+  return "lineup-rating";
 }
 
 function AbsenceList({ team }: { team: FixtureTeamLineup }) {
@@ -775,7 +1276,7 @@ function AbsenceList({ team }: { team: FixtureTeamLineup }) {
       <div className="lineup-list">
         {team.absences?.length ? (
           team.absences.map((absence) => (
-            <div className="lineup-list-row" key={`absence-${absence.playerId}`}>
+            <div className="lineup-list-row absence" key={`absence-${absence.playerId}`}>
               <span>-</span>
               <Link className="lineup-player-link" to={`/players/${absence.playerId}`}>
                 {absence.playerName ?? "-"}
@@ -1083,7 +1584,8 @@ function playerTop(column: number, rowColumns: number[]) {
   const orderedColumns = rowColumns.slice().sort((a, b) => a - b);
   const columnIndex = Math.max(0, orderedColumns.indexOf(column));
   const rowSize = Math.max(orderedColumns.length, 1);
-  return 50 + (columnIndex - (rowSize - 1) / 2) * Math.min(19, 70 / rowSize);
+  const step = rowSize === 1 ? 0 : Math.min(32, 76 / (rowSize - 1));
+  return 50 + (columnIndex - (rowSize - 1) / 2) * step;
 }
 
 function sortLineupPlayers(players: FixtureLineupPlayer[]) {
@@ -1180,11 +1682,20 @@ function teamStatRows(home: FixtureTeamStat | null, away: FixtureTeamStat | null
 }
 
 function eventCategory(event: FixtureEvent) {
+  if (isMissedPenaltyEvent(event)) {
+    return "missed-penalty";
+  }
+  if (isOwnGoalEvent(event)) {
+    return "own-goal";
+  }
   if (isGoalEvent(event)) {
     return "goal";
   }
   if (isSubstitutionEvent(event)) {
     return "substitution";
+  }
+  if (isRedCardEvent(event)) {
+    return "red-card";
   }
   if (normalizedText(event.type, event.detail).includes("card")) {
     return "card";
@@ -1193,11 +1704,20 @@ function eventCategory(event: FixtureEvent) {
 }
 
 function eventBadgeLabel(category: string) {
+  if (category === "missed-penalty") {
+    return "PK 실축";
+  }
+  if (category === "own-goal") {
+    return "자책골";
+  }
   if (category === "goal") {
     return "골";
   }
   if (category === "substitution") {
     return "교체";
+  }
+  if (category === "red-card") {
+    return "카드";
   }
   if (category === "card") {
     return "카드";
@@ -1206,12 +1726,40 @@ function eventBadgeLabel(category: string) {
 }
 
 function isGoalEvent(event: FixtureEvent) {
-  return normalizedText(event.type, event.detail).includes("goal");
+  if (normalizedEventType(event) !== "goal") {
+    return false;
+  }
+  const detail = normalizedEventDetail(event);
+  return detail === "normal goal" || detail === "penalty";
+}
+
+function isOwnGoalEvent(event: FixtureEvent) {
+  return normalizedEventType(event) === "goal" && normalizedEventDetail(event) === "own goal";
+}
+
+function isMissedPenaltyEvent(event: FixtureEvent) {
+  return normalizedEventType(event) === "goal" && normalizedEventDetail(event) === "missed penalty";
+}
+
+function isYellowCardEvent(event: FixtureEvent) {
+  return normalizedEventType(event) === "card" && normalizedEventDetail(event) === "yellow card";
+}
+
+function isRedCardEvent(event: FixtureEvent) {
+  return normalizedEventType(event) === "card" && normalizedEventDetail(event) === "red card";
 }
 
 function isSubstitutionEvent(event: FixtureEvent) {
   const text = normalizedText(event.type, event.detail);
   return text.includes("subst") || text.includes("substitution");
+}
+
+function normalizedEventType(event: FixtureEvent) {
+  return event.type?.trim().toLowerCase() ?? "";
+}
+
+function normalizedEventDetail(event: FixtureEvent) {
+  return event.detail?.trim().toLowerCase() ?? "";
 }
 
 function normalizedText(...values: Array<string | null>) {
