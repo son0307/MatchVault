@@ -17,6 +17,7 @@ export type FixtureSummary = {
 export type FixtureMeta = {
   minDate: string | null;
   maxDate: string | null;
+  latestStartedDate: string | null;
   minRound: number | null;
   maxRound: number | null;
 };

@@ -1,7 +1,14 @@
 import { FormEvent, useEffect, useRef, useState } from "react";
 import { LoaderCircle } from "lucide-react";
 import { Navigate } from "react-router-dom";
-import { clearApiMemoryCache, fetchFixtures, fetchLeagueSeasons, type LeagueSeasonCoverage } from "../api";
+import {
+  clearApiMemoryCache,
+  fetchFixtures,
+  fetchLeagueSeasons,
+  fetchTeamPlayers,
+  type LeagueSeasonCoverage,
+  type PlayerSummary,
+} from "../api";
 import { type LeagueAuthState } from "../App";
 
 type AdminPageProps = {
@@ -187,7 +194,7 @@ const playerFields: FieldConfig[] = [
 ];
 
 const fixtureFields: FieldConfig[] = [
-  { name: "fixtureDate", label: "Fixture Date", kind: "datetime", help: "UTC 기준으로 입력해주세요." },
+  { name: "fixtureDate", label: "경기 일시", kind: "datetime", help: "한국 시간(KST) 기준으로 입력됩니다." },
   { name: "referee", label: "Referee" },
   { name: "venueId", label: "Venue ID", kind: "number" },
   { name: "venueName", label: "Venue Name" },
@@ -318,6 +325,9 @@ export function AdminPage({ authState }: AdminPageProps) {
   });
   const [playerKeyword, setPlayerKeyword] = useState("");
   const [players, setPlayers] = useState<PlayerAdmin[]>([]);
+  const [selectedPlayerTeamId, setSelectedPlayerTeamId] = useState<number | null>(null);
+  const [teamPlayers, setTeamPlayers] = useState<PlayerSummary[]>([]);
+  const [teamPlayerStatus, setTeamPlayerStatus] = useState<FixtureListStatus>("idle");
   const [playerSelection, setPlayerSelection] = useState<PlayerSelectionState>({
     playerId: null,
     status: "idle",
@@ -350,6 +360,7 @@ export function AdminPage({ authState }: AdminPageProps) {
   const [error, setError] = useState("");
   const teamRequestIdRef = useRef(0);
   const playerRequestIdRef = useRef(0);
+  const teamPlayerRequestIdRef = useRef(0);
   const fixtureTeamRequestIdRef = useRef(0);
   const fixtureListRequestIdRef = useRef(0);
   const fixtureRequestIdRef = useRef(0);
@@ -379,13 +390,12 @@ export function AdminPage({ authState }: AdminPageProps) {
 
   useEffect(() => {
     if (
-      activeTab === "fixture"
-      && authState.authStatus === "authenticated"
+      authState.authStatus === "authenticated"
       && authState.currentUser?.role === "ADMIN"
     ) {
       void loadFixtureTeams(authState.season);
     }
-  }, [activeTab, authState.authStatus, authState.currentUser?.role, authState.season]);
+  }, [authState.authStatus, authState.currentUser?.role, authState.season]);
 
   useEffect(() => {
     if (fixtureSelection.status !== "ready") {
@@ -470,7 +480,13 @@ export function AdminPage({ authState }: AdminPageProps) {
     fixtureTeamRequestIdRef.current = requestId;
     fixtureListRequestIdRef.current += 1;
     fixtureRequestIdRef.current += 1;
+    teamPlayerRequestIdRef.current += 1;
     setFixtureTeamStatus("loading");
+    setTeamSelection({ teamId: null, status: "idle", detail: null });
+    setSelectedPlayerTeamId(null);
+    setTeamPlayers([]);
+    setTeamPlayerStatus("idle");
+    setPlayerSelection({ playerId: null, status: "idle", detail: null });
     setSelectedFixtureTeamId(null);
     setFixtures([]);
     setFixtureListStatus("idle");
@@ -486,6 +502,33 @@ export function AdminPage({ authState }: AdminPageProps) {
         setFixtureTeams([]);
         setFixtureTeamStatus("error");
         setError(nextError instanceof Error ? nextError.message : "시즌 참가 팀을 불러오지 못했습니다.");
+      }
+    }
+  }
+
+  async function selectPlayerTeam(teamId: number) {
+    if (savingKey !== null) {
+      return;
+    }
+    const requestId = teamPlayerRequestIdRef.current + 1;
+    teamPlayerRequestIdRef.current = requestId;
+    playerRequestIdRef.current += 1;
+    setSelectedPlayerTeamId(teamId);
+    setTeamPlayers([]);
+    setTeamPlayerStatus("loading");
+    setPlayerSelection({ playerId: null, status: "idle", detail: null });
+    setError("");
+    setMessage("");
+    try {
+      const result = await fetchTeamPlayers(teamId, authState.season);
+      if (teamPlayerRequestIdRef.current === requestId) {
+        setTeamPlayers(result);
+        setTeamPlayerStatus("ready");
+      }
+    } catch (nextError) {
+      if (teamPlayerRequestIdRef.current === requestId) {
+        setTeamPlayerStatus("error");
+        setError(nextError instanceof Error ? nextError.message : "팀 선수 목록을 불러오지 못했습니다.");
       }
     }
   }
@@ -776,6 +819,25 @@ export function AdminPage({ authState }: AdminPageProps) {
 
       {activeTab === "team" ? (
         <EditorPanel title="Team Editor" eyebrow="Teams">
+          <label className="admin-fixture-team-select">
+            <span>{authState.season} 시즌 팀</span>
+            <select
+              value={teamSelection.teamId ?? ""}
+              onChange={(event) => {
+                const teamId = Number(event.currentTarget.value);
+                if (Number.isFinite(teamId) && teamId > 0) {
+                  void selectTeam(teamId);
+                }
+              }}
+              disabled={fixtureTeamStatus !== "ready" || savingKey !== null}
+            >
+              <option value="">{fixtureTeamStatus === "loading" ? "팀 목록 불러오는 중..." : "팀을 선택하세요"}</option>
+              {fixtureTeams.map((team) => (
+                <option key={team.teamId} value={team.teamId}>{team.name ?? `#${team.teamId}`}</option>
+              ))}
+            </select>
+          </label>
+          <p className="muted admin-sync-message">목록에 없는 팀은 아래 검색으로 찾을 수 있습니다.</p>
           <SearchRow value={teamKeyword} placeholder="Search team" onChange={setTeamKeyword} onSubmit={searchTeams} />
           <ResultList
             items={teams}
@@ -801,6 +863,39 @@ export function AdminPage({ authState }: AdminPageProps) {
 
       {activeTab === "player" ? (
         <EditorPanel title="Player Editor" eyebrow="Players">
+          <div className="admin-fixture-browser">
+            <label className="admin-fixture-team-select">
+              <span>{authState.season} 시즌 팀</span>
+              <select
+                value={selectedPlayerTeamId ?? ""}
+                onChange={(event) => {
+                  const teamId = Number(event.currentTarget.value);
+                  if (Number.isFinite(teamId) && teamId > 0) {
+                    void selectPlayerTeam(teamId);
+                  }
+                }}
+                disabled={fixtureTeamStatus !== "ready" || savingKey !== null}
+              >
+                <option value="">{fixtureTeamStatus === "loading" ? "팀 목록 불러오는 중..." : "팀을 선택하세요"}</option>
+                {fixtureTeams.map((team) => (
+                  <option key={team.teamId} value={team.teamId}>{team.name ?? `#${team.teamId}`}</option>
+                ))}
+              </select>
+            </label>
+            {teamPlayerStatus === "loading" ? <p className="muted admin-sync-message">선수 목록을 불러오는 중입니다.</p> : null}
+            {teamPlayerStatus === "error" ? <p className="muted admin-sync-message">선수 목록을 불러오지 못했습니다.</p> : null}
+            {teamPlayerStatus === "ready" && teamPlayers.length === 0 ? <p className="muted admin-sync-message">선택한 팀의 선수가 없습니다.</p> : null}
+            {teamPlayers.length > 0 ? (
+              <ResultList
+                items={teamPlayers}
+                getKey={(player) => player.playerId}
+                render={(player) => `${player.playerName ?? "-"} #${player.playerId}`}
+                onSelect={(player) => void selectPlayer(player.playerId)}
+                disabled={savingKey !== null}
+              />
+            ) : null}
+          </div>
+          <p className="muted admin-sync-message">현재 시즌 팀 목록에 없는 선수는 아래 검색으로 찾을 수 있습니다.</p>
           <SearchRow value={playerKeyword} placeholder="Search player" onChange={setPlayerKeyword} onSubmit={searchPlayers} />
           <ResultList
             items={players}
@@ -1576,6 +1671,9 @@ function coerceValue(value: unknown, kind: FieldKind = "text") {
   if (kind === "boolean") {
     return text === "true" ? true : text === "false" ? false : null;
   }
+  if (kind === "datetime") {
+    return `${text}:00+09:00`;
+  }
   return text;
 }
 
@@ -1731,6 +1829,7 @@ function formatFixtureDate(value: string | null) {
     return value;
   }
   return new Intl.DateTimeFormat("ko-KR", {
+    timeZone: "Asia/Seoul",
     month: "short",
     day: "numeric",
     weekday: "short",

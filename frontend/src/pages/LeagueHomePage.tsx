@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { CalendarDays, ChevronLeft, ChevronRight, Star, Trophy } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import type { AuthStatus } from "../App";
 import {
   ApiError,
@@ -16,7 +16,8 @@ import {
 import { formatFixtureDateKey, parseKoreaDateTime } from "../dateUtils";
 
 export function LeagueHomePage({ authStatus, season }: { authStatus: AuthStatus; season: number }) {
-  const [selectedDate, setSelectedDate] = useState(todayKoreaDateKey());
+  const [searchParams, setSearchParams] = useSearchParams();
+  const selectedDate = validDateKey(searchParams.get("date")) ?? todayKoreaDateKey();
   const [standings, setStandings] = useState<TeamStanding[]>([]);
   const [fixtures, setFixtures] = useState<FixtureSummary[]>([]);
   const [favorites, setFavorites] = useState<FavoriteDashboard | null>(null);
@@ -43,6 +44,16 @@ export function LeagueHomePage({ authStatus, season }: { authStatus: AuthStatus;
   useEffect(() => {
     void loadStandings();
   }, [season]);
+
+  useEffect(() => {
+    if (searchParams.get("date") !== selectedDate) {
+      setSearchParams((current) => {
+        const next = new URLSearchParams(current);
+        next.set("date", selectedDate);
+        return next;
+      }, { replace: true });
+    }
+  }, [searchParams, selectedDate, setSearchParams]);
 
   useEffect(() => {
     if (authStatus === "checking") {
@@ -143,7 +154,18 @@ export function LeagueHomePage({ authStatus, season }: { authStatus: AuthStatus;
   }
 
   function moveDate(dayDelta: number) {
-    setSelectedDate(addDaysToDateKey(selectedDate, dayDelta));
+    updateSelectedDate(addDaysToDateKey(selectedDate, dayDelta));
+  }
+
+  function updateSelectedDate(nextDate: string) {
+    if (!validDateKey(nextDate)) {
+      return;
+    }
+    setSearchParams((current) => {
+      const next = new URLSearchParams(current);
+      next.set("date", nextDate);
+      return next;
+    });
   }
 
   return (
@@ -156,13 +178,22 @@ export function LeagueHomePage({ authStatus, season }: { authStatus: AuthStatus;
                 <CalendarDays size={20} aria-hidden="true" />
                 <h2>경기 일정</h2>
               </div>
-              <p className="panel-subtitle">{dateGroupTitle(selectedDate)}</p>
+              <label className="home-date-picker">
+                <span>{dateGroupTitle(selectedDate)}</span>
+                <CalendarDays size={17} aria-hidden="true" />
+                <input
+                  aria-label="경기 날짜 선택"
+                  type="date"
+                  value={selectedDate}
+                  onChange={(event) => updateSelectedDate(event.currentTarget.value)}
+                />
+              </label>
             </div>
             <div className="date-controls" aria-label="경기 날짜 이동">
               <button type="button" onClick={() => moveDate(-1)} aria-label="이전 날짜" title="이전 날짜">
                 <ChevronLeft size={18} aria-hidden="true" />
               </button>
-              <button type="button" onClick={() => setSelectedDate(todayKoreaDateKey())}>
+              <button type="button" onClick={() => updateSelectedDate(todayKoreaDateKey())}>
                 오늘
               </button>
               <button type="button" onClick={() => moveDate(1)} aria-label="다음 날짜" title="다음 날짜">
@@ -418,6 +449,19 @@ function todayKoreaDateKey() {
     month: "2-digit",
     day: "2-digit",
   }).format(new Date());
+}
+
+function validDateKey(value: string | null) {
+  if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    return null;
+  }
+  const [year, month, day] = value.split("-").map(Number);
+  const date = new Date(Date.UTC(year, month - 1, day));
+  return date.getUTCFullYear() === year
+    && date.getUTCMonth() === month - 1
+    && date.getUTCDate() === day
+    ? value
+    : null;
 }
 
 function addDaysToDateKey(dateKey: string, dayDelta: number) {

@@ -47,6 +47,7 @@ import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.time.ZoneId;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -206,12 +207,18 @@ public class AdminService {
     public AdminDto.FixtureAdminDetailResponse updateFixture(Long adminUserId, Long fixtureId, AdminDto.FixtureUpdateRequest request) {
         Fixture fixture = findFixtureWithTeams(fixtureId);
         List<FieldChange> changes = changedFixtureFields(fixture, request);
+        LocalDateTime fixtureDateUtc = request.getFixtureDate() != null
+                ? LocalDateTime.ofInstant(request.getFixtureDate().toInstant(), ZoneOffset.UTC)
+                : fixture.getFixtureDate();
+        Long timestamp = request.getFixtureDate() != null
+                ? request.getFixtureDate().toInstant().getEpochSecond()
+                : fixture.getTimestamp();
 
         fixture.updateFixtureMetadata(
-                request.getFixtureDate() != null ? request.getFixtureDate() : fixture.getFixtureDate(),
+                fixtureDateUtc,
                 request.getReferee(),
                 fixture.getTimezone(),
-                fixture.getTimestamp(),
+                timestamp,
                 fixture.getFirstPeriod(),
                 fixture.getSecondPeriod(),
                 request.getVenueId(),
@@ -916,7 +923,10 @@ public class AdminService {
 
     private List<FieldChange> changedFixtureFields(Fixture fixture, AdminDto.FixtureUpdateRequest request) {
         List<FieldChange> changes = new ArrayList<>();
-        addIfChanged(changes, "fixtureDate", fixture.getFixtureDate(), request.getFixtureDate());
+        LocalDateTime requestedFixtureDateUtc = request.getFixtureDate() != null
+                ? LocalDateTime.ofInstant(request.getFixtureDate().toInstant(), ZoneOffset.UTC)
+                : null;
+        addIfChanged(changes, "fixtureDate", fixture.getFixtureDate(), requestedFixtureDateUtc);
         addIfChanged(changes, "referee", fixture.getReferee(), request.getReferee());
         addIfChanged(changes, "venueId", fixture.getVenueId(), request.getVenueId());
         addIfChanged(changes, "venueName", fixture.getVenueName(), request.getVenueName());
@@ -995,7 +1005,7 @@ public class AdminService {
     private AdminDto.FixtureAdminSummaryResponse toFixtureSummaryResponse(Fixture fixture) {
         return AdminDto.FixtureAdminSummaryResponse.builder()
                 .fixtureId(fixture.getFixtureId())
-                .fixtureDate(fixture.getFixtureDate())
+                .fixtureDate(utcToKoreaOffsetDateTime(fixture.getFixtureDate()))
                 .season(fixture.getSeason())
                 .round(fixture.getRound())
                 .homeTeamId(fixture.getHomeTeam().getTeamId())
@@ -1034,7 +1044,7 @@ public class AdminService {
     private AdminDto.FixtureAdminResponse toFixtureResponse(Fixture fixture) {
         return AdminDto.FixtureAdminResponse.builder()
                 .fixtureId(fixture.getFixtureId())
-                .fixtureDate(fixture.getFixtureDate())
+                .fixtureDate(utcToKoreaOffsetDateTime(fixture.getFixtureDate()))
                 .referee(fixture.getReferee())
                 .timezone(fixture.getTimezone())
                 .timestamp(fixture.getTimestamp())
@@ -1234,6 +1244,12 @@ public class AdminService {
 
     private OffsetDateTime toKoreaOffsetDateTime(LocalDateTime dateTime) {
         return dateTime.atZone(KOREA_ZONE).toOffsetDateTime();
+    }
+
+    private OffsetDateTime utcToKoreaOffsetDateTime(LocalDateTime dateTime) {
+        return dateTime == null
+                ? null
+                : dateTime.atOffset(ZoneOffset.UTC).atZoneSameInstant(KOREA_ZONE).toOffsetDateTime();
     }
 
     private record SyncStatusDefinition(String task, String label) {

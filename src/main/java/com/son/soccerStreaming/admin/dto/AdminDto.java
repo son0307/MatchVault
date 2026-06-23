@@ -53,7 +53,7 @@ public class AdminDto {
     @NoArgsConstructor
     @AllArgsConstructor
     public static class FixtureUpdateRequest {
-        private LocalDateTime fixtureDate;
+        private OffsetDateTime fixtureDate;
         private String referee;
         private String timezone;
         private Long timestamp;
@@ -226,7 +226,7 @@ public class AdminDto {
     @Builder
     public static class FixtureAdminSummaryResponse {
         private Long fixtureId;
-        private LocalDateTime fixtureDate;
+        private OffsetDateTime fixtureDate;
         private Integer season;
         private Integer round;
         private Long homeTeamId;
@@ -259,7 +259,7 @@ public class AdminDto {
     @Builder
     public static class FixtureAdminResponse {
         private Long fixtureId;
-        private LocalDateTime fixtureDate;
+        private OffsetDateTime fixtureDate;
         private String referee;
         private String timezone;
         private Long timestamp;

@@ -14,6 +14,13 @@ import com.son.soccerStreaming.admin.entity.AdminOverrideTargetType;
 import com.son.soccerStreaming.apifootball.repository.ApiFootballSyncStatusRepository;
 import com.son.soccerStreaming.auth.entity.AppUser;
 import com.son.soccerStreaming.global.exception.CustomException;
+import com.son.soccerStreaming.fixture.entity.Fixture;
+import com.son.soccerStreaming.fixture.repository.FixtureEventRepository;
+import com.son.soccerStreaming.fixture.repository.FixtureLineupRepository;
+import com.son.soccerStreaming.fixture.repository.FixtureRepository;
+import com.son.soccerStreaming.fixture.repository.FixtureStatRepository;
+import com.son.soccerStreaming.fixture.repository.PlayerFixtureStatRepository;
+import com.son.soccerStreaming.fixture.service.FixtureRedisService;
 import com.son.soccerStreaming.league.entity.LeagueSeasonCoverage;
 import com.son.soccerStreaming.league.repository.LeagueSeasonCoverageRepository;
 import com.son.soccerStreaming.player.entity.Player;
@@ -28,7 +35,10 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.test.util.ReflectionTestUtils;
 
+import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 import java.util.Optional;
 import java.util.List;
 
@@ -52,6 +62,18 @@ class AdminServiceTest {
     private AdminOverrideService adminOverrideService;
     @Mock
     private AdminAuditLogRepository adminAuditLogRepository;
+    @Mock
+    private FixtureRepository fixtureRepository;
+    @Mock
+    private FixtureEventRepository fixtureEventRepository;
+    @Mock
+    private FixtureLineupRepository fixtureLineupRepository;
+    @Mock
+    private FixtureStatRepository fixtureStatRepository;
+    @Mock
+    private PlayerFixtureStatRepository playerFixtureStatRepository;
+    @Mock
+    private FixtureRedisService fixtureRedisService;
     @Mock
     private LeagueSeasonCoverageRepository leagueSeasonCoverageRepository;
     @Mock
@@ -277,6 +299,37 @@ class AdminServiceTest {
     void clearOverrideRejectsUnknownFieldName() {
         assertThatThrownBy(() -> adminService.clearTeamOverride(1L, 47L, "unknown"))
                 .isInstanceOf(CustomException.class);
+    }
+
+    @Test
+    void updateFixtureConvertsKoreaTimeToUtcAndUpdatesTimestamp() {
+        AppUser admin = adminUser();
+        Team home = Team.builder().teamId(42L).name("Arsenal").build();
+        Team away = Team.builder().teamId(49L).name("Chelsea").build();
+        Fixture fixture = Fixture.builder()
+                .fixtureId(1000L)
+                .homeTeam(home)
+                .awayTeam(away)
+                .fixtureDate(LocalDateTime.of(2025, 8, 22, 14, 0))
+                .timestamp(1755871200L)
+                .build();
+        AdminDto.FixtureUpdateRequest request = new AdminDto.FixtureUpdateRequest();
+        OffsetDateTime koreaKickoff = OffsetDateTime.parse("2025-08-22T23:30:00+09:00");
+        ReflectionTestUtils.setField(request, "fixtureDate", koreaKickoff);
+
+        when(fixtureRepository.findWithTeamsByFixtureId(1000L)).thenReturn(Optional.of(fixture));
+        when(appUserRepository.findById(1L)).thenReturn(Optional.of(admin));
+        when(fixtureEventRepository.findAllByFixtureFixtureIdOrderByMatchTimeAsc(1000L)).thenReturn(List.of());
+        when(fixtureLineupRepository.findAllByFixtureId(1000L)).thenReturn(List.of());
+        when(fixtureStatRepository.findAllByFixtureFixtureId(1000L)).thenReturn(List.of());
+        when(playerFixtureStatRepository.findAllByFixtureFixtureId(1000L)).thenReturn(List.of());
+
+        AdminDto.FixtureAdminDetailResponse response = adminService.updateFixture(1L, 1000L, request);
+
+        assertThat(fixture.getFixtureDate()).isEqualTo(LocalDateTime.of(2025, 8, 22, 14, 30));
+        assertThat(fixture.getTimestamp()).isEqualTo(koreaKickoff.toInstant().getEpochSecond());
+        assertThat(response.getFixture().getFixtureDate()).isEqualTo(koreaKickoff);
+        verify(fixtureRedisService).evictFixtureCaches(1000L);
     }
 
     private AppUser adminUser() {

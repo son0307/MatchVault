@@ -74,6 +74,8 @@ public class FixtureService {
         return FixtureMetaResponseDto.builder()
                 .minDate(toKoreaDate(fixtureRepository.findMinFixtureDateBySeason(season).orElse(null)))
                 .maxDate(toKoreaDate(fixtureRepository.findMaxFixtureDateBySeason(season).orElse(null)))
+                .latestStartedDate(toKoreaDate(
+                        fixtureRepository.findLatestStartedFixtureDateBySeason(season).orElse(null)))
                 .minRound(fixtureRepository.findMinRoundBySeason(season).orElse(null))
                 .maxRound(fixtureRepository.findMaxRoundBySeason(season).orElse(null))
                 .build();

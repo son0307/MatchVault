@@ -161,4 +161,24 @@ class FixtureServiceTest {
         );
         assertThat(endCaptor.getValue()).isEqualTo(startCaptor.getValue().plusDays(7));
     }
+
+    @Test
+    void getFixtureMetaUsesLatestStartedFixtureDateAsDefaultDateSource() {
+        when(fixtureRepository.findMinFixtureDateBySeason(2022))
+                .thenReturn(Optional.of(LocalDateTime.of(2022, 8, 5, 19, 0)));
+        when(fixtureRepository.findMaxFixtureDateBySeason(2022))
+                .thenReturn(Optional.of(LocalDateTime.of(2023, 5, 28, 15, 30)));
+        when(fixtureRepository.findLatestStartedFixtureDateBySeason(2022))
+                .thenReturn(Optional.of(LocalDateTime.of(2023, 4, 30, 15, 30)));
+        when(fixtureRepository.findMinRoundBySeason(2022)).thenReturn(Optional.of(1));
+        when(fixtureRepository.findMaxRoundBySeason(2022)).thenReturn(Optional.of(38));
+
+        var response = fixtureService.getFixtureMeta(2022);
+
+        assertThat(response.getMinDate()).isEqualTo(LocalDate.of(2022, 8, 6));
+        assertThat(response.getMaxDate()).isEqualTo(LocalDate.of(2023, 5, 29));
+        assertThat(response.getLatestStartedDate()).isEqualTo(LocalDate.of(2023, 5, 1));
+        assertThat(response.getMinRound()).isEqualTo(1);
+        assertThat(response.getMaxRound()).isEqualTo(38);
+    }
 }

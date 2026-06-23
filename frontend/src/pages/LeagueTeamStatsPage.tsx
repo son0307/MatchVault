@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import {
   fetchLeagueTeamRankings,
   type LeagueTeamRankingRow,
@@ -78,7 +78,8 @@ const categories: RankingCategory[] = [
 ];
 
 export function LeagueTeamStatsPage({ season }: { season: number }) {
-  const [activeKey, setActiveKey] = useState<RankingKey>("goalsFor");
+  const [searchParams, setSearchParams] = useSearchParams();
+  const activeKey = rankingKey(searchParams.get("stat")) ?? "goalsFor";
   const [rankings, setRankings] = useState<LeagueTeamRankings | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState("");
@@ -118,6 +119,24 @@ export function LeagueTeamStatsPage({ season }: { season: number }) {
     void loadRankings(season);
   }, [season]);
 
+  useEffect(() => {
+    if (searchParams.get("stat") !== activeKey) {
+      setSearchParams((current) => {
+        const next = new URLSearchParams(current);
+        next.set("stat", activeKey);
+        return next;
+      }, { replace: true });
+    }
+  }, [activeKey, searchParams, setSearchParams]);
+
+  function selectRanking(nextKey: RankingKey) {
+    setSearchParams((current) => {
+      const next = new URLSearchParams(current);
+      next.set("stat", nextKey);
+      return next;
+    });
+  }
+
   return (
     <section className="league-content player-rankings-page">
       <div className="player-rankings-heading">
@@ -134,7 +153,7 @@ export function LeagueTeamStatsPage({ season }: { season: number }) {
             className={activeKey === item.key ? "active" : ""}
             key={item.key}
             type="button"
-            onClick={() => setActiveKey(item.key)}
+            onClick={() => selectRanking(item.key)}
           >
             {item.label}
           </button>
@@ -160,6 +179,10 @@ export function LeagueTeamStatsPage({ season }: { season: number }) {
       </article>
     </section>
   );
+}
+
+function rankingKey(value: string | null): RankingKey | null {
+  return categories.some((category) => category.key === value) ? value as RankingKey : null;
 }
 
 function RankingTable({

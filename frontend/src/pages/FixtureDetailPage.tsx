@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties, Dispatch, SetStateAction } from "react";
 import { Star } from "lucide-react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import type { AuthStatus } from "../App";
 import {
   addFavoritePlayer,
@@ -31,7 +31,7 @@ import {
   type FixtureTeamStat,
   type LeagueSeasonCoverage,
 } from "../api";
-import { formatFixtureDateTime } from "../dateUtils";
+import { parseKoreaDateTime } from "../dateUtils";
 
 type DetailTab = "events" | "lineups" | "stats";
 type LoadState<T> = {
@@ -67,8 +67,9 @@ const initialLoadState = <T,>(): LoadState<T> => ({
 export function FixtureDetailPage({ authStatus, season }: { authStatus: AuthStatus; season: number }) {
   const navigate = useNavigate();
   const { fixtureId } = useParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const numericFixtureId = Number(fixtureId);
-  const [activeTab, setActiveTab] = useState<DetailTab>("events");
+  const activeTab = detailTab(searchParams.get("tab")) ?? "events";
   const [fixtureState, setFixtureState] = useState<LoadState<FixtureSummary>>(initialLoadState);
   const [eventsState, setEventsState] = useState<LoadState<FixtureEventResponse>>(initialLoadState);
   const [lineupsState, setLineupsState] = useState<LoadState<FixtureLineupResponse>>(initialLoadState);
@@ -150,6 +151,16 @@ export function FixtureDetailPage({ authStatus, season }: { authStatus: AuthStat
       isCurrent = false;
     };
   }, [numericFixtureId]);
+
+  useEffect(() => {
+    if (searchParams.get("tab") !== activeTab) {
+      setSearchParams((current) => {
+        const next = new URLSearchParams(current);
+        next.set("tab", activeTab);
+        return next;
+      }, { replace: true });
+    }
+  }, [activeTab, searchParams, setSearchParams]);
 
   useEffect(() => {
     const fixture = fixtureState.data;
@@ -377,7 +388,13 @@ export function FixtureDetailPage({ authStatus, season }: { authStatus: AuthStat
           <button
             className={activeTab === tab.value ? "active" : ""}
             key={tab.value}
-            onClick={() => setActiveTab(tab.value)}
+            onClick={() => {
+              setSearchParams((current) => {
+                const next = new URLSearchParams(current);
+                next.set("tab", tab.value);
+                return next;
+              });
+            }}
             type="button"
           >
             {tab.label}
@@ -452,6 +469,7 @@ function FixtureDetailHero({
   homeTeamId: number | null;
   lineups: FixtureLineupResponse | null;
 }) {
+  const dateParts = fixtureDateParts(fixture.fixtureDate);
   const playerTeamIds = lineupPlayerTeamIds(lineups);
   const homeScorers = fixtureScorers(events, homeTeamId, fixture.homeTeamName, playerTeamIds);
   const awayScorers = fixtureScorers(events, awayTeamId, fixture.awayTeamName, playerTeamIds);
@@ -483,9 +501,10 @@ function FixtureDetailHero({
         ) : null} 
       </div>
       <div className="detail-scoreboard">
-        <p>
-          {formatDate(fixture.fixtureDate)}
-          {fixture.round ? ` · ${fixture.round}라운드` : ""}
+        <p className="fixture-detail-meta">
+          <span>{dateParts.date}</span>
+          {dateParts.time ? <span>{dateParts.time}</span> : null}
+          {fixture.round ? <span>{fixture.round}라운드</span> : null}
         </p>
         <strong>{scoreText(fixture)}</strong>
         <span className="status-pill">{fixture.fixtureStatus ?? "예정"}</span>
@@ -1790,8 +1809,29 @@ function scoreText(fixture: FixtureSummary) {
   return `${fixture.homeScore}:${fixture.awayScore}`;
 }
 
-function formatDate(value: string | null) {
-  return formatFixtureDateTime(value, "날짜 미정");
+function detailTab(value: string | null): DetailTab | null {
+  return value === "events" || value === "lineups" || value === "stats" ? value : null;
+}
+
+function fixtureDateParts(value: string | null) {
+  const date = parseKoreaDateTime(value);
+  if (!date) {
+    return { date: "날짜 미정", time: "" };
+  }
+  return {
+    date: new Intl.DateTimeFormat("ko-KR", {
+      timeZone: "Asia/Seoul",
+      month: "long",
+      day: "numeric",
+      weekday: "short",
+    }).format(date),
+    time: new Intl.DateTimeFormat("ko-KR", {
+      timeZone: "Asia/Seoul",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    }).format(date),
+  };
 }
 
 function formatStat(value: number, format?: "percent" | "decimal") {

@@ -49,6 +49,10 @@ public interface FixtureRepository extends JpaRepository<Fixture, Long>, Fixture
     @Query("SELECT MAX(f.fixtureDate) FROM Fixture f WHERE f.season = :season")
     Optional<LocalDateTime> findMaxFixtureDateBySeason(@Param("season") Integer season);
 
+    @Query("SELECT MAX(f.fixtureDate) FROM Fixture f " +
+            "WHERE f.season = :season AND f.fixtureStatus IN ('LIVE', 'FINISHED')")
+    Optional<LocalDateTime> findLatestStartedFixtureDateBySeason(@Param("season") Integer season);
+
     @Query("SELECT MIN(f.round) FROM Fixture f WHERE f.season = :season AND f.round IS NOT NULL")
     Optional<Integer> findMinRoundBySeason(@Param("season") Integer season);
 

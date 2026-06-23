@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ChevronDown, ChevronLeft, ChevronRight } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import {
   fetchFixtureMeta,
   fetchFixtures,
@@ -29,15 +29,24 @@ const fixtureModes: Array<{ label: string; value: FixtureMode }> = [
 ];
 
 export function LeagueFixturesPage({ season }: { season: number }) {
-  const [mode, setMode] = useState<FixtureMode>("date");
+  const [searchParams, setSearchParams] = useSearchParams();
+  const mode = fixtureMode(searchParams.get("mode")) ?? "date";
+  const urlSeason = positiveInteger(searchParams.get("season"));
+  const isSeasonUrlCurrent = urlSeason === season;
   const [meta, setMeta] = useState<FixtureMeta | null>(null);
-  const [weekStart, setWeekStart] = useState(startOfKoreaWeek(todayKoreaDateKey()));
-  const [round, setRound] = useState(1);
+  const [metaSeason, setMetaSeason] = useState<number | null>(null);
+  const activeMeta = metaSeason === season ? meta : null;
+  const requestedWeek = isSeasonUrlCurrent ? validDateKey(searchParams.get("week")) : null;
+  const weekStart = activeMeta
+    ? clampWeekStart(requestedWeek ?? defaultWeekStart(activeMeta), activeMeta)
+    : requestedWeek ?? startOfKoreaWeek(todayKoreaDateKey());
+  const isDateWeekReady = isSeasonUrlCurrent && (requestedWeek !== null || activeMeta !== null);
+  const round = positiveInteger(searchParams.get("round")) ?? 1;
   const [isRoundMenuOpen, setIsRoundMenuOpen] = useState(false);
   const [teams, setTeams] = useState<FixtureTeamOption[]>([]);
-  const [selectedTeamId, setSelectedTeamId] = useState<number | null>(null);
+  const selectedTeamId = positiveInteger(searchParams.get("teamId"));
   const [fixtures, setFixtures] = useState<FixtureSummary[]>([]);
-  const [teamPage, setTeamPage] = useState(0);
+  const teamPage = Math.max(0, (positiveInteger(searchParams.get("page")) ?? 1) - 1);
   const [isLoading, setIsLoading] = useState(true);
   const [isLoadingTeams, setIsLoadingTeams] = useState(true);
   const [errorMessage, setErrorMessage] = useState("");
@@ -47,10 +56,10 @@ export function LeagueFixturesPage({ season }: { season: number }) {
   const teamRequestId = useRef(0);
 
   const minRound = 1;
-  const maxRound = meta?.maxRound ?? 38;
+  const maxRound = activeMeta?.maxRound ?? 38;
   const weekEnd = addDaysToDateKey(weekStart, 6);
-  const canMovePreviousWeek = !meta?.minDate || weekStart > startOfKoreaWeek(meta.minDate);
-  const canMoveNextWeek = !meta?.maxDate || weekStart < startOfKoreaWeek(meta.maxDate);
+  const canMovePreviousWeek = !activeMeta?.minDate || weekStart > startOfKoreaWeek(activeMeta.minDate);
+  const canMoveNextWeek = !activeMeta?.maxDate || weekStart < startOfKoreaWeek(activeMeta.maxDate);
   const selectedTeam = teams.find((team) => team.teamId === selectedTeamId) ?? null;
   const orderedFixtures = useMemo(
     () => (mode === "team" ? sortTeamFixtures(fixtures) : fixtures),
@@ -70,18 +79,77 @@ export function LeagueFixturesPage({ season }: { season: number }) {
   );
 
   useEffect(() => {
+    setMeta(null);
+    setMetaSeason(null);
     void loadFixtureMeta();
     void loadTeamOptions();
   }, [season]);
 
   useEffect(() => {
+    setSearchParams((current) => {
+      const next = new URLSearchParams(current);
+      let changed = false;
+      if (next.get("season") !== String(season)) {
+        next.set("season", String(season));
+        if (mode === "date") {
+          next.delete("week");
+        }
+        changed = true;
+        return next;
+      }
+      if (next.get("mode") !== mode) {
+        next.set("mode", mode);
+        changed = true;
+      }
+      if (mode === "date" && isDateWeekReady && next.get("week") !== weekStart) {
+        next.set("week", weekStart);
+        changed = true;
+      }
+      if (mode === "date") {
+        changed = deleteParams(next, ["round", "teamId", "page"]) || changed;
+      }
+      if (mode === "round" && next.get("round") !== String(Math.min(round, maxRound))) {
+        next.set("round", String(Math.min(round, maxRound)));
+        changed = true;
+      }
+      if (mode === "round") {
+        changed = deleteParams(next, ["week", "teamId", "page"]) || changed;
+      }
+      if (mode === "team" && teams.length && !teams.some((team) => team.teamId === selectedTeamId)) {
+        next.set("teamId", String(teams[0].teamId));
+        next.set("page", "1");
+        changed = true;
+      }
+      if (mode === "team" && next.get("page") !== String(teamPage + 1)) {
+        next.set("page", String(teamPage + 1));
+        changed = true;
+      }
+      if (mode === "team") {
+        changed = deleteParams(next, ["week", "round"]) || changed;
+      }
+      return changed ? next : current;
+    }, { replace: true });
+  }, [isDateWeekReady, maxRound, mode, round, searchParams, season, selectedTeamId, setSearchParams, teamPage, teams, weekStart]);
+
+  useEffect(() => {
+    if (mode === "date" && !isDateWeekReady) {
+      setFixtures([]);
+      setIsLoading(true);
+      return;
+    }
     if (mode === "team" && !selectedTeamId) {
       setFixtures([]);
       setIsLoading(false);
       return;
     }
     void loadFixtures();
-  }, [mode, weekStart, weekEnd, round, selectedTeamId, season]);
+  }, [isDateWeekReady, mode, weekStart, weekEnd, round, selectedTeamId, season]);
+
+  useEffect(() => {
+    if (mode === "team" && !isLoading && teamPage >= totalTeamPages) {
+      updateQuery({ page: totalTeamPages }, true);
+    }
+  }, [isLoading, mode, teamPage, totalTeamPages]);
 
   async function loadFixtureMeta() {
     const requestId = metaRequestId.current + 1;
@@ -92,14 +160,7 @@ export function LeagueFixturesPage({ season }: { season: number }) {
         return;
       }
       setMeta(fixtureMeta);
-      setRound(1);
-
-      if (fixtureMeta.minDate && weekStart < startOfKoreaWeek(fixtureMeta.minDate)) {
-        setWeekStart(startOfKoreaWeek(fixtureMeta.minDate));
-      }
-      if (fixtureMeta.maxDate && weekStart > startOfKoreaWeek(fixtureMeta.maxDate)) {
-        setWeekStart(startOfKoreaWeek(fixtureMeta.maxDate));
-      }
+      setMetaSeason(season);
     } catch (error) {
       if (requestId !== metaRequestId.current) {
         return;
@@ -120,13 +181,11 @@ export function LeagueFixturesPage({ season }: { season: number }) {
       }
       const teamOptions = standingsToTeamOptions(standings);
       setTeams(teamOptions);
-      setSelectedTeamId((current) => current ?? teamOptions[0]?.teamId ?? null);
     } catch (error) {
       if (requestId !== teamRequestId.current) {
         return;
       }
       setTeams([]);
-      setSelectedTeamId(null);
       setTeamErrorMessage(error instanceof Error ? error.message : "팀 목록을 불러오지 못했습니다.");
     } finally {
       if (requestId === teamRequestId.current) {
@@ -153,7 +212,6 @@ export function LeagueFixturesPage({ season }: { season: number }) {
         return;
       }
       setFixtures(response.content ?? []);
-      setTeamPage(0);
     } catch (error) {
       if (requestId !== fixtureRequestId.current) {
         return;
@@ -167,17 +225,33 @@ export function LeagueFixturesPage({ season }: { season: number }) {
   }
 
   function moveWeek(dayDelta: number) {
-    setWeekStart((current) => addDaysToDateKey(current, dayDelta));
+    updateQuery({ week: addDaysToDateKey(weekStart, dayDelta) });
   }
 
   function selectRound(nextRound: number) {
-    setRound(nextRound);
+    updateQuery({ round: nextRound });
     setIsRoundMenuOpen(false);
   }
 
   function selectTeam(teamId: number) {
-    setSelectedTeamId(teamId);
-    setTeamPage(0);
+    updateQuery({ teamId, page: 1 });
+  }
+
+  function selectMode(nextMode: FixtureMode) {
+    updateQuery({ mode: nextMode });
+  }
+
+  function selectTeamPage(nextPage: number) {
+    updateQuery({ page: nextPage + 1 });
+  }
+
+  function updateQuery(values: Record<string, string | number>, replace = false) {
+    setSearchParams((current) => {
+      const next = new URLSearchParams(current);
+      next.set("season", String(season));
+      Object.entries(values).forEach(([key, value]) => next.set(key, String(value)));
+      return next;
+    }, { replace });
   }
 
   return (
@@ -189,7 +263,7 @@ export function LeagueFixturesPage({ season }: { season: number }) {
               className={mode === item.value ? "active" : ""}
               key={item.value}
               type="button"
-              onClick={() => setMode(item.value)}
+              onClick={() => selectMode(item.value)}
             >
               {item.label}
             </button>
@@ -210,7 +284,7 @@ export function LeagueFixturesPage({ season }: { season: number }) {
 
         {mode === "round" ? (
           <div className="fixture-control-group round-control">
-            <button type="button" onClick={() => setRound((value) => Math.max(minRound, value - 1))} disabled={round <= minRound} aria-label="이전 라운드">
+            <button type="button" onClick={() => selectRound(Math.max(minRound, round - 1))} disabled={round <= minRound} aria-label="이전 라운드">
               <ChevronLeft size={18} aria-hidden="true" />
             </button>
             <div className="round-menu-wrap">
@@ -233,7 +307,7 @@ export function LeagueFixturesPage({ season }: { season: number }) {
                 </div>
               ) : null}
             </div>
-            <button type="button" onClick={() => setRound((value) => Math.min(maxRound, value + 1))} disabled={round >= maxRound} aria-label="다음 라운드">
+            <button type="button" onClick={() => selectRound(Math.min(maxRound, round + 1))} disabled={round >= maxRound} aria-label="다음 라운드">
               <ChevronRight size={18} aria-hidden="true" />
             </button>
           </div>
@@ -285,12 +359,12 @@ export function LeagueFixturesPage({ season }: { season: number }) {
 
       {mode === "team" && fixtures.length > TEAM_PAGE_SIZE ? (
         <div className="team-pager">
-          <button type="button" onClick={() => setTeamPage((page) => Math.max(0, page - 1))} disabled={teamPage === 0}>
+          <button type="button" onClick={() => selectTeamPage(Math.max(0, teamPage - 1))} disabled={teamPage === 0}>
             <ChevronLeft size={18} aria-hidden="true" />
             이전
           </button>
           <strong>{teamPage + 1} / {totalTeamPages}</strong>
-          <button type="button" onClick={() => setTeamPage((page) => Math.min(totalTeamPages - 1, page + 1))} disabled={teamPage >= totalTeamPages - 1}>
+          <button type="button" onClick={() => selectTeamPage(Math.min(totalTeamPages - 1, teamPage + 1))} disabled={teamPage >= totalTeamPages - 1}>
             다음
             <ChevronRight size={18} aria-hidden="true" />
           </button>
@@ -463,6 +537,59 @@ function todayKoreaDateKey() {
     month: "2-digit",
     day: "2-digit",
   }).format(new Date());
+}
+
+function fixtureMode(value: string | null): FixtureMode | null {
+  return value === "date" || value === "round" || value === "team" ? value : null;
+}
+
+function positiveInteger(value: string | null) {
+  if (!value || !/^\d+$/.test(value)) {
+    return null;
+  }
+  const number = Number(value);
+  return Number.isSafeInteger(number) && number > 0 ? number : null;
+}
+
+function validDateKey(value: string | null) {
+  if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    return null;
+  }
+  const [year, month, day] = value.split("-").map(Number);
+  const date = new Date(Date.UTC(year, month - 1, day));
+  return date.getUTCFullYear() === year
+    && date.getUTCMonth() === month - 1
+    && date.getUTCDate() === day
+    ? value
+    : null;
+}
+
+function clampWeekStart(weekStart: string, meta: FixtureMeta) {
+  const minWeek = meta.minDate ? startOfKoreaWeek(meta.minDate) : null;
+  const maxWeek = meta.maxDate ? startOfKoreaWeek(meta.maxDate) : null;
+  if (minWeek && weekStart < minWeek) {
+    return minWeek;
+  }
+  if (maxWeek && weekStart > maxWeek) {
+    return maxWeek;
+  }
+  return weekStart;
+}
+
+function defaultWeekStart(meta: FixtureMeta) {
+  const defaultDate = meta.latestStartedDate ?? meta.minDate ?? todayKoreaDateKey();
+  return startOfKoreaWeek(defaultDate);
+}
+
+function deleteParams(params: URLSearchParams, keys: string[]) {
+  let changed = false;
+  keys.forEach((key) => {
+    if (params.has(key)) {
+      params.delete(key);
+      changed = true;
+    }
+  });
+  return changed;
 }
 
 function startOfKoreaWeek(dateKeyValue: string) {

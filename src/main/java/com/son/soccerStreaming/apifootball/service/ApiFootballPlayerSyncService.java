@@ -23,6 +23,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
+import org.springframework.web.util.HtmlUtils;
 
 import java.time.LocalDate;
 import java.time.format.DateTimeParseException;
@@ -292,9 +293,9 @@ public class ApiFootballPlayerSyncService {
                 PROFILE_OVERRIDE_FIELDS
         );
         player.updateProfile(
-                adminOverrideService.apiValueUnlessOverridden(overrides, "name", player.getName(), nameOrFallback(playerInfo.getName(), player.getName())),
-                adminOverrideService.apiValueUnlessOverridden(overrides, "firstname", player.getFirstname(), playerInfo.getFirstname()),
-                adminOverrideService.apiValueUnlessOverridden(overrides, "lastname", player.getLastname(), playerInfo.getLastname()),
+                adminOverrideService.apiValueUnlessOverridden(overrides, "name", player.getName(), nameOrFallback(normalizeName(playerInfo.getName()), player.getName())),
+                adminOverrideService.apiValueUnlessOverridden(overrides, "firstname", player.getFirstname(), normalizeName(playerInfo.getFirstname())),
+                adminOverrideService.apiValueUnlessOverridden(overrides, "lastname", player.getLastname(), normalizeName(playerInfo.getLastname())),
                 adminOverrideService.apiValueUnlessOverridden(overrides, "age", player.getAge(), playerInfo.getAge()),
                 adminOverrideService.apiValueUnlessOverridden(overrides, "birthDate", player.getBirthDate(), birth != null ? parseBirthDate(birth.getDate()) : null),
                 adminOverrideService.apiValueUnlessOverridden(overrides, "birthPlace", player.getBirthPlace(), birth != null ? birth.getPlace() : null),
@@ -332,7 +333,7 @@ public class ApiFootballPlayerSyncService {
     private Player saveMinimalPlayer(Long playerId, String name, Integer number, String position, String photoUrl) {
         Player player = Player.builder()
                 .playerId(playerId)
-                .name(name)
+                .name(normalizeName(name))
                 .number(number)
                 .position(position)
                 .photoUrl(photoUrl)
@@ -347,11 +348,20 @@ public class ApiFootballPlayerSyncService {
     }
 
     private String nameOrFallback(String name, Long playerId) {
-        return name != null && !name.isBlank() ? name : "Player " + playerId;
+        String normalizedName = normalizeName(name);
+        return normalizedName != null && !normalizedName.isBlank() ? normalizedName : "Player " + playerId;
     }
 
     private String nameOrFallback(String name, String fallback) {
         return name != null && !name.isBlank() ? name : fallback;
+    }
+
+    private String normalizeName(String value) {
+        if (value == null) {
+            return null;
+        }
+        // Spring HtmlUtils follows the HTML 4 entity set, which does not include &apos;.
+        return HtmlUtils.htmlUnescape(value.replace("&apos;", "'"));
     }
 
     private LocalDate parseBirthDate(String date) {

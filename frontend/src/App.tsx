@@ -1,6 +1,17 @@
 import { Children, useEffect, useRef, useState, type ReactNode } from "react";
 import { Search, X } from "lucide-react";
-import { BrowserRouter, Navigate, NavLink, Route, Routes, useNavigate } from "react-router-dom";
+import {
+  BrowserRouter,
+  Navigate,
+  NavLink,
+  Outlet,
+  Route,
+  Routes,
+  useLocation,
+  useNavigate,
+  useOutletContext,
+  useSearchParams,
+} from "react-router-dom";
 import {
   ApiError,
   fetchCurrentUser,
@@ -39,10 +50,6 @@ export type LeagueAuthState = {
   setAuthStatus: (status: AuthStatus) => void;
 };
 
-type LeagueLayoutProps = {
-  children: ReactNode | ((state: LeagueAuthState) => ReactNode);
-};
-
 const DEFAULT_SEASON = 2025;
 
 const leagueTabs = [
@@ -60,73 +67,72 @@ export function App() {
         <Route path="/" element={<Navigate to="/league/overview" replace />} />
         <Route path="/login" element={<AuthPage mode="login" />} />
         <Route path="/signup" element={<AuthPage mode="signup" />} />
-        <Route path="/league" element={<Navigate to="/league/overview" replace />} />
-        <Route
-          path="/league/overview"
-          element={
-            <LeagueLayout>
-              {(authState) => <LeagueHomePage authStatus={authState.authStatus} season={authState.season} />}
-            </LeagueLayout>
-          }
-        />
-        <Route
-          path="/league/standings"
-          element={
-            <LeagueLayout>{(authState) => <LeagueStandingsPage season={authState.season} />}</LeagueLayout>
-          }
-        />
-        <Route
-          path="/league/fixtures"
-          element={<LeagueLayout>{(authState) => <LeagueFixturesPage season={authState.season} />}</LeagueLayout>}
-        />
-        <Route
-          path="/league/player-stats"
-          element={<LeagueLayout>{(authState) => <LeaguePlayerStatsPage season={authState.season} />}</LeagueLayout>}
-        />
-        <Route
-          path="/league/team-stats"
-          element={<LeagueLayout>{(authState) => <LeagueTeamStatsPage season={authState.season} />}</LeagueLayout>}
-        />
-        <Route
-          path="/fixtures/:fixtureId"
-          element={
-            <LeagueLayout>
-              {(authState) => <FixtureDetailPage authStatus={authState.authStatus} season={authState.season} />}
-            </LeagueLayout>
-          }
-        />
-        <Route
-          path="/mypage"
-          element={
-            <LeagueLayout>{(authState) => <MyPage authState={authState} season={authState.season} />}</LeagueLayout>
-          }
-        />
-        <Route
-          path="/admin"
-          element={
-            <LeagueLayout>{(authState) => <AdminPage authState={authState} />}</LeagueLayout>
-          }
-        />
-        <Route
-          path="/players/:playerId"
-          element={
-            <LeagueLayout>
-              {(authState) => <PlayerDetailPage authStatus={authState.authStatus} season={authState.season} />}
-            </LeagueLayout>
-          }
-        />
-        <Route
-          path="/teams/:teamId"
-          element={
-            <LeagueLayout>
-              {(authState) => <TeamDetailPage authStatus={authState.authStatus} season={authState.season} />}
-            </LeagueLayout>
-          }
-        />
-        <Route path="/league/*" element={<Navigate to="/league/overview" replace />} />
+        <Route element={<LeagueLayout />}>
+          <Route path="/league" element={<Navigate to="/league/overview" replace />} />
+          <Route path="/league/overview" element={<LeagueHomeRoute />} />
+          <Route path="/league/standings" element={<LeagueStandingsRoute />} />
+          <Route path="/league/fixtures" element={<LeagueFixturesRoute />} />
+          <Route path="/league/player-stats" element={<LeaguePlayerStatsRoute />} />
+          <Route path="/league/team-stats" element={<LeagueTeamStatsRoute />} />
+          <Route path="/fixtures/:fixtureId" element={<FixtureDetailRoute />} />
+          <Route path="/mypage" element={<MyPageRoute />} />
+          <Route path="/admin" element={<AdminRoute />} />
+          <Route path="/players/:playerId" element={<PlayerDetailRoute />} />
+          <Route path="/teams/:teamId" element={<TeamDetailRoute />} />
+          <Route path="/league/*" element={<Navigate to="/league/overview" replace />} />
+        </Route>
       </Routes>
     </BrowserRouter>
   );
+}
+
+function useLeagueAuthState() {
+  return useOutletContext<LeagueAuthState>();
+}
+
+function LeagueHomeRoute() {
+  const authState = useLeagueAuthState();
+  return <LeagueHomePage authStatus={authState.authStatus} season={authState.season} />;
+}
+
+function LeagueStandingsRoute() {
+  return <LeagueStandingsPage season={useLeagueAuthState().season} />;
+}
+
+function LeagueFixturesRoute() {
+  return <LeagueFixturesPage season={useLeagueAuthState().season} />;
+}
+
+function LeaguePlayerStatsRoute() {
+  return <LeaguePlayerStatsPage season={useLeagueAuthState().season} />;
+}
+
+function LeagueTeamStatsRoute() {
+  return <LeagueTeamStatsPage season={useLeagueAuthState().season} />;
+}
+
+function FixtureDetailRoute() {
+  const authState = useLeagueAuthState();
+  return <FixtureDetailPage authStatus={authState.authStatus} season={authState.season} />;
+}
+
+function MyPageRoute() {
+  const authState = useLeagueAuthState();
+  return <MyPage authState={authState} season={authState.season} />;
+}
+
+function AdminRoute() {
+  return <AdminPage authState={useLeagueAuthState()} />;
+}
+
+function PlayerDetailRoute() {
+  const authState = useLeagueAuthState();
+  return <PlayerDetailPage authStatus={authState.authStatus} season={authState.season} />;
+}
+
+function TeamDetailRoute() {
+  const authState = useLeagueAuthState();
+  return <TeamDetailPage authStatus={authState.authStatus} season={authState.season} />;
 }
 
 const searchTabs: { label: string; value: SearchScope }[] = [
@@ -377,10 +383,13 @@ function scoreText(homeScore: number | null, awayScore: number | null) {
   return `${homeScore}:${awayScore}`;
 }
 
-function LeagueLayout({ children }: LeagueLayoutProps) {
+function LeagueLayout() {
+  const location = useLocation();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
   const [authStatus, setAuthStatus] = useState<AuthStatus>("checking");
-  const [season, setSeason] = useState(DEFAULT_SEASON);
+  const requestedSeason = parseSeason(searchParams.get("season"));
+  const [season, setSeason] = useState(requestedSeason ?? DEFAULT_SEASON);
   const [authError, setAuthError] = useState("");
   const [seasonOptions, setSeasonOptions] = useState<LeagueSeasonCoverage[]>([]);
   const [seasonError, setSeasonError] = useState("");
@@ -391,6 +400,22 @@ function LeagueLayout({ children }: LeagueLayoutProps) {
     void loadCurrentUser();
     void loadLeagueSeasons();
   }, []);
+
+  useEffect(() => {
+    if (requestedSeason && seasonOptions.some((option) => option.seasonYear === requestedSeason)) {
+      setSeason(requestedSeason);
+    }
+  }, [requestedSeason, seasonOptions]);
+
+  useEffect(() => {
+    if (seasonOptions.length && !seasonOptions.some((option) => option.seasonYear === requestedSeason)) {
+      setSearchParams((current) => {
+        const next = new URLSearchParams(current);
+        next.set("season", String(season));
+        return next;
+      }, { replace: true });
+    }
+  }, [requestedSeason, season, seasonOptions, setSearchParams]);
 
   async function loadCurrentUser() {
     try {
@@ -414,10 +439,20 @@ function LeagueLayout({ children }: LeagueLayoutProps) {
     setSeasonError("");
     try {
       const response = await fetchLeagueSeasons();
-      setSeasonOptions(response.seasons ?? []);
-      if (Number.isInteger(response.currentSeason)) {
-        setSeason(response.currentSeason);
-      }
+      const options = response.seasons ?? [];
+      const optionYears = new Set(options.map((option) => option.seasonYear));
+      const nextSeason = requestedSeason && optionYears.has(requestedSeason)
+        ? requestedSeason
+        : Number.isInteger(response.currentSeason)
+          ? response.currentSeason
+          : DEFAULT_SEASON;
+      setSeasonOptions(options);
+      setSeason(nextSeason);
+      setSearchParams((current) => {
+        const next = new URLSearchParams(current);
+        next.set("season", String(nextSeason));
+        return next;
+      }, { replace: true });
     } catch (error) {
       setSeasonOptions([]);
       setSeasonError(error instanceof Error ? error.message : "시즌 정보를 불러오지 못했습니다.");
@@ -475,6 +510,14 @@ function LeagueLayout({ children }: LeagueLayoutProps) {
     const nextSeason = Number(value);
     if (Number.isInteger(nextSeason)) {
       setSeason(nextSeason);
+      setSearchParams((current) => {
+        const next = new URLSearchParams(current);
+        next.set("season", String(nextSeason));
+        if (location.pathname === "/league/fixtures" && (next.get("mode") ?? "date") === "date") {
+          next.delete("week");
+        }
+        return next;
+      });
     }
   }
 
@@ -520,7 +563,7 @@ function LeagueLayout({ children }: LeagueLayoutProps) {
             <NavLink
               className={({ isActive }) => `league-tab${isActive ? " active" : ""}`}
               key={tab.to}
-              to={tab.to}
+              to={`${tab.to}?season=${season}`}
             >
               {tab.label}
             </NavLink>
@@ -532,7 +575,15 @@ function LeagueLayout({ children }: LeagueLayoutProps) {
         )}
       </nav>
 
-      {typeof children === "function" ? children(authState) : children}
+      <Outlet context={authState} />
     </main>
   );
+}
+
+function parseSeason(value: string | null) {
+  if (!value || !/^\d{4}$/.test(value)) {
+    return null;
+  }
+  const season = Number(value);
+  return Number.isInteger(season) ? season : null;
 }

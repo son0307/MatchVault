@@ -10,6 +10,7 @@ import java.time.LocalDate;
 public class FixtureMetaResponseDto {
     private LocalDate minDate;
     private LocalDate maxDate;
+    private LocalDate latestStartedDate;
     private Integer minRound;
     private Integer maxRound;
 }

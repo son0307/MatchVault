@@ -80,6 +80,34 @@ class ApiFootballPlayerSyncProfileOnlyTest {
         verify(playerTeamSeasonStatRepository, never()).save(any());
     }
 
+    @Test
+    void decodesHtmlEntitiesBeforeSavingPlayerNames() {
+        Team chelsea = Team.builder().teamId(49L).name("Chelsea").build();
+        ApiFootballPlayerDto.RegisteredPlayerResponse response =
+                mock(ApiFootballPlayerDto.RegisteredPlayerResponse.class);
+        ApiFootballPlayerDto.ProfilePlayer profile = mock(ApiFootballPlayerDto.ProfilePlayer.class);
+
+        when(response.getPlayer()).thenReturn(profile);
+        when(response.getStatistics()).thenReturn(List.of());
+        when(profile.getId()).thenReturn(100L);
+        when(profile.getName()).thenReturn("O&apos;Name");
+        when(profile.getFirstname()).thenReturn("O&#39;Name");
+        when(profile.getLastname()).thenReturn("A&amp;B");
+        when(playerRepository.findByPlayerId(100L)).thenReturn(Optional.empty());
+        when(adminOverrideService.overriddenFields(any(), any(), any())).thenReturn(Set.of());
+        when(adminOverrideService.apiValueUnlessOverridden(anySet(), anyString(), any(), any()))
+                .thenAnswer(invocation -> invocation.getArgument(3));
+        when(playerRepository.save(any(Player.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        service.upsertRegisteredPlayer(response, chelsea, 39, 2025);
+
+        ArgumentCaptor<Player> playerCaptor = ArgumentCaptor.forClass(Player.class);
+        verify(playerRepository).save(playerCaptor.capture());
+        assertThat(playerCaptor.getValue().getName()).isEqualTo("O'Name");
+        assertThat(playerCaptor.getValue().getFirstname()).isEqualTo("O'Name");
+        assertThat(playerCaptor.getValue().getLastname()).isEqualTo("A&B");
+    }
+
     private ApiFootballPlayerDto.PlayerStatistics playerStat(
             Long teamId,
             Long leagueId,
