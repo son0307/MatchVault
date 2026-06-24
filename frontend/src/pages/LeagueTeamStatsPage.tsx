@@ -5,6 +5,7 @@ import {
   type LeagueTeamRankingRow,
   type LeagueTeamRankings,
 } from "../api";
+import { RankingInfoButton } from "../components/RankingInfoButton";
 
 type RankingKey = keyof Pick<
   LeagueTeamRankings,
@@ -142,8 +143,10 @@ export function LeagueTeamStatsPage({ season }: { season: number }) {
       <div className="player-rankings-heading">
         <div>
           <p className="eyebrow">{season} 시즌</p>
-          <h2>팀 통계 순위</h2>
-          <p>{category.description}</p>
+          <div className="ranking-title-row">
+            <h2>팀 통계 순위</h2>
+            <RankingInfoButton description={category.description} />
+          </div>
         </div>
       </div>
 

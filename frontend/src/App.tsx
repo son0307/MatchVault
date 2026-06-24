@@ -112,8 +112,7 @@ function LeagueTeamStatsRoute() {
 }
 
 function FixtureDetailRoute() {
-  const authState = useLeagueAuthState();
-  return <FixtureDetailPage authStatus={authState.authStatus} season={authState.season} />;
+  return <FixtureDetailPage />;
 }
 
 function MyPageRoute() {
@@ -522,16 +521,27 @@ function LeagueLayout() {
   }
 
   const authState: LeagueAuthState = { authStatus, currentUser, season, setSeason, setCurrentUser, setAuthStatus };
+  const showSeasonSelector = !/^\/fixtures\/[^/]+\/?$/.test(location.pathname);
 
   return (
     <main className="app-shell league-shell">
       <header className="league-hero">
-        <div>
+        <NavLink className="app-brand" to={`/league/overview?season=${season}`}>
+          <img src="/favicon.png" alt="" />
+          <strong>MatchVault</strong>
+        </NavLink>
+        <div className="league-header-actions">
+          <GlobalSearch />
+          {renderAuthAction()}
+        </div>
+      </header>
+
+      <div className="league-context-toolbar">
+        <div className="league-brand">
           <p className="eyebrow">England</p>
           <h1>Premier League</h1>
         </div>
-        <div className="league-header-actions">
-          <GlobalSearch />
+        {showSeasonSelector ? (
           <label className="season-field compact league-season-field">
             <span>현재 시즌</span>
             <select
@@ -550,9 +560,8 @@ function LeagueLayout() {
               )}
             </select>
           </label>
-          {renderAuthAction()}
-        </div>
-      </header>
+        ) : null}
+      </div>
 
       {authError ? <div className="notice error auth-error">{authError}</div> : null}
       {seasonError ? <div className="notice error auth-error">{seasonError}</div> : null}

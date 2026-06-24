@@ -1,22 +1,13 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { CSSProperties, Dispatch, SetStateAction } from "react";
-import { Star } from "lucide-react";
-import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
-import type { AuthStatus } from "../App";
+import { Link, useParams, useSearchParams } from "react-router-dom";
 import {
-  addFavoritePlayer,
-  addFavoriteTeam,
-  ApiError,
   fetchFixture,
   fetchFixtureEvents,
-  fetchFavoriteDashboard,
   fetchFixtureLineups,
   fetchFixturePlayerStats,
   fetchFixtureStats,
   fetchLeagueSeasons,
-  removeFavoritePlayer,
-  removeFavoriteTeam,
-  type FavoriteDashboard,
   type FixtureColorInfo,
   type FixtureEvent,
   type FixtureEventResponse,
@@ -41,15 +32,29 @@ type LoadState<T> = {
 };
 type CoverageStatus = "loading" | "ready" | "error";
 type Side = "home" | "away";
-type FavoriteTarget = "team" | "player";
-type FavoriteControls = {
-  authStatus: AuthStatus;
-  favoriteTeamIds: Set<number>;
-  favoritePlayerIds: Set<number>;
-  pendingFavoriteKey: string;
-  onToggleTeam: (teamId: number) => void;
-  onTogglePlayer: (playerId: number) => void;
+type EventSide = Side | "neutral";
+type EventCategory =
+  | "goal"
+  | "own-goal"
+  | "missed-penalty"
+  | "yellow-card"
+  | "red-card"
+  | "substitution"
+  | "var"
+  | "event";
+type EventTimelineEventItem = {
+  kind: "event";
+  event: FixtureEvent;
+  category: EventCategory;
+  side: EventSide;
+  score: { home: number; away: number } | null;
 };
+type EventTimelineSectionItem = {
+  kind: "section";
+  id: "half-time" | "full-time";
+  label: string;
+};
+type EventTimelineItem = EventTimelineEventItem | EventTimelineSectionItem;
 
 const detailTabs: Array<{ label: string; value: DetailTab }> = [
   { label: "이벤트", value: "events" },
@@ -64,8 +69,7 @@ const initialLoadState = <T,>(): LoadState<T> => ({
   isLoading: true,
 });
 
-export function FixtureDetailPage({ authStatus, season }: { authStatus: AuthStatus; season: number }) {
-  const navigate = useNavigate();
+export function FixtureDetailPage() {
   const { fixtureId } = useParams();
   const [searchParams, setSearchParams] = useSearchParams();
   const numericFixtureId = Number(fixtureId);
@@ -77,16 +81,6 @@ export function FixtureDetailPage({ authStatus, season }: { authStatus: AuthStat
   const [playerStatsState, setPlayerStatsState] = useState<LoadState<FixturePlayerStatResponse>>(initialLoadState);
   const [seasonCoverages, setSeasonCoverages] = useState<LeagueSeasonCoverage[]>([]);
   const [coverageStatus, setCoverageStatus] = useState<CoverageStatus>("loading");
-  const [favorites, setFavorites] = useState<FavoriteDashboard | null>(null);
-  const [favoritesError, setFavoritesError] = useState("");
-  const [pendingFavoriteKey, setPendingFavoriteKey] = useState("");
-  const favoritesLoadIdRef = useRef(0);
-  const favoriteMutationIdRef = useRef(0);
-  const currentSeasonRef = useRef(season);
-
-  useEffect(() => {
-    currentSeasonRef.current = season;
-  }, [season]);
 
   useEffect(() => {
     let isCurrent = true;
@@ -210,51 +204,6 @@ export function FixtureDetailPage({ authStatus, season }: { authStatus: AuthStat
     };
   }, [coverageStatus, fixtureState.data, numericFixtureId, seasonCoverages]);
 
-  useEffect(() => {
-    if (authStatus !== "authenticated") {
-      favoritesLoadIdRef.current += 1;
-      setFavorites(null);
-      setFavoritesError("");
-      return;
-    }
-
-    const requestId = favoritesLoadIdRef.current + 1;
-    favoritesLoadIdRef.current = requestId;
-    fetchFavoriteDashboard(season)
-      .then((data) => {
-        if (requestId === favoritesLoadIdRef.current) {
-          setFavorites(data);
-          setFavoritesError("");
-        }
-      })
-      .catch((error) => {
-        if (requestId === favoritesLoadIdRef.current && !(error instanceof ApiError && error.status === 401)) {
-          setFavoritesError(error instanceof Error ? error.message : "즐겨찾기 상태를 불러오지 못했습니다.");
-        }
-      });
-
-    return () => {
-      favoritesLoadIdRef.current += 1;
-    };
-  }, [authStatus, season]);
-
-  const favoriteTeamIds = useMemo(
-    () => new Set((favorites?.teams ?? []).map((team) => team.teamId)),
-    [favorites],
-  );
-  const favoritePlayerIds = useMemo(
-    () => new Set((favorites?.players ?? []).map((player) => player.playerId)),
-    [favorites],
-  );
-  const favoriteControls: FavoriteControls = {
-    authStatus,
-    favoriteTeamIds,
-    favoritePlayerIds,
-    pendingFavoriteKey,
-    onToggleTeam: handleToggleTeam,
-    onTogglePlayer: handleTogglePlayer,
-  };
-
   if (fixtureState.isLoading) {
     return (
       <section className="league-content">
@@ -290,98 +239,15 @@ export function FixtureDetailPage({ authStatus, season }: { authStatus: AuthStat
     ?? statsState.data?.awayTeamStat?.teamId
     ?? null;
 
-  async function handleToggleTeam(teamId: number) {
-    if (!Number.isFinite(teamId) || teamId <= 0) {
-      return;
-    }
-    await handleToggleFavorite("team", teamId, favoriteTeamIds.has(teamId));
-  }
-
-  async function handleTogglePlayer(playerId: number) {
-    if (!Number.isFinite(playerId) || playerId <= 0) {
-      return;
-    }
-    await handleToggleFavorite("player", playerId, favoritePlayerIds.has(playerId));
-  }
-
-  async function handleToggleFavorite(target: FavoriteTarget, id: number, isFavorite: boolean) {
-    if (!Number.isFinite(id) || id <= 0) {
-      return;
-    }
-    if (authStatus !== "authenticated") {
-      navigate("/login");
-      return;
-    }
-    if (pendingFavoriteKey) {
-      return;
-    }
-
-    const key = `${target}-${id}`;
-    const requestId = favoriteMutationIdRef.current + 1;
-    const requestSeason = season;
-    favoriteMutationIdRef.current = requestId;
-    setPendingFavoriteKey(key);
-    setFavoritesError("");
-    try {
-      const nextFavorites = target === "team"
-        ? isFavorite
-          ? await removeFavoriteTeam(id, season)
-          : await addFavoriteTeam(id, season)
-        : isFavorite
-          ? await removeFavoritePlayer(id, season)
-          : await addFavoritePlayer(id, season);
-      if (requestId === favoriteMutationIdRef.current && requestSeason === currentSeasonRef.current) {
-        setFavorites(nextFavorites);
-      }
-    } catch (error) {
-      if (requestId !== favoriteMutationIdRef.current) {
-        return;
-      }
-      setFavoritesError(error instanceof Error ? error.message : "즐겨찾기 변경에 실패했습니다.");
-    } finally {
-      if (requestId === favoriteMutationIdRef.current) {
-        setPendingFavoriteKey("");
-      }
-    }
-  }
-
-  async function reloadFavorites() {
-    if (authStatus !== "authenticated") {
-      return;
-    }
-    const requestId = favoritesLoadIdRef.current + 1;
-    favoritesLoadIdRef.current = requestId;
-    setFavoritesError("");
-    try {
-      const nextFavorites = await fetchFavoriteDashboard(season);
-      if (requestId === favoritesLoadIdRef.current) {
-        setFavorites(nextFavorites);
-      }
-    } catch (error) {
-      if (requestId === favoritesLoadIdRef.current && !(error instanceof ApiError && error.status === 401)) {
-        setFavoritesError(error instanceof Error ? error.message : "즐겨찾기 상태를 불러오지 못했습니다.");
-      }
-    }
-  }
-
   return (
     <section className="league-content fixture-detail-page">
       <FixtureDetailHero
         awayTeamId={awayTeamId}
         events={eventsState.data?.events ?? []}
-        favoriteControls={favoriteControls}
         fixture={fixture}
         homeTeamId={homeTeamId}
         lineups={lineupsState.data}
       />
-      {favoritesError ? (
-        <div className="notice error inline-retry">
-          <span>{favoritesError}</span>
-          <button type="button" onClick={() => void reloadFavorites()}>
-            다시 불러오기
-          </button>
-        </div>
-      ) : null}
 
       <nav className="detail-tabs" aria-label="경기 상세 메뉴">
         {detailTabs.map((tab) => (
@@ -415,14 +281,12 @@ export function FixtureDetailPage({ authStatus, season }: { authStatus: AuthStat
       {activeTab === "lineups" ? (
         <LineupsPanel
           events={eventsState.data?.events ?? []}
-          favoriteControls={favoriteControls}
           playerStats={playerStatsState.data}
           state={lineupsState}
         />
       ) : null}
       {activeTab === "stats" ? (
         <StatsPanel
-          favoriteControls={favoriteControls}
           fixture={fixture}
           playerStatsState={playerStatsState}
           statsState={statsState}
@@ -457,14 +321,12 @@ async function loadSection<T>(
 function FixtureDetailHero({
   awayTeamId,
   events,
-  favoriteControls,
   fixture,
   homeTeamId,
   lineups,
 }: {
   awayTeamId: number | null;
   events: FixtureEvent[];
-  favoriteControls: FavoriteControls;
   fixture: FixtureSummary;
   homeTeamId: number | null;
   lineups: FixtureLineupResponse | null;
@@ -491,14 +353,6 @@ function FixtureDetailHero({
           <FixtureScorerList scorers={homeScorers} />
           <FixtureRedCardList redCards={homeRedCards} />
         </div>
-        {homeTeamId && favoriteControls.authStatus === "authenticated" ? (
-          <FavoriteToggleButton
-            isFavorite={favoriteControls.favoriteTeamIds.has(homeTeamId)}
-            isPending={favoriteControls.pendingFavoriteKey === `team-${homeTeamId}`}
-            label={`${fixture.homeTeamName ?? "홈 팀"} 즐겨찾기`}
-            onClick={() => favoriteControls.onToggleTeam(homeTeamId)}
-          />
-        ) : null} 
       </div>
       <div className="detail-scoreboard">
         <p className="fixture-detail-meta">
@@ -522,14 +376,6 @@ function FixtureDetailHero({
           <FixtureScorerList scorers={awayScorers} />
           <FixtureRedCardList redCards={awayRedCards} />
         </div>
-        {awayTeamId && favoriteControls.authStatus === "authenticated" ? (
-          <FavoriteToggleButton
-            isFavorite={favoriteControls.favoriteTeamIds.has(awayTeamId)}
-            isPending={favoriteControls.pendingFavoriteKey === `team-${awayTeamId}`}
-            label={`${fixture.awayTeamName ?? "원정 팀"} 즐겨찾기`}
-            onClick={() => favoriteControls.onToggleTeam(awayTeamId)}
-          />
-        ) : null}
       </div>
     </article>
   );
@@ -704,31 +550,6 @@ function FixtureRedCardList({ redCards }: { redCards: FixtureRedCard[] }) {
   );
 }
 
-function FavoriteToggleButton({
-  isFavorite,
-  isPending,
-  label,
-  onClick,
-}: {
-  isFavorite: boolean;
-  isPending: boolean;
-  label: string;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      aria-label={label}
-      className={`favorite-toggle-button${isFavorite ? " active" : ""}`}
-      disabled={isPending}
-      onClick={onClick}
-      title={label}
-      type="button"
-    >
-      <Star size={16} aria-hidden="true" fill={isFavorite ? "currentColor" : "none"} />
-    </button>
-  );
-}
-
 function EventsPanel({ state, fixture }: { state: LoadState<FixtureEventResponse>; fixture: FixtureSummary }) {
   if (state.isLoading) {
     return <SectionLoading label="이벤트를 불러오는 중입니다." />;
@@ -742,6 +563,7 @@ function EventsPanel({ state, fixture }: { state: LoadState<FixtureEventResponse
   if (!events.length) {
     return <EmptyPanel message="저장된 경기 이벤트가 없습니다." />;
   }
+  const timeline = buildEventTimeline(events, fixture);
 
   return (
     <article className="panel detail-panel">
@@ -749,60 +571,87 @@ function EventsPanel({ state, fixture }: { state: LoadState<FixtureEventResponse
         <h2>이벤트</h2>
       </div>
       <div className="event-timeline">
-        {events.map((event, index) => (
-          <EventRow event={event} fixture={fixture} key={`${event.sequence ?? index}-${index}`} />
+        {timeline.map((item, index) => (
+          <EventRow item={item} key={item.kind === "section" ? `${item.id}-${index}` : `${item.event.sequence ?? index}-${index}`} />
         ))}
       </div>
     </article>
   );
 }
 
-function EventRow({ event, fixture }: { event: FixtureEvent; fixture: FixtureSummary }) {
-  const category = eventCategory(event);
-  const isHome = event.team?.name && event.team.name === fixture.homeTeamName;
-  const sideClass = isHome ? "home" : "away";
+function EventRow({ item }: { item: EventTimelineItem }) {
+  if (item.kind === "section") {
+    return (
+      <div className="event-timeline-section" role="separator">
+        <span>{item.label}</span>
+      </div>
+    );
+  }
+
+  const icon = eventIcon(item.category);
+  const minute = eventMinuteParts(item.event);
 
   return (
-    <article className={`event-timeline-row ${sideClass}`}>
-      <span className="event-minute">{eventMinute(event)}</span>
-      <div className={`event-badge ${category}`}>{eventBadgeLabel(category)}</div>
+    <article className={`event-timeline-row ${item.side}`}>
       <div className="event-body">
-        <strong>{event.team?.name ?? "팀 정보 없음"}</strong>
-        {eventMarkup(event)}
-        {event.comments ? <p className="muted">{event.comments}</p> : null}
+        {eventMarkup(item)}
+        {item.event.comments ? <p className="muted">{item.event.comments}</p> : null}
+      </div>
+      <div className="event-center">
+        <span className="event-minute" aria-label={minute.label} title={minute.label}>
+          <span className="event-minute-main">{minute.elapsed}</span>
+          {minute.extra ? <span className="event-minute-extra">+{minute.extra}</span> : null}
+        </span>
+        <img className="event-icon" src={icon.src} alt={icon.label} title={icon.label} />
       </div>
     </article>
   );
 }
 
-function eventMarkup(event: FixtureEvent) {
-  const isSubstitution = isSubstitutionEvent(event);
-  const isGoal = isGoalEvent(event);
-
-  if (isSubstitution) {
+function eventMarkup(item: EventTimelineEventItem) {
+  const { category, event, score } = item;
+  if (category === "substitution") {
     return (
-      <p>
-        <span className="event-out">OUT</span> <EventPlayerLink player={event.player} />
+      <div className="event-substitution">
         {event.assist?.name ? (
-          <>
-            <span className="event-in">IN</span> <EventPlayerLink player={event.assist} />
-          </>
+          <p className="event-in">
+            <span>IN</span> <EventPlayerLink player={event.assist} />
+          </p>
         ) : null}
+        <p className="event-out">
+          <span>OUT</span> <EventPlayerLink player={event.player} />
+        </p>
+      </div>
+    );
+  }
+
+  if (category === "var") {
+    return (
+      <p className="event-primary">
+        <strong>{varEventLabel(event)}</strong>
       </p>
     );
   }
 
+  const player = event.player?.name
+    ? <EventPlayerLink player={event.player} />
+    : <>{event.team?.name ?? "이벤트 정보 없음"}</>;
+
   return (
     <>
-      <p>
-        <EventPlayerLink player={event.player} />
-        {event.detail ? <span className="muted"> · {event.detail}</span> : null}
+      <p className="event-primary">
+        <strong>{player}</strong>
+        {score ? <span className="event-score">({score.home} - {score.away})</span> : null}
       </p>
-      {isGoal && event.assist?.name ? (
-        <p className="muted">
-          도움: <EventPlayerLink player={event.assist} />
+      {category === "goal" && event.assist?.name ? (
+        <p className="event-assist">
+          <EventPlayerLink player={event.assist} />의 도움
         </p>
       ) : null}
+      {category === "goal" && normalizedEventDetail(event) === "penalty" ? <p className="muted">페널티</p> : null}
+      {category === "own-goal" ? <p className="muted">자책골</p> : null}
+      {category === "missed-penalty" ? <p className="muted">페널티 실축</p> : null}
+      {category === "event" && event.detail ? <p className="muted">{event.detail}</p> : null}
     </>
   );
 }
@@ -821,12 +670,10 @@ function EventPlayerLink({ player }: { player: { id: number; name: string | null
 
 function LineupsPanel({
   events,
-  favoriteControls,
   playerStats,
   state,
 }: {
   events: FixtureEvent[];
-  favoriteControls: FavoriteControls;
   playerStats: FixturePlayerStatResponse | null;
   state: LoadState<FixtureLineupResponse>;
 }) {
@@ -862,14 +709,12 @@ function LineupsPanel({
       </article>
       <div className="lineup-detail-grid">
         <LineupTeamCard
-          favoriteControls={favoriteControls}
           playerDetails={playerDetails}
           side="home"
           team={state.data.homeTeam}
           topRatedPlayerId={topRatedPlayerId}
         />
         <LineupTeamCard
-          favoriteControls={favoriteControls}
           playerDetails={playerDetails}
           side="away"
           team={state.data.awayTeam}
@@ -969,13 +814,11 @@ function PitchPlayer({
 }
 
 function LineupTeamCard({
-  favoriteControls,
   playerDetails,
   side,
   team,
   topRatedPlayerId,
 }: {
-  favoriteControls: FavoriteControls;
   playerDetails: Map<number, LineupPlayerDetail>;
   side: Side;
   team: FixtureTeamLineup | null;
@@ -1002,7 +845,6 @@ function LineupTeamCard({
         <strong>{team.coachName ?? "-"}</strong>
       </div>
       <LineupList
-        favoriteControls={favoriteControls}
         playerDetails={playerDetails}
         title="교체 명단"
         players={team.substitutes ?? []}
@@ -1014,13 +856,11 @@ function LineupTeamCard({
 }
 
 function LineupList({
-  favoriteControls,
   playerDetails,
   title,
   players,
   topRatedPlayerId,
 }: {
-  favoriteControls: FavoriteControls;
   playerDetails: Map<number, LineupPlayerDetail>;
   title: string;
   players: FixtureLineupPlayer[];
@@ -1056,14 +896,6 @@ function LineupList({
                 ) : (
                   <em>-</em>
                 )}
-                {favoriteControls.authStatus === "authenticated" ? (
-                  <FavoriteToggleButton
-                    isFavorite={favoriteControls.favoritePlayerIds.has(player.playerId)}
-                    isPending={favoriteControls.pendingFavoriteKey === `player-${player.playerId}`}
-                    label={`${player.playerName ?? "선수"} 즐겨찾기`}
-                    onClick={() => favoriteControls.onTogglePlayer(player.playerId)}
-                  />
-                ) : null}
               </div>
             );
           })
@@ -1312,12 +1144,10 @@ function AbsenceList({ team }: { team: FixtureTeamLineup }) {
 }
 
 function StatsPanel({
-  favoriteControls,
   fixture,
   statsState,
   playerStatsState,
 }: {
-  favoriteControls: FavoriteControls;
   fixture: FixtureSummary;
   statsState: LoadState<FixtureStatResponse>;
   playerStatsState: LoadState<FixturePlayerStatResponse>;
@@ -1325,7 +1155,7 @@ function StatsPanel({
   return (
     <div className="detail-stats-stack">
       <TeamStatsPanel fixture={fixture} state={statsState} />
-      <PlayerStatsPanel favoriteControls={favoriteControls} state={playerStatsState} />
+      <PlayerStatsPanel state={playerStatsState} />
     </div>
   );
 }
@@ -1383,13 +1213,7 @@ function StatCompareRow({ row }: { row: TeamStatRow }) {
   );
 }
 
-function PlayerStatsPanel({
-  favoriteControls,
-  state,
-}: {
-  favoriteControls: FavoriteControls;
-  state: LoadState<FixturePlayerStatResponse>;
-}) {
+function PlayerStatsPanel({ state }: { state: LoadState<FixturePlayerStatResponse> }) {
   if (state.isLoading) {
     return <SectionLoading label="선수별 경기 통계를 불러오는 중입니다." />;
   }
@@ -1410,20 +1234,14 @@ function PlayerStatsPanel({
       </div>
       <div className="player-stat-team-grid">
         {groups.map((group) => (
-          <PlayerStatTable favoriteControls={favoriteControls} group={group} key={group.teamId} />
+          <PlayerStatTable group={group} key={group.teamId} />
         ))}
       </div>
     </article>
   );
 }
 
-function PlayerStatTable({
-  favoriteControls,
-  group,
-}: {
-  favoriteControls: FavoriteControls;
-  group: FixtureTeamPlayerStats;
-}) {
+function PlayerStatTable({ group }: { group: FixtureTeamPlayerStats }) {
   const players = (group.players ?? []).slice().sort((a, b) => {
     const minuteOrder = zeroMinuteRank(a.minutesPlayed) - zeroMinuteRank(b.minutesPlayed);
     if (minuteOrder !== 0) {
@@ -1453,17 +1271,16 @@ function PlayerStatTable({
               <th>패스</th>
               <th>태클</th>
               <th>카드</th>
-              <th>즐겨찾기</th>
             </tr>
           </thead>
           <tbody>
             {players.length ? (
               players.map((player) => (
-                <PlayerStatRow favoriteControls={favoriteControls} key={player.playerId} player={player} />
+                <PlayerStatRow key={player.playerId} player={player} />
               ))
             ) : (
               <tr>
-                <td colSpan={11}>선수 통계가 없습니다.</td>
+                <td colSpan={10}>선수 통계가 없습니다.</td>
               </tr>
             )}
           </tbody>
@@ -1473,13 +1290,7 @@ function PlayerStatTable({
   );
 }
 
-function PlayerStatRow({
-  favoriteControls,
-  player,
-}: {
-  favoriteControls: FavoriteControls;
-  player: FixturePlayerStat;
-}) {
+function PlayerStatRow({ player }: { player: FixturePlayerStat }) {
   return (
     <tr>
       <td>
@@ -1500,14 +1311,6 @@ function PlayerStatRow({
       <td>{numberText(player.tacklesTotal)}</td>
       <td>
         {numberText(player.yellowCards)}Y / {numberText(player.redCards)}R
-      </td>
-      <td>
-        <FavoriteToggleButton
-          isFavorite={favoriteControls.favoritePlayerIds.has(player.playerId)}
-          isPending={favoriteControls.pendingFavoriteKey === `player-${player.playerId}`}
-          label={`${player.playerName ?? "선수"} 즐겨찾기`}
-          onClick={() => favoriteControls.onTogglePlayer(player.playerId)}
-        />
       </td>
     </tr>
   );
@@ -1700,7 +1503,101 @@ function teamStatRows(home: FixtureTeamStat | null, away: FixtureTeamStat | null
   ];
 }
 
-function eventCategory(event: FixtureEvent) {
+function buildEventTimeline(events: FixtureEvent[], fixture: FixtureSummary): EventTimelineItem[] {
+  let homeScore = 0;
+  let awayScore = 0;
+  const goals: Array<{ teamId: number; playerId: number | null; minute: number; active: boolean }> = [];
+  const timeline: EventTimelineItem[] = [];
+  const hasFirstHalfEvents = events.some((event) => (event.time?.elapsed ?? 0) <= 45);
+  const hasSecondHalfEvents = events.some((event) => (event.time?.elapsed ?? 0) > 45);
+  let insertedHalfTime = false;
+
+  events.forEach((event) => {
+    if (!insertedHalfTime && hasFirstHalfEvents && hasSecondHalfEvents && (event.time?.elapsed ?? 0) > 45) {
+      timeline.push({
+        kind: "section",
+        id: "half-time",
+        label: `HT ${homeScore} - ${awayScore}`,
+      });
+      insertedHalfTime = true;
+    }
+
+    const category = eventCategory(event);
+    const side = eventSide(event, fixture);
+    let score: EventTimelineEventItem["score"] = null;
+
+    if (category === "goal" || category === "own-goal") {
+      const scoringTeamId = event.team?.id ?? null;
+      if (scoringTeamId !== null && scoringTeamId === fixture.homeTeamId) {
+        homeScore += 1;
+        goals.push({
+          teamId: scoringTeamId,
+          playerId: event.player?.id ?? null,
+          minute: eventMinuteValue(event),
+          active: true,
+        });
+        score = { home: homeScore, away: awayScore };
+      } else if (scoringTeamId !== null && scoringTeamId === fixture.awayTeamId) {
+        awayScore += 1;
+        goals.push({
+          teamId: scoringTeamId,
+          playerId: event.player?.id ?? null,
+          minute: eventMinuteValue(event),
+          active: true,
+        });
+        score = { home: homeScore, away: awayScore };
+      }
+    } else if (isVarGoalCancelledEvent(event) && event.team?.id) {
+      const cancellationMinute = eventMinuteValue(event);
+      const cancelledGoal = goals
+        .slice()
+        .reverse()
+        .find((goal) => (
+          goal.active
+          && goal.teamId === event.team?.id
+          && cancellationMinute - goal.minute >= 0
+          && cancellationMinute - goal.minute <= 5
+          && (!event.player?.id || !goal.playerId || goal.playerId === event.player.id)
+        ));
+      if (cancelledGoal) {
+        cancelledGoal.active = false;
+        if (cancelledGoal.teamId === fixture.homeTeamId) {
+          homeScore = Math.max(0, homeScore - 1);
+        } else if (cancelledGoal.teamId === fixture.awayTeamId) {
+          awayScore = Math.max(0, awayScore - 1);
+        }
+      }
+    }
+
+    timeline.push({ kind: "event", event, category, side, score });
+  });
+
+  if (isFullTimeFixture(fixture)) {
+    timeline.push({
+      kind: "section",
+      id: "full-time",
+      label: `FT ${fixture.homeScore ?? homeScore} - ${fixture.awayScore ?? awayScore}`,
+    });
+  }
+
+  return timeline;
+}
+
+function eventSide(event: FixtureEvent, fixture: FixtureSummary): EventSide {
+  if (event.team?.id === fixture.homeTeamId) {
+    return "home";
+  }
+  if (event.team?.id === fixture.awayTeamId) {
+    return "away";
+  }
+  return "neutral";
+}
+
+function isFullTimeFixture(fixture: FixtureSummary) {
+  return ["FINISHED", "FT", "AET", "PEN"].includes(fixture.fixtureStatus?.toUpperCase() ?? "");
+}
+
+function eventCategory(event: FixtureEvent): EventCategory {
   if (isMissedPenaltyEvent(event)) {
     return "missed-penalty";
   }
@@ -1713,35 +1610,30 @@ function eventCategory(event: FixtureEvent) {
   if (isSubstitutionEvent(event)) {
     return "substitution";
   }
+  if (normalizedEventType(event) === "var") {
+    return "var";
+  }
   if (isRedCardEvent(event)) {
     return "red-card";
   }
-  if (normalizedText(event.type, event.detail).includes("card")) {
-    return "card";
+  if (isYellowCardEvent(event)) {
+    return "yellow-card";
   }
   return "event";
 }
 
-function eventBadgeLabel(category: string) {
-  if (category === "missed-penalty") {
-    return "PK 실축";
-  }
-  if (category === "own-goal") {
-    return "자책골";
-  }
-  if (category === "goal") {
-    return "골";
-  }
-  if (category === "substitution") {
-    return "교체";
-  }
-  if (category === "red-card") {
-    return "카드";
-  }
-  if (category === "card") {
-    return "카드";
-  }
-  return "이벤트";
+function eventIcon(category: EventCategory) {
+  const icons: Record<EventCategory, { src: string; label: string }> = {
+    goal: { src: "/events/goal.svg", label: "골" },
+    "own-goal": { src: "/events/own-goal.svg", label: "자책골" },
+    "missed-penalty": { src: "/events/penalty-missed.svg", label: "페널티 실축" },
+    "yellow-card": { src: "/events/yellow-card.svg", label: "옐로카드" },
+    "red-card": { src: "/events/red-card.svg", label: "레드카드" },
+    substitution: { src: "/events/substitute.svg", label: "선수 교체" },
+    var: { src: "/events/var.svg", label: "VAR" },
+    event: { src: "/events/unknown-event.svg", label: "기타 이벤트" },
+  };
+  return icons[category];
 }
 
 function isGoalEvent(event: FixtureEvent) {
@@ -1773,6 +1665,21 @@ function isSubstitutionEvent(event: FixtureEvent) {
   return text.includes("subst") || text.includes("substitution");
 }
 
+function isVarGoalCancelledEvent(event: FixtureEvent) {
+  return normalizedEventType(event) === "var" && normalizedEventDetail(event) === "goal cancelled";
+}
+
+function varEventLabel(event: FixtureEvent) {
+  const labels: Record<string, string> = {
+    "goal cancelled": "골 취소",
+    "goal confirmed": "골 확정",
+    "penalty confirmed": "페널티 확정",
+    "penalty cancelled": "페널티 취소",
+    "card upgrade": "카드 판정 변경",
+  };
+  return labels[normalizedEventDetail(event)] ?? event.detail ?? "VAR 판정";
+}
+
 function normalizedEventType(event: FixtureEvent) {
   return event.type?.trim().toLowerCase() ?? "";
 }
@@ -1785,13 +1692,26 @@ function normalizedText(...values: Array<string | null>) {
   return values.filter(Boolean).join(" ").toLowerCase();
 }
 
-function eventMinute(event: FixtureEvent) {
+function eventMinuteParts(event: FixtureEvent) {
   const elapsed = event.time?.elapsed;
   const extra = event.time?.extra;
-  if (!elapsed) {
-    return "-";
+  if (elapsed === null || elapsed === undefined) {
+    return { elapsed: "-", extra: null, label: "시간 정보 없음" };
   }
-  return extra ? `${elapsed}+${extra}'` : `${elapsed}'`;
+  return {
+    elapsed: `${elapsed}'`,
+    extra: extra ? `${extra}` : null,
+    label: extra ? `${elapsed}분 추가 시간 ${extra}분` : `${elapsed}분`,
+  };
+}
+
+function eventMinute(event: FixtureEvent) {
+  const minute = eventMinuteParts(event);
+  return minute.extra ? `${minute.elapsed.replace("'", "")}+${minute.extra}'` : minute.elapsed;
+}
+
+function eventMinuteValue(event: FixtureEvent) {
+  return (event.time?.elapsed ?? 0) + (event.time?.extra ?? 0);
 }
 
 function isGoalkeeperPosition(position: string | null) {

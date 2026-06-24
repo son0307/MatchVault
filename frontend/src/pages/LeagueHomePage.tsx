@@ -334,7 +334,7 @@ function FavoritesPreview({ favorites }: { favorites: FavoriteDashboard | null }
     return (
       <div className="favorite-empty">
         <strong>아직 즐겨찾기한 팀이나 선수가 없습니다.</strong>
-        <p>로그인 기능을 연결한 뒤 즐겨찾기 데이터가 이 카드에 표시됩니다.</p>
+        <p>팀 상세 정보 페이지나 선수 상세 정보 페이지에서 즐겨찾기 버튼을 통해 즐겨찾기를 추가할 수 있습니다.</p>
       </div>
     );
   }

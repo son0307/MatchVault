@@ -922,21 +922,8 @@ export function AdminPage({ authState }: AdminPageProps) {
       {activeTab === "fixture" ? (
       <EditorPanel title="Fixture Editor" eyebrow="Fixtures">
         <div className="admin-fixture-browser">
-          <div className="admin-fixture-browser-heading">
-            <div>
-              <strong>{authState.season} 시즌 경기 찾기</strong>
-              <span>팀을 선택하면 팀 정보 페이지와 같은 기준으로 경기 일정이 표시됩니다.</span>
-            </div>
-            <button
-              type="button"
-              onClick={() => void loadFixtureTeams(authState.season)}
-              disabled={fixtureTeamStatus === "loading" || savingKey !== null}
-            >
-              새로고침
-            </button>
-          </div>
           <label className="admin-fixture-team-select">
-            <span>팀</span>
+            <span>{authState.season} 시즌 팀</span>
             <select
               value={selectedFixtureTeamId ?? ""}
               onChange={(event) => {
@@ -953,7 +940,7 @@ export function AdminPage({ authState }: AdminPageProps) {
               ))}
             </select>
           </label>
-          {fixtureTeamStatus === "error" ? <p className="muted admin-sync-message">팀 목록을 불러오지 못했습니다. 새로고침을 눌러 다시 시도해주세요.</p> : null}
+          {fixtureTeamStatus === "error" ? <p className="muted admin-sync-message">팀 목록을 불러오지 못했습니다.</p> : null}
           {fixtureListStatus === "loading" ? <p className="muted admin-sync-message">경기 목록을 불러오는 중입니다.</p> : null}
           {fixtureListStatus === "ready" && fixtures.length === 0 ? <p className="muted admin-sync-message">선택한 팀의 경기가 없습니다.</p> : null}
           {fixtures.length > 0 ? (
