@@ -10,6 +10,7 @@ import {
   type TeamStanding,
 } from "../api";
 import { formatFixtureDateKey, parseKoreaDateTime } from "../dateUtils";
+import { displayTeamName } from "../teamNames";
 
 const TEAM_PAGE_SIZE = 10;
 const TEAM_FETCH_SIZE = 100;
@@ -439,7 +440,7 @@ function FixtureCard({ fixture }: { fixture: FixtureSummary }) {
     <Link className="fixture-match-card" to={`/fixtures/${fixture.fixtureId}`}>
       <time>{formatTime(fixture.fixtureDate)}</time>
       <div className="fixture-match-team home">
-        <strong>{fixture.homeTeamName ?? "-"}</strong>
+        <strong>{displayTeamName(fixture.homeTeamId, fixture.homeTeamName)}</strong>
         {fixture.homeTeamLogoUrl ? (
           <img src={fixture.homeTeamLogoUrl} alt="" className="team-logo" />
         ) : (
@@ -453,7 +454,7 @@ function FixtureCard({ fixture }: { fixture: FixtureSummary }) {
         ) : (
           <span className="team-logo placeholder" aria-hidden="true" />
         )}
-        <strong>{fixture.awayTeamName ?? "-"}</strong>
+        <strong>{displayTeamName(fixture.awayTeamId, fixture.awayTeamName)}</strong>
       </div>
       <span className="status-pill">{fixture.fixtureStatus ?? "예정"}</span>
     </Link>
@@ -466,7 +467,7 @@ function standingsToTeamOptions(standings: TeamStanding[]): FixtureTeamOption[] 
     .sort((a, b) => valueOf(a.rank) - valueOf(b.rank))
     .map((standing) => ({
       teamId: standing.team?.id ?? 0,
-      teamName: standing.team?.name ?? "-",
+      teamName: displayTeamName(standing.team?.id, standing.team?.name),
       logoUrl: standing.team?.logo ?? null,
     }))
     .filter((team) => team.teamId > 0);

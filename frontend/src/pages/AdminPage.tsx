@@ -1,6 +1,6 @@
 import { FormEvent, useEffect, useRef, useState } from "react";
 import { LoaderCircle } from "lucide-react";
-import { Navigate } from "react-router-dom";
+import { Navigate, useSearchParams } from "react-router-dom";
 import {
   clearApiMemoryCache,
   fetchFixtures,
@@ -16,6 +16,10 @@ type AdminPageProps = {
 };
 
 type AdminTab = "team" | "player" | "fixture";
+
+function adminTab(value: string | null): AdminTab | null {
+  return value === "team" || value === "player" || value === "fixture" ? value : null;
+}
 
 type FieldKind = "text" | "number" | "datetime" | "date" | "boolean" | "select";
 
@@ -315,6 +319,7 @@ const syncTasks = [
 ];
 
 export function AdminPage({ authState }: AdminPageProps) {
+  const [searchParams] = useSearchParams();
   const [activeTab, setActiveTab] = useState<AdminTab>("team");
   const [teamKeyword, setTeamKeyword] = useState("");
   const [teams, setTeams] = useState<TeamAdmin[]>([]);
@@ -364,6 +369,8 @@ export function AdminPage({ authState }: AdminPageProps) {
   const fixtureTeamRequestIdRef = useRef(0);
   const fixtureListRequestIdRef = useRef(0);
   const fixtureRequestIdRef = useRef(0);
+  const appliedAdminTargetRef = useRef("");
+  const pendingAdminTargetRef = useRef<{ tab: AdminTab; id: number } | null>(null);
   const fixtureEditorRef = useRef<HTMLDivElement>(null);
   const selectedTeam = teamSelection.status === "ready" ? teamSelection.detail : null;
   const loadingTeamId = teamSelection.status === "loading" ? teamSelection.teamId : null;
@@ -396,6 +403,70 @@ export function AdminPage({ authState }: AdminPageProps) {
       void loadFixtureTeams(authState.season);
     }
   }, [authState.authStatus, authState.currentUser?.role, authState.season]);
+
+  useEffect(() => {
+    if (authState.authStatus !== "authenticated" || authState.currentUser?.role !== "ADMIN") {
+      return;
+    }
+    const tab = adminTab(searchParams.get("tab"));
+    const id = Number(searchParams.get("id"));
+    if (!tab || !Number.isFinite(id) || id <= 0) {
+      return;
+    }
+    const targetKey = `${tab}:${id}`;
+    if (appliedAdminTargetRef.current === targetKey) {
+      return;
+    }
+    appliedAdminTargetRef.current = targetKey;
+    pendingAdminTargetRef.current = { tab, id };
+    setActiveTab(tab);
+    if (tab === "team") {
+      void selectTeam(id);
+      return;
+    }
+    if (tab === "player") {
+      void selectPlayer(id);
+      return;
+    }
+    void selectFixture(id);
+  }, [authState.authStatus, authState.currentUser?.role, searchParams]);
+
+  useEffect(() => {
+    const target = pendingAdminTargetRef.current;
+    if (!target) {
+      return;
+    }
+    if (target.tab === "team" && teamSelection.status === "ready" && teamSelection.teamId === target.id) {
+      pendingAdminTargetRef.current = null;
+      return;
+    }
+    if (target.tab === "player" && playerSelection.status === "ready" && playerSelection.playerId === target.id) {
+      pendingAdminTargetRef.current = null;
+      return;
+    }
+    if (target.tab === "fixture" && fixtureSelection.status === "ready" && fixtureSelection.fixtureId === target.id) {
+      pendingAdminTargetRef.current = null;
+      return;
+    }
+    if (fixtureTeamStatus !== "ready") {
+      return;
+    }
+    if (target.tab === "team" && teamSelection.status === "idle") {
+      void selectTeam(target.id);
+    } else if (target.tab === "player" && playerSelection.status === "idle") {
+      void selectPlayer(target.id);
+    } else if (target.tab === "fixture" && fixtureSelection.status === "idle") {
+      void selectFixture(target.id);
+    }
+  }, [
+    fixtureSelection.fixtureId,
+    fixtureSelection.status,
+    fixtureTeamStatus,
+    playerSelection.playerId,
+    playerSelection.status,
+    teamSelection.status,
+    teamSelection.teamId,
+  ]);
 
   useEffect(() => {
     if (fixtureSelection.status !== "ready") {

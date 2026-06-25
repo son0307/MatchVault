@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Activity, CalendarDays, Shirt, Star, UserRound } from "lucide-react";
+import { Activity, CalendarDays, Pencil, Shirt, Star, UserRound } from "lucide-react";
 import { Link, useParams } from "react-router-dom";
 import {
   ApiError,
@@ -9,6 +9,7 @@ import {
   fetchPlayerRecentMatches,
   fetchPlayerSeasonSummary,
   removeFavoritePlayer,
+  type CurrentUser,
   type PlayerMatchStat,
   type PlayerProfile,
   type PlayerSeasonSummary,
@@ -16,6 +17,7 @@ import {
 } from "../api";
 import type { AuthStatus } from "../App";
 import { formatFixtureDate, parseKoreaDateTime } from "../dateUtils";
+import { displayTeamName } from "../teamNames";
 
 type LoadState<T> = {
   data: T | null;
@@ -31,7 +33,7 @@ const loadingState = <T,>(): LoadState<T> => ({
   isLoading: true,
 });
 
-export function PlayerDetailPage({ authStatus, season }: { authStatus: AuthStatus; season: number }) {
+export function PlayerDetailPage({ authStatus, currentUser, season }: { authStatus: AuthStatus; currentUser: CurrentUser | null; season: number }) {
   const { playerId } = useParams();
   const numericPlayerId = Number(playerId);
   const isValidPlayerId = Number.isFinite(numericPlayerId) && numericPlayerId > 0;
@@ -252,6 +254,7 @@ export function PlayerDetailPage({ authStatus, season }: { authStatus: AuthStatu
         onToggleFavorite={toggleFavorite}
         profile={profileState.data}
         seasonState={seasonState}
+        isAdmin={currentUser?.role === "ADMIN"}
       />
       <SeasonSummaryPanel
         isGoalkeeper={isGoalkeeperPosition(profileState.data.position)}
@@ -272,6 +275,7 @@ function PlayerHero({
   isFavoriteLoading,
   favoriteError,
   onToggleFavorite,
+  isAdmin,
 }: {
   profile: PlayerProfile;
   seasonState: LoadState<PlayerSeasonSummary>;
@@ -280,6 +284,7 @@ function PlayerHero({
   isFavoriteLoading: boolean;
   favoriteError: string;
   onToggleFavorite: () => void;
+  isAdmin: boolean;
 }) {
   return (
     <article className="panel player-hero">
@@ -304,6 +309,11 @@ function PlayerHero({
               typeLabel="선수"
             />
           ) : null}
+          {isAdmin ? (
+            <Link aria-label="관리자 수정" className="admin-edit-link icon" title="관리자 수정" to={`/admin?tab=player&id=${profile.playerId}`}>
+              <Pencil size={16} aria-hidden="true" />
+            </Link>
+          ) : null}
         </div>
         {favoriteError ? <p className="favorite-inline-error">{favoriteError}</p> : null}
         <div className="player-meta-list">
@@ -322,6 +332,7 @@ function SeasonTeamSummary({ state }: { state: LoadState<PlayerSeasonSummary> })
   if (state.isLoading) {
     return (
       <div className="player-team-card">
+        <strong className="player-team-card-title">선택 시즌 소속팀</strong>
         <div>
           <strong>소속팀 확인 중</strong>
           <p>선택 시즌 기준으로 불러오고 있습니다.</p>
@@ -333,6 +344,7 @@ function SeasonTeamSummary({ state }: { state: LoadState<PlayerSeasonSummary> })
   if (state.error) {
     return (
       <div className="player-team-card">
+        <strong className="player-team-card-title">선택 시즌 소속팀</strong>
         <div>
           <strong>소속팀 정보를 불러오지 못했습니다.</strong>
           <p>{state.error}</p>
@@ -345,6 +357,7 @@ function SeasonTeamSummary({ state }: { state: LoadState<PlayerSeasonSummary> })
   if (!teams.length) {
     return (
       <div className="player-team-card">
+        <strong className="player-team-card-title">선택 시즌 소속팀</strong>
         <div>
           <strong>해당 시즌 소속팀 정보 없음</strong>
           <p>선택 시즌의 EPL 기록이 없습니다.</p>
@@ -355,24 +368,18 @@ function SeasonTeamSummary({ state }: { state: LoadState<PlayerSeasonSummary> })
 
   return (
     <div className="player-team-card">
-      <div className="player-season-team-logos">
-        {teams.map((team) =>
-          team.teamLogoUrl ? (
-            <img src={team.teamLogoUrl} alt="" className="team-logo large" key={team.teamId} />
-          ) : (
-            <span className="team-logo large placeholder" aria-hidden="true" key={team.teamId} />
-          ),
-        )}
-      </div>
-      <div>
-        <strong>{teams.length > 1 ? "선택 시즌 소속팀" : "선택 시즌 소속팀"}</strong>
-        <div className="player-season-team-links">
-          {teams.map((team) => (
-            <Link className="team-name-link" to={`/teams/${team.teamId}`} key={team.teamId}>
-              {team.teamName ?? "-"}
-            </Link>
-          ))}
-        </div>
+      <strong className="player-team-card-title">선택 시즌 소속팀</strong>
+      <div className="player-season-team-list">
+        {teams.map((team) => (
+          <Link className="player-season-team-row" to={`/teams/${team.teamId}`} key={team.teamId}>
+            {team.teamLogoUrl ? (
+              <img src={team.teamLogoUrl} alt="" className="team-logo large" />
+            ) : (
+              <span className="team-logo large placeholder" aria-hidden="true" />
+            )}
+            <span>{displayTeamName(team.teamId, team.teamName)}</span>
+          </Link>
+        ))}
       </div>
     </div>
   );
@@ -507,7 +514,7 @@ function SeasonTeamStats({
               <span className="team-logo placeholder" aria-hidden="true" />
             )}
             <Link className="team-name-link" to={`/teams/${team.teamId}`}>
-              {team.teamName ?? "-"}
+              {displayTeamName(team.teamId, team.teamName)}
             </Link>
             <span>
               {isGoalkeeper
@@ -597,8 +604,8 @@ function SectionError({ title, message, onRetry }: { title: string; message: str
 }
 
 function PlayerMatchRow({ match }: { match: PlayerMatchStat }) {
-  const homeTeamName = match.homeTeamName ?? inferHomeTeam(match);
-  const awayTeamName = match.awayTeamName ?? inferAwayTeam(match);
+  const homeTeamName = displayTeamName(match.homeTeamId, match.homeTeamName ?? inferHomeTeam(match));
+  const awayTeamName = displayTeamName(match.awayTeamId, match.awayTeamName ?? inferAwayTeam(match));
   const homeScore = match.homeScore ?? inferHomeScore(match);
   const awayScore = match.awayScore ?? inferAwayScore(match);
 
@@ -608,14 +615,14 @@ function PlayerMatchRow({ match }: { match: PlayerMatchStat }) {
       <div className="player-match-teams" aria-label="홈팀과 원정팀">
         <strong>
           <span>홈</span>
-          {homeTeamName ?? "-"}
+          {homeTeamName}
         </strong>
         <span>
           {numberText(homeScore)}:{numberText(awayScore)}
         </span>
         <strong>
           <span>원정</span>
-          {awayTeamName ?? "-"}
+          {awayTeamName}
         </strong>
       </div>
       <div className="player-match-stats">

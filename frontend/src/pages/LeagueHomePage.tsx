@@ -14,6 +14,7 @@ import {
   type TeamStanding,
 } from "../api";
 import { formatFixtureDateKey, parseKoreaDateTime } from "../dateUtils";
+import { displayTeamName } from "../teamNames";
 
 export function LeagueHomePage({ authStatus, season }: { authStatus: AuthStatus; season: number }) {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -271,10 +272,10 @@ function CompactRanking({ standings }: { standings: TeamStanding[] }) {
           )}
           {standing.team?.id ? (
             <Link className="team-name-link" to={`/teams/${standing.team.id}`}>
-              {standing.team.name ?? "-"}
+              {displayTeamName(standing.team.id, standing.team.name)}
             </Link>
           ) : (
-            <strong>{standing.team?.name ?? "-"}</strong>
+            <strong>{displayTeamName(standing.team?.id, standing.team?.name)}</strong>
           )}
           <b>{standing.points ?? 0}</b>
         </div>
@@ -294,9 +295,19 @@ function FixtureSchedule({ fixtures }: { fixtures: FixtureSummary[] }) {
         <Link className="home-fixture-card" key={fixture.fixtureId} to={`/fixtures/${fixture.fixtureId}`}>
           <time>{formatTime(fixture.fixtureDate)}</time>
           <div className="home-fixture-teams">
-            <strong>{fixture.homeTeamName ?? "-"}</strong>
+            <strong>{displayTeamName(fixture.homeTeamId, fixture.homeTeamName)}</strong>
+            {fixture.homeTeamLogoUrl ? (
+              <img src={fixture.homeTeamLogoUrl} alt="" className="team-logo" />
+            ) : (
+              <span className="team-logo placeholder" aria-hidden="true" />
+            )}
             <span>{scoreText(fixture)}</span>
-            <strong>{fixture.awayTeamName ?? "-"}</strong>
+            {fixture.awayTeamLogoUrl ? (
+              <img src={fixture.awayTeamLogoUrl} alt="" className="team-logo" />
+            ) : (
+              <span className="team-logo placeholder" aria-hidden="true" />
+            )}
+            <strong>{displayTeamName(fixture.awayTeamId, fixture.awayTeamName)}</strong>
           </div>
           <span className="status-pill">{fixture.fixtureStatus ?? "예정"}</span>
         </Link>

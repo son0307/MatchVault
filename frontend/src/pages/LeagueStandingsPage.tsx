@@ -7,6 +7,7 @@ import {
   type StandingRecord,
   type TeamStanding,
 } from "../api";
+import { displayTeamName } from "../teamNames";
 
 type StandingMode = "all" | "home" | "away" | "recent";
 
@@ -213,7 +214,7 @@ function toStandingRow(standing: TeamStanding, mode: StandingMode): StandingRow 
   return {
     teamId: standing.team?.id ?? standing.rank ?? 0,
     displayRank: standing.rank ?? 0,
-    teamName: standing.team?.name ?? "-",
+    teamName: displayTeamName(standing.team?.id, standing.team?.name),
     logo: standing.team?.logo ?? null,
     played: mode === "recent" ? recentSummary.played : valueOf(source?.played),
     win: mode === "recent" ? recentSummary.win : valueOf(source?.win),

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { Dispatch, SetStateAction } from "react";
-import { CalendarDays, Clock, Goal, Star, Users } from "lucide-react";
+import { CalendarDays, Clock, Goal, Pencil, Star, Users } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { Link, useParams } from "react-router-dom";
 import {
@@ -12,6 +12,7 @@ import {
   fetchTeamPlayerRankings,
   fetchTeamPlayers,
   removeFavoriteTeam,
+  type CurrentUser,
   type FixtureSummary,
   type PlayerSummary,
   type TeamDetails,
@@ -19,6 +20,7 @@ import {
 } from "../api";
 import type { AuthStatus } from "../App";
 import { formatFixtureDateKey, parseKoreaDateTime } from "../dateUtils";
+import { displayTeamName } from "../teamNames";
 
 type LoadState<T> = {
   data: T | null;
@@ -29,7 +31,7 @@ type LoadState<T> = {
 const FIXTURE_FETCH_SIZE = 100;
 const TEAM_FIXTURE_PAGE_SIZE = 10;
 
-export function TeamDetailPage({ authStatus, season }: { authStatus: AuthStatus; season: number }) {
+export function TeamDetailPage({ authStatus, currentUser, season }: { authStatus: AuthStatus; currentUser: CurrentUser | null; season: number }) {
   const { teamId } = useParams();
   const numericTeamId = Number(teamId);
   const loadRequestId = useRef(0);
@@ -379,6 +381,7 @@ export function TeamDetailPage({ authStatus, season }: { authStatus: AuthStatus;
         isFavoriteLoading={isFavoriteLoading}
         onToggleFavorite={toggleFavorite}
         team={teamState.data}
+        isAdmin={currentUser?.role === "ADMIN"}
       />
       <TeamFixturePanel
         fixturePage={fixturePage}
@@ -399,6 +402,7 @@ function TeamHero({
   isFavoriteLoading,
   favoriteError,
   onToggleFavorite,
+  isAdmin,
 }: {
   team: TeamDetails;
   canUseFavorite: boolean;
@@ -406,6 +410,7 @@ function TeamHero({
   isFavoriteLoading: boolean;
   favoriteError: string;
   onToggleFavorite: () => void;
+  isAdmin: boolean;
 }) {
   return (
     <article className="panel team-detail-hero">
@@ -413,7 +418,7 @@ function TeamHero({
       <div>
         <p className="eyebrow">{team.country ?? "Team"}</p>
         <div className="detail-title-row">
-          <h2>{team.teamName ?? "-"}</h2>
+          <h2>{displayTeamName(team.teamId, team.teamName)}</h2>
           {canUseFavorite ? (
             <FavoriteToggleButton
               isActive={isFavorite}
@@ -421,6 +426,11 @@ function TeamHero({
               onClick={onToggleFavorite}
               typeLabel="팀"
             />
+          ) : null}
+          {isAdmin ? (
+            <Link aria-label="관리자 수정" className="admin-edit-link icon" title="관리자 수정" to={`/admin?tab=team&id=${team.teamId}`}>
+              <Pencil size={16} aria-hidden="true" />
+            </Link>
           ) : null}
         </div>
         {favoriteError ? <p className="favorite-inline-error">{favoriteError}</p> : null}
@@ -527,9 +537,19 @@ function TeamFixtureGroups({ groupedFixtures }: { groupedFixtures: Array<[string
           {fixtures.map((fixture) => (
             <Link className="team-detail-fixture-row" key={fixture.fixtureId} to={`/fixtures/${fixture.fixtureId}`}>
               <time>{formatTime(fixture.fixtureDate)}</time>
-              <strong>{fixture.homeTeamName ?? "-"}</strong>
+              <strong>{displayTeamName(fixture.homeTeamId, fixture.homeTeamName)}</strong>
+              {fixture.homeTeamLogoUrl ? (
+                <img src={fixture.homeTeamLogoUrl} alt="" className="team-logo" />
+              ) : (
+                <span className="team-logo placeholder" aria-hidden="true" />
+              )}
               <span>{scoreText(fixture)}</span>
-              <strong>{fixture.awayTeamName ?? "-"}</strong>
+              {fixture.awayTeamLogoUrl ? (
+                <img src={fixture.awayTeamLogoUrl} alt="" className="team-logo" />
+              ) : (
+                <span className="team-logo placeholder" aria-hidden="true" />
+              )}
+              <strong>{displayTeamName(fixture.awayTeamId, fixture.awayTeamName)}</strong>
               <em>{fixture.fixtureStatus ?? "예정"}</em>
             </Link>
           ))}

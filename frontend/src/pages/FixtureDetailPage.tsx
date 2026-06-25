@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import type { CSSProperties, Dispatch, SetStateAction } from "react";
+import { Pencil } from "lucide-react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import {
   fetchFixture,
@@ -21,8 +22,10 @@ import {
   type FixtureTeamPlayerStats,
   type FixtureTeamStat,
   type LeagueSeasonCoverage,
+  type CurrentUser,
 } from "../api";
 import { parseKoreaDateTime } from "../dateUtils";
+import { displayTeamName } from "../teamNames";
 
 type DetailTab = "events" | "lineups" | "stats";
 type LoadState<T> = {
@@ -55,6 +58,8 @@ type EventTimelineSectionItem = {
   label: string;
 };
 type EventTimelineItem = EventTimelineEventItem | EventTimelineSectionItem;
+type PlayerStatSortKey = "minutes" | "rating" | "goals" | "assists" | "shots" | "passes" | "tackles";
+type SortDirection = "asc" | "desc";
 
 const detailTabs: Array<{ label: string; value: DetailTab }> = [
   { label: "이벤트", value: "events" },
@@ -69,7 +74,7 @@ const initialLoadState = <T,>(): LoadState<T> => ({
   isLoading: true,
 });
 
-export function FixtureDetailPage() {
+export function FixtureDetailPage({ currentUser }: { currentUser: CurrentUser | null }) {
   const { fixtureId } = useParams();
   const [searchParams, setSearchParams] = useSearchParams();
   const numericFixtureId = Number(fixtureId);
@@ -246,6 +251,7 @@ export function FixtureDetailPage() {
         events={eventsState.data?.events ?? []}
         fixture={fixture}
         homeTeamId={homeTeamId}
+        isAdmin={currentUser?.role === "ADMIN"}
         lineups={lineupsState.data}
       />
 
@@ -323,12 +329,14 @@ function FixtureDetailHero({
   events,
   fixture,
   homeTeamId,
+  isAdmin,
   lineups,
 }: {
   awayTeamId: number | null;
   events: FixtureEvent[];
   fixture: FixtureSummary;
   homeTeamId: number | null;
+  isAdmin: boolean;
   lineups: FixtureLineupResponse | null;
 }) {
   const dateParts = fixtureDateParts(fixture.fixtureDate);
@@ -337,19 +345,23 @@ function FixtureDetailHero({
   const awayScorers = fixtureScorers(events, awayTeamId, fixture.awayTeamName, playerTeamIds);
   const homeRedCards = fixtureRedCards(events, homeTeamId, fixture.homeTeamName);
   const awayRedCards = fixtureRedCards(events, awayTeamId, fixture.awayTeamName);
+  const homeTeamName = displayTeamName(homeTeamId, fixture.homeTeamName);
+  const awayTeamName = displayTeamName(awayTeamId, fixture.awayTeamName);
 
   return (
     <article className="panel fixture-detail-hero">
       <div className="detail-team home">
-        {fixture.homeTeamLogoUrl ? <img src={fixture.homeTeamLogoUrl} alt="" className="team-logo large" /> : null}
-        <div className="detail-team-content">
+        <div className="detail-team-identity">
+          {fixture.homeTeamLogoUrl ? <img src={fixture.homeTeamLogoUrl} alt="" className="team-logo large" /> : null}
           {homeTeamId ? (
             <Link className="team-name-link" to={`/teams/${homeTeamId}`}>
-              {fixture.homeTeamName ?? "-"}
+              {homeTeamName}
             </Link>
           ) : (
-            <strong>{fixture.homeTeamName ?? "-"}</strong>
+            <strong>{homeTeamName}</strong>
           )}
+        </div>
+        <div className="detail-team-summary">
           <FixtureScorerList scorers={homeScorers} />
           <FixtureRedCardList redCards={homeRedCards} />
         </div>
@@ -361,20 +373,34 @@ function FixtureDetailHero({
           {fixture.round ? <span>{fixture.round}라운드</span> : null}
         </p>
         <strong>{scoreText(fixture)}</strong>
+        {false && isAdmin ? (
+          <Link aria-label="관리자 수정" className="admin-edit-link icon" title="관리자 수정" to={`/admin?tab=fixture&id=${fixture.fixtureId}`}>
+            <Pencil size={16} aria-hidden="true" />
+            관리자 수정
+          </Link>
+        ) : null}
         <span className="status-pill">{fixture.fixtureStatus ?? "예정"}</span>
       </div>
+        {isAdmin ? (
+          <Link aria-label="관리자 수정" className="admin-edit-link icon fixture-admin-edit-link" title="관리자 수정" to={`/admin?tab=fixture&id=${fixture.fixtureId}`}>
+            <Pencil size={16} aria-hidden="true" />
+            관리자 수정
+          </Link>
+        ) : null}
       <div className="detail-team away">
-        {fixture.awayTeamLogoUrl ? <img src={fixture.awayTeamLogoUrl} alt="" className="team-logo large" /> : null}
-        <div className="detail-team-content">
-          {awayTeamId ? (
-            <Link className="team-name-link" to={`/teams/${awayTeamId}`}>
-              {fixture.awayTeamName ?? "-"}
-            </Link>
-          ) : (
-            <strong>{fixture.awayTeamName ?? "-"}</strong>
-          )}
+        <div className="detail-team-summary">
           <FixtureScorerList scorers={awayScorers} />
           <FixtureRedCardList redCards={awayRedCards} />
+        </div>
+        <div className="detail-team-identity">
+          {fixture.awayTeamLogoUrl ? <img src={fixture.awayTeamLogoUrl} alt="" className="team-logo large" /> : null}
+          {awayTeamId ? (
+            <Link className="team-name-link" to={`/teams/${awayTeamId}`}>
+              {awayTeamName}
+            </Link>
+          ) : (
+            <strong>{awayTeamName}</strong>
+          )}
         </div>
       </div>
     </article>
@@ -740,24 +766,75 @@ function FootballPitch({
   const awayPlayers = useMemo(() => positionedPlayers(awayTeam, "away"), [awayTeam]);
 
   return (
-    <div className="football-pitch" aria-label="라인업 포메이션">
-      <div className="pitch-line halfway" />
-      <div className="pitch-circle" />
-      <div className="pitch-box left" />
-      <div className="pitch-box right" />
-      <div className="pitch-goal left" />
-      <div className="pitch-goal right" />
-      <FormationLabel side="home" team={homeTeam} />
-      <FormationLabel side="away" team={awayTeam} />
-      {[...homePlayers, ...awayPlayers].map((player) => (
+    <>
+      <div className="football-pitch" aria-label="라인업 포메이션">
+        <div className="pitch-line halfway" />
+        <div className="pitch-circle" />
+        <div className="pitch-box left" />
+        <div className="pitch-box right" />
+        <div className="pitch-goal left" />
+        <div className="pitch-goal right" />
+        <FormationLabel side="home" team={homeTeam} />
+        <FormationLabel side="away" team={awayTeam} />
+        {[...homePlayers, ...awayPlayers].map((player) => (
+          <PitchPlayer
+            detail={playerDetails.get(player.player.playerId)}
+            isTopRated={player.player.playerId === topRatedPlayerId}
+            player={player}
+            key={`${player.side}-${player.player.playerId}`}
+          />
+        ))}
+      </div>
+      <div className="mobile-lineup-board" aria-label="모바일 라인업 포메이션">
+        <MobileLineupPitch
+          awayTeam={awayTeam}
+          homeTeam={homeTeam}
+          playerDetails={playerDetails}
+          topRatedPlayerId={topRatedPlayerId}
+        />
+      </div>
+    </>
+  );
+}
+
+function MobileLineupPitch({
+  awayTeam,
+  homeTeam,
+  playerDetails,
+  topRatedPlayerId,
+}: {
+  awayTeam: FixtureTeamLineup | null;
+  homeTeam: FixtureTeamLineup | null;
+  playerDetails: Map<number, LineupPlayerDetail>;
+  topRatedPlayerId: number | null;
+}) {
+  const homePlayers = useMemo(() => positionedMobilePlayers(homeTeam, "home"), [homeTeam]);
+  const awayPlayers = useMemo(() => positionedMobilePlayers(awayTeam, "away"), [awayTeam]);
+  const players = [...homePlayers, ...awayPlayers];
+
+  return (
+    <section className="mobile-football-pitch" aria-label="모바일 라인업">
+      <div className="mobile-pitch-line halfway" />
+      <div className="mobile-pitch-circle center" />
+      <div className="mobile-pitch-box top" />
+      <div className="mobile-pitch-box bottom" />
+      <div className="mobile-formation-label home">
+        <strong>{homeTeam?.teamName ?? "홈팀"}</strong>
+        <span>{homeTeam?.formation ?? "-"}</span>
+      </div>
+      <div className="mobile-formation-label away">
+        <strong>{awayTeam?.teamName ?? "원정팀"}</strong>
+        <span>{awayTeam?.formation ?? "-"}</span>
+      </div>
+      {players.map((player) => (
         <PitchPlayer
           detail={playerDetails.get(player.player.playerId)}
           isTopRated={player.player.playerId === topRatedPlayerId}
           player={player}
-          key={`${player.side}-${player.player.playerId}`}
+          key={`${player.side}-mobile-${player.player.playerId}`}
         />
       ))}
-    </div>
+    </section>
   );
 }
 
@@ -880,22 +957,20 @@ function LineupList({
                 <PlayerPhoto player={player} />
                 <span className="lineup-shirt-number">{player.backNumber ?? "-"}</span>
                 <div className="lineup-player-summary">
-                  <Link className="lineup-player-link" to={`/players/${player.playerId}`}>
-                    {player.playerName ?? "-"}
-                  </Link>
+                  <div className="lineup-player-name-row">
+                    <Link className="lineup-player-link" to={`/players/${player.playerId}`}>
+                      {player.playerName ?? "-"}
+                    </Link>
+                    <LineupEventBadges detail={detail} />
+                  </div>
                   <small>{player.position ?? "-"}</small>
-                  <LineupEventBadges detail={detail} />
                 </div>
                 {detail?.rating ? (
                   <b className={ratingClassName(detail.rating, player.playerId === topRatedPlayerId)}>
                     {player.playerId === topRatedPlayerId ? "★ " : ""}{detail.rating.toFixed(1)}
                   </b>
                 ) : null}
-                {detail?.subbedInMinute ? (
-                  <em className="lineup-substitution-minute">IN {detail.subbedInMinute}</em>
-                ) : (
-                  <em>-</em>
-                )}
+                <LineupSubstitutionMinutes detail={detail} />
               </div>
             );
           })
@@ -904,6 +979,19 @@ function LineupList({
         )}
       </div>
     </div>
+  );
+}
+
+function LineupSubstitutionMinutes({ detail }: { detail?: LineupPlayerDetail }) {
+  if (!detail?.subbedInMinute && !detail?.subbedOutMinute) {
+    return <em>-</em>;
+  }
+
+  return (
+    <em className="lineup-substitution-minutes">
+      {detail.subbedInMinute ? <span className="lineup-substitution-minute in">IN {detail.subbedInMinute}</span> : null}
+      {detail.subbedOutMinute ? <span className="lineup-substitution-minute out">OUT {detail.subbedOutMinute}</span> : null}
+    </em>
   );
 }
 
@@ -1182,8 +1270,8 @@ function TeamStatsPanel({ fixture, state }: { fixture: FixtureSummary; state: Lo
       </div>
       <div className="team-stat-comparison">
         <div className="team-stat-head">
-          <strong>{fixture.homeTeamName ?? "홈팀"}</strong>
-          <strong>{fixture.awayTeamName ?? "원정팀"}</strong>
+          <strong>{displayTeamName(fixture.homeTeamId, fixture.homeTeamName ?? "홈팀")}</strong>
+          <strong>{displayTeamName(fixture.awayTeamId, fixture.awayTeamName ?? "원정팀")}</strong>
         </div>
         {rows.map((row) => (
           <StatCompareRow key={row.label} row={row} />
@@ -1242,17 +1330,18 @@ function PlayerStatsPanel({ state }: { state: LoadState<FixturePlayerStatRespons
 }
 
 function PlayerStatTable({ group }: { group: FixtureTeamPlayerStats }) {
-  const players = (group.players ?? []).slice().sort((a, b) => {
-    const minuteOrder = zeroMinuteRank(a.minutesPlayed) - zeroMinuteRank(b.minutesPlayed);
-    if (minuteOrder !== 0) {
-      return minuteOrder;
-    }
-
-    return comparePlayerOrder(
-      { position: a.position, number: a.jerseyNumber, name: a.playerName },
-      { position: b.position, number: b.jerseyNumber, name: b.playerName },
-    );
+  const [sort, setSort] = useState<{ key: PlayerStatSortKey | null; direction: SortDirection }>({
+    key: null,
+    direction: "desc",
   });
+  const players = sortPlayerStats(group.players ?? [], sort.key, sort.direction);
+
+  function updateSort(key: PlayerStatSortKey) {
+    setSort((current) => ({
+      key,
+      direction: current.key === key && current.direction === "desc" ? "asc" : "desc",
+    }));
+  }
 
   return (
     <section className="player-stat-team">
@@ -1263,13 +1352,13 @@ function PlayerStatTable({ group }: { group: FixtureTeamPlayerStats }) {
             <tr>
               <th>선수</th>
               <th>포지션</th>
-              <th>분</th>
-              <th>평점</th>
-              <th>골</th>
-              <th>도움</th>
-              <th>슈팅</th>
-              <th>패스</th>
-              <th>태클</th>
+              <SortableStatHead activeKey={sort.key} direction={sort.direction} label="분" sortKey="minutes" onSort={updateSort} />
+              <SortableStatHead activeKey={sort.key} direction={sort.direction} label="평점" sortKey="rating" onSort={updateSort} />
+              <SortableStatHead activeKey={sort.key} direction={sort.direction} label="골" sortKey="goals" onSort={updateSort} />
+              <SortableStatHead activeKey={sort.key} direction={sort.direction} label="도움" sortKey="assists" onSort={updateSort} />
+              <SortableStatHead activeKey={sort.key} direction={sort.direction} label="슈팅" sortKey="shots" onSort={updateSort} />
+              <SortableStatHead activeKey={sort.key} direction={sort.direction} label="패스" sortKey="passes" onSort={updateSort} />
+              <SortableStatHead activeKey={sort.key} direction={sort.direction} label="태클" sortKey="tackles" onSort={updateSort} />
               <th>카드</th>
             </tr>
           </thead>
@@ -1290,6 +1379,35 @@ function PlayerStatTable({ group }: { group: FixtureTeamPlayerStats }) {
   );
 }
 
+function SortableStatHead({
+  activeKey,
+  direction,
+  label,
+  onSort,
+  sortKey,
+}: {
+  activeKey: PlayerStatSortKey | null;
+  direction: SortDirection;
+  label: string;
+  onSort: (key: PlayerStatSortKey) => void;
+  sortKey: PlayerStatSortKey;
+}) {
+  const isActive = activeKey === sortKey;
+  return (
+    <th>
+      <button
+        aria-label={`${label} 기준 정렬`}
+        className={`player-stat-sort-button${isActive ? " active" : ""}`}
+        onClick={() => onSort(sortKey)}
+        type="button"
+      >
+        {label}
+        {isActive ? <span aria-hidden="true">{direction === "desc" ? "↓" : "↑"}</span> : null}
+      </button>
+    </th>
+  );
+}
+
 function PlayerStatRow({ player }: { player: FixturePlayerStat }) {
   return (
     <tr>
@@ -1299,9 +1417,9 @@ function PlayerStatRow({ player }: { player: FixturePlayerStat }) {
           {player.playerName ?? "-"}
         </Link>
       </td>
-      <td>{player.position ?? "-"}</td>
+      <td>{compactPosition(player.position)}</td>
       <td>{numberText(player.minutesPlayed)}</td>
-      <td>{player.rating ? player.rating.toFixed(1) : "-"}</td>
+      <td>{player.rating ? <span className={ratingClassName(player.rating)}>{player.rating.toFixed(1)}</span> : "-"}</td>
       <td>{numberText(player.goals)}</td>
       <td>{numberText(player.assists)}</td>
       <td>
@@ -1310,10 +1428,103 @@ function PlayerStatRow({ player }: { player: FixturePlayerStat }) {
       <td>{numberText(player.passesTotal)}</td>
       <td>{numberText(player.tacklesTotal)}</td>
       <td>
-        {numberText(player.yellowCards)}Y / {numberText(player.redCards)}R
+        <CardStatIcons yellowCards={player.yellowCards} redCards={player.redCards} />
       </td>
     </tr>
   );
+}
+
+function CardStatIcons({ yellowCards, redCards }: { yellowCards: number | null; redCards: number | null }) {
+  const yellow = yellowCards ?? 0;
+  const red = redCards ?? 0;
+  if (yellow === 0 && red === 0) {
+    return <span className="muted">-</span>;
+  }
+  return (
+    <span className="player-card-icons">
+      {yellow > 0 ? (
+        <span className="player-card-icon" title={`옐로카드 ${yellow}`}>
+          <img src="/events/yellow-card.svg" alt="옐로카드" />
+          {yellow > 1 ? <span>{yellow}</span> : null}
+        </span>
+      ) : null}
+      {red > 0 ? (
+        <span className="player-card-icon" title={`레드카드 ${red}`}>
+          <img src="/events/red-card.svg" alt="레드카드" />
+          {red > 1 ? <span>{red}</span> : null}
+        </span>
+      ) : null}
+    </span>
+  );
+}
+
+function sortPlayerStats(players: FixturePlayerStat[], sortKey: PlayerStatSortKey | null, direction: SortDirection) {
+  const sorted = players.slice();
+  if (!sortKey) {
+    return sorted.sort(compareDefaultPlayerStats);
+  }
+  return sorted.sort((left, right) => {
+    const order = comparePlayerStatValue(left, right, sortKey)
+      || compareDefaultPlayerStats(left, right);
+    return direction === "desc" ? order : -order;
+  });
+}
+
+function comparePlayerStatValue(left: FixturePlayerStat, right: FixturePlayerStat, key: PlayerStatSortKey) {
+  if (key === "shots") {
+    return compareNumberDescending(left.shotsOnTarget ?? 0, right.shotsOnTarget ?? 0)
+      || compareNumberDescending(left.shotsTotal ?? 0, right.shotsTotal ?? 0);
+  }
+  return compareNumberDescending(playerStatValue(left, key), playerStatValue(right, key));
+}
+
+function compareDefaultPlayerStats(left: FixturePlayerStat, right: FixturePlayerStat) {
+  const minuteOrder = zeroMinuteRank(left.minutesPlayed) - zeroMinuteRank(right.minutesPlayed);
+  if (minuteOrder !== 0) {
+    return minuteOrder;
+  }
+  return comparePlayerOrder(
+    { position: left.position, number: left.jerseyNumber, name: left.playerName },
+    { position: right.position, number: right.jerseyNumber, name: right.playerName },
+  );
+}
+
+function playerStatValue(player: FixturePlayerStat, key: PlayerStatSortKey) {
+  switch (key) {
+    case "minutes":
+      return player.minutesPlayed ?? 0;
+    case "rating":
+      return player.rating ?? 0;
+    case "goals":
+      return player.goals ?? 0;
+    case "assists":
+      return player.assists ?? 0;
+    case "shots":
+      return player.shotsOnTarget ?? 0;
+    case "passes":
+      return player.passesTotal ?? 0;
+    case "tackles":
+      return player.tacklesTotal ?? 0;
+    default:
+      return 0;
+  }
+}
+
+function compactPosition(position: string | null) {
+  const normalized = position?.trim().toUpperCase() ?? "";
+  if (normalized === "G" || normalized === "GK" || normalized.includes("GOAL")) {
+    return "G";
+  }
+  if (normalized === "D" || normalized.includes("DEF")) {
+    return "D";
+  }
+  if (normalized === "M" || normalized.includes("MID")) {
+    return "M";
+  }
+  if (normalized === "F" || normalized.includes("ATT") || normalized.includes("FOR")) {
+    return "F";
+  }
+  return normalized.slice(0, 1) || "-";
 }
 
 function SectionLoading({ label }: { label: string }) {
@@ -1383,6 +1594,40 @@ function positionedPlayers(team: FixtureTeamLineup | null, side: Side): Position
     });
 }
 
+function positionedMobilePlayers(team: FixtureTeamLineup | null, side: Side): PositionedPlayer[] {
+  if (!team?.starters?.length) {
+    return [];
+  }
+
+  const parsedPlayers = team.starters
+    .map((player) => ({ player, grid: parseGrid(player.grid) }))
+    .filter((item): item is { player: FixtureLineupPlayer; grid: { row: number; column: number } } => Boolean(item.grid));
+  const columnsByRow = new Map<number, number[]>();
+
+  parsedPlayers.forEach(({ grid }) => {
+    const columns = columnsByRow.get(grid.row) ?? [];
+    columnsByRow.set(grid.row, [...columns, grid.column].sort((a, b) => a - b));
+  });
+
+  return parsedPlayers.map(({ player, grid }) => {
+    const isGoalkeeper = isGoalkeeperPosition(player.position);
+    const color = (isGoalkeeper ? team.colors?.goalkeeper : team.colors?.player) ?? {
+      primary: side === "home" ? "#b4d455" : "#b9d7f4",
+      number: "#102015",
+      border: "#ffffff",
+    };
+    const rowColumns = columnsByRow.get(grid.row) ?? [grid.column];
+
+    return {
+      player,
+      side,
+      left: playerTop(grid.column, rowColumns),
+      top: mobilePlayerTop(grid.row, side),
+      color,
+    };
+  });
+}
+
 function parseGrid(value: string | null) {
   if (!value) {
     return null;
@@ -1408,6 +1653,12 @@ function playerTop(column: number, rowColumns: number[]) {
   const rowSize = Math.max(orderedColumns.length, 1);
   const step = rowSize === 1 ? 0 : Math.min(32, 76 / (rowSize - 1));
   return 50 + (columnIndex - (rowSize - 1) / 2) * step;
+}
+
+function mobilePlayerTop(row: number, side: Side) {
+  const clampedRow = Math.max(1, Math.min(row, 5));
+  const topHalf = 7 + ((clampedRow - 1) / 4) * 40;
+  return side === "home" ? topHalf : 100 - topHalf;
 }
 
 function sortLineupPlayers(players: FixtureLineupPlayer[]) {
@@ -1571,7 +1822,6 @@ function buildEventTimeline(events: FixtureEvent[], fixture: FixtureSummary): Ev
 
     timeline.push({ kind: "event", event, category, side, score });
   });
-
   if (isFullTimeFixture(fixture)) {
     timeline.push({
       kind: "section",
@@ -1670,6 +1920,12 @@ function isVarGoalCancelledEvent(event: FixtureEvent) {
 }
 
 function varEventLabel(event: FixtureEvent) {
+  if (normalizedEventDetail(event) === "goal cancelled" && event.player?.name) {
+    return `${event.player.name}의 골 취소`;
+  }
+  if (normalizedEventDetail(event) === "goal confirmed" && event.player?.name) {
+    return `${event.player.name}의 골 확정`;
+  }
   const labels: Record<string, string> = {
     "goal cancelled": "골 취소",
     "goal confirmed": "골 확정",

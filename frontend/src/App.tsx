@@ -112,7 +112,7 @@ function LeagueTeamStatsRoute() {
 }
 
 function FixtureDetailRoute() {
-  return <FixtureDetailPage />;
+  return <FixtureDetailPage currentUser={useLeagueAuthState().currentUser} />;
 }
 
 function MyPageRoute() {
@@ -126,12 +126,12 @@ function AdminRoute() {
 
 function PlayerDetailRoute() {
   const authState = useLeagueAuthState();
-  return <PlayerDetailPage authStatus={authState.authStatus} season={authState.season} />;
+  return <PlayerDetailPage authStatus={authState.authStatus} currentUser={authState.currentUser} season={authState.season} />;
 }
 
 function TeamDetailRoute() {
   const authState = useLeagueAuthState();
-  return <TeamDetailPage authStatus={authState.authStatus} season={authState.season} />;
+  return <TeamDetailPage authStatus={authState.authStatus} currentUser={authState.currentUser} season={authState.season} />;
 }
 
 const searchTabs: { label: string; value: SearchScope }[] = [
