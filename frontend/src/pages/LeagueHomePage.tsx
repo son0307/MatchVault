@@ -14,7 +14,7 @@ import {
   type TeamStanding,
 } from "../api";
 import { formatFixtureDateKey, parseKoreaDateTime } from "../dateUtils";
-import { displayTeamName } from "../teamNames";
+import { displayLocalizedName } from "../teamNames";
 
 export function LeagueHomePage({ authStatus, season }: { authStatus: AuthStatus; season: number }) {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -272,10 +272,10 @@ function CompactRanking({ standings }: { standings: TeamStanding[] }) {
           )}
           {standing.team?.id ? (
             <Link className="team-name-link" to={`/teams/${standing.team.id}`}>
-              {displayTeamName(standing.team.id, standing.team.name)}
+              {displayLocalizedName(standing.team.nameKo, standing.team.name)}
             </Link>
           ) : (
-            <strong>{displayTeamName(standing.team?.id, standing.team?.name)}</strong>
+            <strong>{displayLocalizedName(standing.team?.nameKo, standing.team?.name)}</strong>
           )}
           <b>{standing.points ?? 0}</b>
         </div>
@@ -295,7 +295,7 @@ function FixtureSchedule({ fixtures }: { fixtures: FixtureSummary[] }) {
         <Link className="home-fixture-card" key={fixture.fixtureId} to={`/fixtures/${fixture.fixtureId}`}>
           <time>{formatTime(fixture.fixtureDate)}</time>
           <div className="home-fixture-teams">
-            <strong>{displayTeamName(fixture.homeTeamId, fixture.homeTeamName)}</strong>
+            <strong>{displayLocalizedName(fixture.homeTeamNameKo, fixture.homeTeamName)}</strong>
             {fixture.homeTeamLogoUrl ? (
               <img src={fixture.homeTeamLogoUrl} alt="" className="team-logo" />
             ) : (
@@ -307,7 +307,7 @@ function FixtureSchedule({ fixtures }: { fixtures: FixtureSummary[] }) {
             ) : (
               <span className="team-logo placeholder" aria-hidden="true" />
             )}
-            <strong>{displayTeamName(fixture.awayTeamId, fixture.awayTeamName)}</strong>
+            <strong>{displayLocalizedName(fixture.awayTeamNameKo, fixture.awayTeamName)}</strong>
           </div>
           <span className="status-pill">{fixture.fixtureStatus ?? "예정"}</span>
         </Link>
@@ -383,15 +383,15 @@ function FavoriteTeamItem({ team }: { team: FavoriteTeamCard }) {
         )}
         <div>
           <Link className="team-name-link" to={`/teams/${team.teamId}`}>
-            {team.teamName ?? "-"}
+            {displayLocalizedName(team.teamNameKo, team.teamName)}
           </Link>
           <p>{numberText(team.rank)}위 · {numberText(team.points)}점 · 최근 {team.form ?? "-"}</p>
         </div>
       </div>
       {team.liveFixture ? (
-        <p className="favorite-line live">LIVE {team.liveFixture.elapsed ?? "-"}' · {team.liveFixture.homeTeamName} {team.liveFixture.homeScore}:{team.liveFixture.awayScore} {team.liveFixture.awayTeamName}</p>
+        <p className="favorite-line live">LIVE {team.liveFixture.elapsed ?? "-"}' · {displayLocalizedName(team.liveFixture.homeTeamNameKo, team.liveFixture.homeTeamName)} {team.liveFixture.homeScore}:{team.liveFixture.awayScore} {displayLocalizedName(team.liveFixture.awayTeamNameKo, team.liveFixture.awayTeamName)}</p>
       ) : team.nextFixture ? (
-        <p className="favorite-line">다음 경기 · {team.nextFixture.homeTeamName} vs {team.nextFixture.awayTeamName}</p>
+        <p className="favorite-line">다음 경기 · {displayLocalizedName(team.nextFixture.homeTeamNameKo, team.nextFixture.homeTeamName)} vs {displayLocalizedName(team.nextFixture.awayTeamNameKo, team.nextFixture.awayTeamName)}</p>
       ) : (
         <p className="favorite-line muted">예정된 경기 정보가 없습니다.</p>
       )}
@@ -410,9 +410,9 @@ function FavoritePlayerItem({ player }: { player: FavoritePlayerCard }) {
         )}
         <div>
           <Link className="favorite-player-link" to={`/players/${player.playerId}`}>
-            {player.playerName ?? "-"}
+            {displayLocalizedName(player.playerNameKo, player.playerName)}
           </Link>
-          <p>{player.position ?? "Player"} · {player.seasonStat?.teamName ?? "-"}</p>
+          <p>{player.position ?? "Player"} · {displayLocalizedName(player.seasonStat?.teamNameKo, player.seasonStat?.teamName)}</p>
         </div>
       </div>
       <p className="favorite-line">
@@ -435,9 +435,9 @@ function FavoritePlayerItemV2({ player }: { player: FavoritePlayerCard }) {
         )}
         <div>
           <Link className="favorite-player-link" to={`/players/${player.playerId}`}>
-            {player.playerName ?? "-"}
+            {displayLocalizedName(player.playerNameKo, player.playerName)}
           </Link>
-          <p>{player.position ?? "Player"} · {seasonStat?.teamName ?? "-"}</p>
+          <p>{player.position ?? "Player"} · {displayLocalizedName(seasonStat?.teamNameKo, seasonStat?.teamName)}</p>
         </div>
       </div>
       {seasonStat ? (

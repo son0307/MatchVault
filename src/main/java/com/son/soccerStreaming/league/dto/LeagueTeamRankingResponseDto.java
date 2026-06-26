@@ -29,6 +29,7 @@ public class LeagueTeamRankingResponseDto {
         private Integer rank;
         private Long teamId;
         private String teamName;
+        private String teamNameKo;
         private String teamLogoUrl;
         private Integer teamRank;
         private int played;

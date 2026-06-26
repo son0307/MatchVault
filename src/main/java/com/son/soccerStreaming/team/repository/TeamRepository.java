@@ -18,7 +18,14 @@ public interface TeamRepository extends JpaRepository<Team, Long> {
 
     List<Team> findAllByOrderByNameAsc();
 
-    List<Team> findTop20ByNameContainingIgnoreCaseOrderByNameAsc(String keyword);
+    @Query("""
+            select t
+            from Team t
+            where lower(t.name) like lower(concat('%', :keyword, '%'))
+               or lower(coalesce(t.koreanName, '')) like lower(concat('%', :keyword, '%'))
+            order by t.name asc
+            """)
+    List<Team> findTop20ByNameOrKoreanNameContainingIgnoreCaseOrderByNameAsc(@Param("keyword") String keyword);
 
     @Query("""
             select t

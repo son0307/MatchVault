@@ -81,6 +81,16 @@ public class FixtureController {
         return ResponseEntity.ok(fixtureService.getFixture(fixtureId));
     }
 
+    @Operation(summary = "Head-to-head fixtures", description = "Returns recent EPL fixtures between the two teams in the selected fixture.")
+    @GetMapping("/{fixtureId}/head-to-head")
+    public ResponseEntity<FixtureResponseDto.HeadToHead> getHeadToHead(
+            @Parameter(description = "Fixture API ID", example = "1208000")
+            @PathVariable Long fixtureId,
+            @Parameter(description = "Recent match limit", example = "10")
+            @RequestParam(defaultValue = "10") int limit) {
+        return ResponseEntity.ok(fixtureService.getHeadToHead(fixtureId, limit));
+    }
+
     @Operation(summary = "특정 경기 라인업 조회", description = "선발, 교체, 결장 선수 정보를 팀별로 조회합니다.")
     @GetMapping("/{fixtureId}/lineups")
     public ResponseEntity<FixtureLineupResponseDto.Lineup> getLineup(
@@ -106,9 +116,7 @@ public class FixtureController {
     public ResponseEntity<FixturePlayerStatResponseDto> getFixturePlayerStats(
             @Parameter(description = "조회할 경기 API fixture ID", example = "1208000")
             @PathVariable Long fixtureId) {
-        return fixtureRedisService.getPlayerStats(fixtureId)
-                .map(ResponseEntity::ok)
-                .orElseGet(() -> ResponseEntity.ok(fixturePlayerStatService.getFixturePlayerStats(fixtureId)));
+        return ResponseEntity.ok(fixturePlayerStatService.getFixturePlayerStats(fixtureId));
     }
 
     @Operation(summary = "특정 경기 이벤트 조회", description = "특정 경기에서 발생한 골, 카드, 교체 등 이벤트 목록을 조회합니다.")

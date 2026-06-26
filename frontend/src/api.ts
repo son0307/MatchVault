@@ -6,7 +6,9 @@ export type FixtureSummary = {
   homeTeamId: number | null;
   awayTeamId: number | null;
   homeTeamName: string | null;
+  homeTeamNameKo: string | null;
   awayTeamName: string | null;
+  awayTeamNameKo: string | null;
   homeTeamLogoUrl: string | null;
   awayTeamLogoUrl: string | null;
   homeScore: number | null;
@@ -68,10 +70,12 @@ export type LeaguePlayerRankingRow = {
   rank: number;
   playerId: number;
   playerName: string | null;
+  playerNameKo: string | null;
   photoUrl: string | null;
   position: string | null;
   teamId: number;
   teamName: string | null;
+  teamNameKo: string | null;
   teamLogoUrl: string | null;
   teamRank: number | null;
   appearances: number;
@@ -106,6 +110,7 @@ export type LeagueTeamRankingRow = {
   rank: number;
   teamId: number;
   teamName: string | null;
+  teamNameKo: string | null;
   teamLogoUrl: string | null;
   teamRank: number | null;
   played: number;
@@ -144,6 +149,7 @@ export type FixtureEvent = {
 export type FixtureEventPlayer = {
   id: number;
   name: string | null;
+  nameKo: string | null;
 };
 
 export type FixtureLineupResponse = {
@@ -155,6 +161,7 @@ export type FixtureLineupResponse = {
 export type FixtureTeamLineup = {
   teamId: number;
   teamName: string | null;
+  teamNameKo: string | null;
   formation: string | null;
   coachName: string | null;
   colors: FixtureUniformColors | null;
@@ -177,6 +184,7 @@ export type FixtureColorInfo = {
 export type FixtureLineupPlayer = {
   playerId: number;
   playerName: string | null;
+  playerNameKo: string | null;
   photoUrl: string | null;
   backNumber: number | null;
   position: string | null;
@@ -187,8 +195,10 @@ export type FixtureLineupPlayer = {
 export type FixtureLineupAbsence = {
   playerId: number;
   playerName: string | null;
+  playerNameKo: string | null;
   teamId: number;
   teamName: string | null;
+  teamNameKo: string | null;
   absenceType: string | null;
   reason: string | null;
 };
@@ -201,6 +211,8 @@ export type FixtureStatResponse = {
 
 export type FixtureTeamStat = {
   teamId: number;
+  teamName: string | null;
+  teamNameKo: string | null;
   score: number;
   shotsOnGoal: number;
   shotsOffGoal: number;
@@ -231,12 +243,14 @@ export type FixturePlayerStatResponse = {
 export type FixtureTeamPlayerStats = {
   teamId: number;
   teamName: string | null;
+  teamNameKo: string | null;
   players: FixturePlayerStat[];
 };
 
 export type FixturePlayerStat = {
   playerId: number;
   playerName: string | null;
+  playerNameKo: string | null;
   jerseyNumber: number | null;
   position: string | null;
   minutesPlayed: number | null;
@@ -255,9 +269,46 @@ export type FixturePlayerStat = {
   redCards: number | null;
 };
 
+export type FixtureHeadToHead = {
+  summary: FixtureHeadToHeadSummary;
+  recentMatches: FixtureHeadToHeadMatch[];
+};
+
+export type FixtureHeadToHeadSummary = {
+  homeTeamId: number | null;
+  homeTeamName: string | null;
+  homeTeamNameKo: string | null;
+  awayTeamId: number | null;
+  awayTeamName: string | null;
+  awayTeamNameKo: string | null;
+  matches: number;
+  homeWins: number;
+  draws: number;
+  awayWins: number;
+  homeGoals: number;
+  awayGoals: number;
+};
+
+export type FixtureHeadToHeadMatch = {
+  fixtureId: number;
+  fixtureDate: string | null;
+  season: number | null;
+  round: number | null;
+  homeTeamId: number | null;
+  homeTeamName: string | null;
+  homeTeamNameKo: string | null;
+  awayTeamId: number | null;
+  awayTeamName: string | null;
+  awayTeamNameKo: string | null;
+  homeScore: number | null;
+  awayScore: number | null;
+  fixtureStatus: string | null;
+};
+
 export type TeamSummary = {
   teamId: number;
   teamName: string | null;
+  teamNameKo: string | null;
   code: string | null;
   logoUrl: string | null;
 };
@@ -273,6 +324,7 @@ export type SearchResponse = {
 export type TeamSearchResult = {
   teamId: number;
   teamName: string | null;
+  teamNameKo: string | null;
   code: string | null;
   logoUrl: string | null;
 };
@@ -280,6 +332,7 @@ export type TeamSearchResult = {
 export type PlayerSearchResult = {
   playerId: number;
   playerName: string | null;
+  playerNameKo: string | null;
   position: string | null;
   photoUrl: string | null;
 };
@@ -288,7 +341,9 @@ export type FixtureSearchResult = {
   fixtureId: number;
   fixtureDate: string | null;
   homeTeamName: string | null;
+  homeTeamNameKo: string | null;
   awayTeamName: string | null;
+  awayTeamNameKo: string | null;
   homeScore: number | null;
   awayScore: number | null;
   fixtureStatus: string | null;
@@ -313,6 +368,7 @@ export type TeamVenue = {
 export type PlayerSummary = {
   playerId: number;
   playerName: string | null;
+  playerNameKo: string | null;
   backNumber: number | null;
   position: string | null;
   photoUrl: string | null;
@@ -325,6 +381,7 @@ export type TeamPlayerRankings = {
 export type TeamPlayerRanking = {
   playerId: number;
   playerName: string | null;
+  playerNameKo: string | null;
   photoUrl: string | null;
   position: string | null;
   goals: number;
@@ -375,6 +432,7 @@ export type TeamStanding = {
   team: {
     id: number;
     name: string | null;
+    nameKo: string | null;
     logo: string | null;
   } | null;
   points: number | null;
@@ -400,6 +458,7 @@ export type FavoriteDashboard = {
 export type FavoriteTeamCard = {
   teamId: number;
   teamName: string | null;
+  teamNameKo: string | null;
   logoUrl: string | null;
   rank: number | null;
   points: number | null;
@@ -413,7 +472,9 @@ export type FavoriteTeamFixture = {
   fixtureId: number;
   fixtureDate: string | null;
   homeTeamName: string | null;
+  homeTeamNameKo: string | null;
   awayTeamName: string | null;
+  awayTeamNameKo: string | null;
   homeScore: number | null;
   awayScore: number | null;
   fixtureStatus: string | null;
@@ -429,6 +490,7 @@ export type FavoriteLiveFixture = FavoriteTeamFixture & {
 export type FavoritePlayerCard = {
   playerId: number;
   playerName: string | null;
+  playerNameKo: string | null;
   photoUrl: string | null;
   position: string | null;
   recentMatch: FavoriteRecentPlayerMatch | null;
@@ -439,7 +501,9 @@ export type FavoriteRecentPlayerMatch = {
   fixtureId: number;
   fixtureDate: string | null;
   teamName: string | null;
+  teamNameKo: string | null;
   opponentTeamName: string | null;
+  opponentTeamNameKo: string | null;
   teamScore: number | null;
   opponentScore: number | null;
   minutesPlayed: number | null;
@@ -451,6 +515,7 @@ export type FavoriteRecentPlayerMatch = {
 export type FavoritePlayerSeasonStat = {
   season: number | null;
   teamName: string | null;
+  teamNameKo: string | null;
   teamLogoUrl: string | null;
   teamCount: number | null;
   aggregated: boolean | null;
@@ -472,6 +537,7 @@ export type PlayerPanel = {
 export type PlayerProfile = {
   playerId: number;
   playerName: string | null;
+  playerNameKo: string | null;
   firstname: string | null;
   lastname: string | null;
   backNumber: number | null;
@@ -486,6 +552,7 @@ export type PlayerProfile = {
   photoUrl: string | null;
   teamId: number | null;
   teamName: string | null;
+  teamNameKo: string | null;
   teamLogoUrl: string | null;
 };
 
@@ -510,6 +577,7 @@ export type PlayerSeasonSummary = {
 export type PlayerTeamSeasonSummary = {
   teamId: number;
   teamName: string | null;
+  teamNameKo: string | null;
   teamLogoUrl: string | null;
   totalFixtures: number;
   minutesPlayed: number;
@@ -533,14 +601,18 @@ export type PlayerMatchStat = {
   round: number | null;
   teamId: number | null;
   teamName: string | null;
+  teamNameKo: string | null;
   opponentTeamId: number | null;
   opponentTeamName: string | null;
+  opponentTeamNameKo: string | null;
   teamScore: number | null;
   opponentScore: number | null;
   homeTeamId: number | null;
   homeTeamName: string | null;
+  homeTeamNameKo: string | null;
   awayTeamId: number | null;
   awayTeamName: string | null;
+  awayTeamNameKo: string | null;
   homeScore: number | null;
   awayScore: number | null;
   minutesPlayed: number | null;
@@ -641,6 +713,15 @@ export async function fetchFixture(fixtureId: number): Promise<FixtureSummary> {
 
 }
 
+export async function fetchFixtureHeadToHead(fixtureId: number, limit = 10): Promise<FixtureHeadToHead> {
+  return cachedGetJson<FixtureHeadToHead>(
+    `/api/v1/fixtures/${fixtureId}/head-to-head?limit=${limit}`,
+    "최근 전적을 불러오지 못했습니다.",
+    DETAIL_CACHE_TTL_MS,
+  );
+
+}
+
 export async function fetchFixtureMeta(season: number): Promise<FixtureMeta> {
   return cachedGetJson<FixtureMeta>(
     `/api/v1/fixtures/meta?season=${normalizeSeason(season)}`,
@@ -651,19 +732,17 @@ export async function fetchFixtureMeta(season: number): Promise<FixtureMeta> {
 }
 
 export async function fetchFixtureEvents(fixtureId: number): Promise<FixtureEventResponse> {
-  return cachedGetJson<FixtureEventResponse>(
+  return fetchJson<FixtureEventResponse>(
     `/api/v1/fixtures/${fixtureId}/events`,
     "경기 이벤트를 불러오지 못했습니다.",
-    DETAIL_CACHE_TTL_MS,
   );
 
 }
 
 export async function fetchFixtureLineups(fixtureId: number): Promise<FixtureLineupResponse> {
-  return cachedGetJson<FixtureLineupResponse>(
+  return fetchJson<FixtureLineupResponse>(
     `/api/v1/fixtures/${fixtureId}/lineups`,
     "라인업을 불러오지 못했습니다.",
-    DETAIL_CACHE_TTL_MS,
   );
 
 }
@@ -677,10 +756,9 @@ export async function fetchFixtureStats(fixtureId: number): Promise<FixtureStatR
 }
 
 export async function fetchFixturePlayerStats(fixtureId: number): Promise<FixturePlayerStatResponse> {
-  return cachedGetJson<FixturePlayerStatResponse>(
+  return fetchJson<FixturePlayerStatResponse>(
     `/api/v1/fixtures/${fixtureId}/player-stats`,
     "선수별 경기 통계를 불러오지 못했습니다.",
-    SHORT_CACHE_TTL_MS,
   );
 }
 

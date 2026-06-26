@@ -1,5 +1,6 @@
 package com.son.soccerStreaming.fixture.service;
 
+import com.son.soccerStreaming.fixture.dto.FixtureResponseDto;
 import com.son.soccerStreaming.fixture.entity.Fixture;
 import com.son.soccerStreaming.fixture.repository.FixtureRepository;
 import com.son.soccerStreaming.global.exception.CustomException;
@@ -80,6 +81,83 @@ class FixtureServiceTest {
 
         assertThatThrownBy(() -> fixtureService.getFixture(404L))
                 .isInstanceOf(CustomException.class);
+    }
+
+    @Test
+    void getHeadToHeadAggregatesFinishedMatchesFromCurrentHomeTeamPerspective() {
+        Team tottenham = Team.builder()
+                .id(1L)
+                .teamId(47L)
+                .name("Tottenham")
+                .koreanName("토트넘")
+                .build();
+        Team chelsea = Team.builder()
+                .id(2L)
+                .teamId(49L)
+                .name("Chelsea")
+                .koreanName("첼시")
+                .build();
+        Fixture current = Fixture.builder()
+                .fixtureId(100L)
+                .leagueId(39)
+                .fixtureDate(LocalDateTime.of(2026, 5, 22, 12, 0))
+                .homeTeam(tottenham)
+                .awayTeam(chelsea)
+                .fixtureStatus("SCHEDULED")
+                .build();
+        Fixture homeWin = Fixture.builder()
+                .fixtureId(90L)
+                .leagueId(39)
+                .fixtureDate(LocalDateTime.of(2025, 5, 10, 12, 0))
+                .homeTeam(tottenham)
+                .awayTeam(chelsea)
+                .homeScore(2)
+                .awayScore(1)
+                .fixtureStatus("FINISHED")
+                .build();
+        Fixture awayWinWithSidesReversed = Fixture.builder()
+                .fixtureId(80L)
+                .leagueId(39)
+                .fixtureDate(LocalDateTime.of(2024, 5, 10, 12, 0))
+                .homeTeam(chelsea)
+                .awayTeam(tottenham)
+                .homeScore(1)
+                .awayScore(3)
+                .fixtureStatus("FT")
+                .build();
+        Fixture draw = Fixture.builder()
+                .fixtureId(70L)
+                .leagueId(39)
+                .fixtureDate(LocalDateTime.of(2023, 5, 10, 12, 0))
+                .homeTeam(chelsea)
+                .awayTeam(tottenham)
+                .homeScore(0)
+                .awayScore(0)
+                .fixtureStatus("FT")
+                .build();
+
+        when(fixtureRepository.findWithTeamsByFixtureId(100L)).thenReturn(Optional.of(current));
+        when(fixtureRepository.findHeadToHeadFixtures(
+                org.mockito.ArgumentMatchers.eq(100L),
+                org.mockito.ArgumentMatchers.eq(39),
+                org.mockito.ArgumentMatchers.eq(47L),
+                org.mockito.ArgumentMatchers.eq(49L),
+                org.mockito.ArgumentMatchers.eq(List.of("FINISHED", "FT", "AET", "PEN")),
+                org.mockito.ArgumentMatchers.eq(5)
+        )).thenReturn(List.of(homeWin, awayWinWithSidesReversed, draw));
+
+        var response = fixtureService.getHeadToHead(100L, 5);
+
+        assertThat(response.getSummary().getHomeTeamNameKo()).isEqualTo("토트넘");
+        assertThat(response.getSummary().getAwayTeamNameKo()).isEqualTo("첼시");
+        assertThat(response.getSummary().getMatches()).isEqualTo(3);
+        assertThat(response.getSummary().getHomeWins()).isEqualTo(2);
+        assertThat(response.getSummary().getDraws()).isEqualTo(1);
+        assertThat(response.getSummary().getAwayWins()).isZero();
+        assertThat(response.getSummary().getHomeGoals()).isEqualTo(5);
+        assertThat(response.getSummary().getAwayGoals()).isEqualTo(2);
+        assertThat(response.getRecentMatches()).extracting(FixtureResponseDto.HeadToHeadMatch::getFixtureId)
+                .containsExactly(90L, 80L, 70L);
     }
 
     @Test

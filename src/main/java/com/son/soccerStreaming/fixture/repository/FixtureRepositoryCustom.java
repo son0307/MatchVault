@@ -11,4 +11,7 @@ public interface FixtureRepositoryCustom {
                                                 Long teamId, int size);
 
     List<Fixture> searchByTeamNameTokens(List<String> tokens, int size);
+
+    List<Fixture> findHeadToHeadFixtures(Long fixtureId, Integer leagueId, Long homeTeamId, Long awayTeamId,
+                                          List<String> finishedStatuses, int limit);
 }

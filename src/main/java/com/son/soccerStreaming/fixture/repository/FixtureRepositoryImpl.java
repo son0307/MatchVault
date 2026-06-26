@@ -57,6 +57,26 @@ public class FixtureRepositoryImpl implements FixtureRepositoryCustom {
                 .fetch();
     }
 
+    @Override
+    public List<Fixture> findHeadToHeadFixtures(Long fixtureId, Integer leagueId, Long homeTeamId, Long awayTeamId,
+                                                 List<String> finishedStatuses, int limit) {
+        return queryFactory
+                .selectFrom(fixture)
+                .join(fixture.homeTeam).fetchJoin()
+                .join(fixture.awayTeam).fetchJoin()
+                .where(
+                        fixture.fixtureId.ne(fixtureId),
+                        fixture.leagueId.eq(leagueId),
+                        sameTeams(homeTeamId, awayTeamId),
+                        fixture.homeScore.isNotNull(),
+                        fixture.awayScore.isNotNull(),
+                        finished(finishedStatuses)
+                )
+                .orderBy(fixture.fixtureDate.desc(), fixture.fixtureId.desc())
+                .limit(limit)
+                .fetch();
+    }
+
     private BooleanExpression ltCursorId(Long cursorId) {
         return cursorId == null ? null : fixture.id.lt(cursorId);
     }
@@ -83,6 +103,17 @@ public class FixtureRepositoryImpl implements FixtureRepositoryCustom {
 
     private BooleanExpression containsHomeOrAwayTeamName(String token) {
         return fixture.homeTeam.name.containsIgnoreCase(token)
-                .or(fixture.awayTeam.name.containsIgnoreCase(token));
+                .or(fixture.awayTeam.name.containsIgnoreCase(token))
+                .or(fixture.homeTeam.koreanName.containsIgnoreCase(token))
+                .or(fixture.awayTeam.koreanName.containsIgnoreCase(token));
+    }
+
+    private BooleanExpression sameTeams(Long homeTeamId, Long awayTeamId) {
+        return fixture.homeTeam.teamId.eq(homeTeamId).and(fixture.awayTeam.teamId.eq(awayTeamId))
+                .or(fixture.homeTeam.teamId.eq(awayTeamId).and(fixture.awayTeam.teamId.eq(homeTeamId)));
+    }
+
+    private BooleanExpression finished(List<String> finishedStatuses) {
+        return fixture.fixtureStatus.in(finishedStatuses).or(fixture.statusShort.in(finishedStatuses));
     }
 }

@@ -105,6 +105,7 @@ public class TeamPlayerRankingService {
         return TeamResponseDto.PlayerRanking.builder()
                 .playerId(stat.getPlayer().getPlayerId())
                 .playerName(stat.getPlayer().getName())
+                .playerNameKo(stat.getPlayer().getKoreanName())
                 .photoUrl(mediaUrlService.playerPhotoUrl(stat.getPlayer()))
                 .position(stat.getPosition() != null ? stat.getPosition() : stat.getPlayer().getPosition())
                 .goals(valueOf(stat.getGoals()))

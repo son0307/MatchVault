@@ -7,6 +7,7 @@ import com.son.soccerStreaming.global.exception.CustomException;
 import com.son.soccerStreaming.global.exception.ErrorCode;
 import com.son.soccerStreaming.fixture.repository.FixtureRepository;
 import com.son.soccerStreaming.fixture.repository.FixtureStatRepository;
+import com.son.soccerStreaming.team.entity.Team;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -33,8 +34,8 @@ public class FixtureStatService {
 
         return FixtureStatResponseDto.builder()
                 .fixtureId(fixtureId)
-                .homeTeamStat(toSummary(fixture.getHomeTeam().getTeamId(), valueOf(fixture.getHomeScore()), statsByTeamId))
-                .awayTeamStat(toSummary(fixture.getAwayTeam().getTeamId(), valueOf(fixture.getAwayScore()), statsByTeamId))
+                .homeTeamStat(toSummary(fixture.getHomeTeam(), valueOf(fixture.getHomeScore()), statsByTeamId))
+                .awayTeamStat(toSummary(fixture.getAwayTeam(), valueOf(fixture.getAwayScore()), statsByTeamId))
                 .build();
     }
 
@@ -47,6 +48,11 @@ public class FixtureStatService {
     private FixtureStatResponseDto.TeamStatSummary toSummary(Long teamId, int score, Map<Long, FixtureStat> statsByTeamId) {
         FixtureStat stat = statsByTeamId.get(teamId);
         return stat == null ? emptySummary(teamId, score) : toSummary(teamId, score, stat);
+    }
+
+    private FixtureStatResponseDto.TeamStatSummary toSummary(Team team, int score, Map<Long, FixtureStat> statsByTeamId) {
+        FixtureStat stat = statsByTeamId.get(team.getTeamId());
+        return stat == null ? emptySummary(team, score) : toSummary(team, score, stat);
     }
 
     private FixtureStatResponseDto.TeamStatSummary toSummary(Long teamId, int score, FixtureStat stat) {
@@ -74,9 +80,45 @@ public class FixtureStatService {
                 .build();
     }
 
+    private FixtureStatResponseDto.TeamStatSummary toSummary(Team team, int score, FixtureStat stat) {
+        return FixtureStatResponseDto.TeamStatSummary.builder()
+                .teamId(team.getTeamId())
+                .teamName(team.getName())
+                .teamNameKo(team.getKoreanName())
+                .score(score)
+                .shotsOnGoal(valueOf(stat.getShotsOnGoal()))
+                .shotsOffGoal(valueOf(stat.getShotsOffGoal()))
+                .totalShots(valueOf(stat.getTotalShots()))
+                .shotsOnTarget(valueOf(stat.getShotsOnGoal()))
+                .blockedShots(valueOf(stat.getBlockedShots()))
+                .shotsInsideBox(valueOf(stat.getShotsInsideBox()))
+                .shotsOutsideBox(valueOf(stat.getShotsOutsideBox()))
+                .totalPasses(valueOf(stat.getTotalPasses()))
+                .passesAccurate(valueOf(stat.getPassesAccurate()))
+                .passAccuracy(valueOf(stat.getPassAccuracy()))
+                .fouls(valueOf(stat.getFouls()))
+                .cornerKicks(valueOf(stat.getCornerKicks()))
+                .offsides(valueOf(stat.getOffsides()))
+                .ballPossession(valueOf(stat.getBallPossession()))
+                .goalkeeperSaves(valueOf(stat.getGoalkeeperSaves()))
+                .yellowCards(valueOf(stat.getYellowCards()))
+                .redCards(valueOf(stat.getRedCards()))
+                .expectedGoals(stat.getExpectedGoals())
+                .build();
+    }
+
     private FixtureStatResponseDto.TeamStatSummary emptySummary(Long teamId, int score) {
         return FixtureStatResponseDto.TeamStatSummary.builder()
                 .teamId(teamId)
+                .score(score)
+                .build();
+    }
+
+    private FixtureStatResponseDto.TeamStatSummary emptySummary(Team team, int score) {
+        return FixtureStatResponseDto.TeamStatSummary.builder()
+                .teamId(team.getTeamId())
+                .teamName(team.getName())
+                .teamNameKo(team.getKoreanName())
                 .score(score)
                 .build();
     }

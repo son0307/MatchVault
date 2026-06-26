@@ -20,7 +20,7 @@ import {
 } from "../api";
 import type { AuthStatus } from "../App";
 import { formatFixtureDateKey, parseKoreaDateTime } from "../dateUtils";
-import { displayTeamName } from "../teamNames";
+import { displayLocalizedName } from "../teamNames";
 
 type LoadState<T> = {
   data: T | null;
@@ -418,7 +418,7 @@ function TeamHero({
       <div>
         <p className="eyebrow">{team.country ?? "Team"}</p>
         <div className="detail-title-row">
-          <h2>{displayTeamName(team.teamId, team.teamName)}</h2>
+          <h2>{displayLocalizedName(team.teamNameKo, team.teamName)}</h2>
           {canUseFavorite ? (
             <FavoriteToggleButton
               isActive={isFavorite}
@@ -537,7 +537,7 @@ function TeamFixtureGroups({ groupedFixtures }: { groupedFixtures: Array<[string
           {fixtures.map((fixture) => (
             <Link className="team-detail-fixture-row" key={fixture.fixtureId} to={`/fixtures/${fixture.fixtureId}`}>
               <time>{formatTime(fixture.fixtureDate)}</time>
-              <strong>{displayTeamName(fixture.homeTeamId, fixture.homeTeamName)}</strong>
+              <strong>{displayLocalizedName(fixture.homeTeamNameKo, fixture.homeTeamName)}</strong>
               {fixture.homeTeamLogoUrl ? (
                 <img src={fixture.homeTeamLogoUrl} alt="" className="team-logo" />
               ) : (
@@ -549,7 +549,7 @@ function TeamFixtureGroups({ groupedFixtures }: { groupedFixtures: Array<[string
               ) : (
                 <span className="team-logo placeholder" aria-hidden="true" />
               )}
-              <strong>{displayTeamName(fixture.awayTeamId, fixture.awayTeamName)}</strong>
+              <strong>{displayLocalizedName(fixture.awayTeamNameKo, fixture.awayTeamName)}</strong>
               <em>{fixture.fixtureStatus ?? "예정"}</em>
             </Link>
           ))}
@@ -577,7 +577,7 @@ function TeamPlayersPanel({ playersState, onRetry }: { playersState: LoadState<P
               <Link className="team-player-card" key={player.playerId} to={`/players/${player.playerId}`}>
                 {player.photoUrl ? <img src={player.photoUrl} alt="" className="player-thumb" /> : <span className="player-thumb placeholder" aria-hidden="true" />}
                 <div>
-                  <strong>{player.playerName ?? "-"}</strong>
+                  <strong>{displayLocalizedName(player.playerNameKo, player.playerName)}</strong>
                   <p>
                     {player.backNumber ? `No. ${player.backNumber}` : "등번호 없음"} · {player.position ?? "Player"}
                   </p>
@@ -628,7 +628,7 @@ function TeamPlayerRanksPanel({ rankState, onRetry }: { rankState: LoadState<Tea
               {group.rows.map((row, index) => (
                 <Link className="team-rank-row" key={row.playerId} to={`/players/${row.playerId}`}>
                   <span>{index + 1}</span>
-                  <strong>{row.playerName ?? "-"}</strong>
+                  <strong>{displayLocalizedName(row.playerNameKo, row.playerName)}</strong>
                   <em>{group.value(row)}</em>
                 </Link>
               ))}
