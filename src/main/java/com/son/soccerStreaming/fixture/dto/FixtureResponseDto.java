@@ -35,4 +35,49 @@ public class FixtureResponseDto {
         private Integer penaltyAwayScore;
         private String fixtureStatus;
     }
+
+    @Getter
+    @Builder
+    @AllArgsConstructor
+    public static class HeadToHead {
+        private HeadToHeadSummary summary;
+        private java.util.List<HeadToHeadMatch> recentMatches;
+    }
+
+    @Getter
+    @Builder
+    @AllArgsConstructor
+    public static class HeadToHeadSummary {
+        private Long homeTeamId;
+        private String homeTeamName;
+        private String homeTeamNameKo;
+        private Long awayTeamId;
+        private String awayTeamName;
+        private String awayTeamNameKo;
+        private int matches;
+        private int homeWins;
+        private int draws;
+        private int awayWins;
+        private int homeGoals;
+        private int awayGoals;
+    }
+
+    @Getter
+    @Builder
+    @AllArgsConstructor
+    public static class HeadToHeadMatch {
+        private Long fixtureId;
+        private LocalDateTime fixtureDate;
+        private Integer season;
+        private Integer round;
+        private Long homeTeamId;
+        private String homeTeamName;
+        private String homeTeamNameKo;
+        private Long awayTeamId;
+        private String awayTeamName;
+        private String awayTeamNameKo;
+        private Integer homeScore;
+        private Integer awayScore;
+        private String fixtureStatus;
+    }
 }

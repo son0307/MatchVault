@@ -24,6 +24,7 @@ import java.util.List;
 public class FixtureService {
 
     private static final ZoneId KOREA_ZONE = ZoneId.of("Asia/Seoul");
+    private static final List<String> FINISHED_FIXTURE_STATUSES = List.of("FINISHED", "FT", "AET", "PEN");
 
     private final FixtureRepository fixtureRepository;
     private final MediaUrlService mediaUrlService;
@@ -37,15 +38,68 @@ public class FixtureService {
     }
 
     @Transactional(readOnly = true)
+    public FixtureResponseDto.HeadToHead getHeadToHead(Long fixtureId, int limit) {
+        Fixture fixture = fixtureRepository.findWithTeamsByFixtureId(fixtureId)
+                .orElseThrow(() -> new CustomException(ErrorCode.FIXTURE_NOT_FOUND));
+        int normalizedLimit = Math.max(1, Math.min(limit, 10));
+        Long homeTeamId = fixture.getHomeTeam().getTeamId();
+        Long awayTeamId = fixture.getAwayTeam().getTeamId();
+        List<Fixture> matches = fixtureRepository.findHeadToHeadFixtures(
+                fixture.getFixtureId(),
+                fixture.getLeagueId(),
+                homeTeamId,
+                awayTeamId,
+                FINISHED_FIXTURE_STATUSES,
+                normalizedLimit
+        );
+
+        int homeWins = 0;
+        int draws = 0;
+        int awayWins = 0;
+        int homeGoals = 0;
+        int awayGoals = 0;
+        for (Fixture match : matches) {
+            Scoreline scoreline = scorelineForFixtureTeams(match, homeTeamId);
+            homeGoals += scoreline.homeTeamGoals();
+            awayGoals += scoreline.awayTeamGoals();
+            if (scoreline.homeTeamGoals() > scoreline.awayTeamGoals()) {
+                homeWins++;
+            } else if (scoreline.homeTeamGoals() < scoreline.awayTeamGoals()) {
+                awayWins++;
+            } else {
+                draws++;
+            }
+        }
+
+        return FixtureResponseDto.HeadToHead.builder()
+                .summary(FixtureResponseDto.HeadToHeadSummary.builder()
+                        .homeTeamId(homeTeamId)
+                        .homeTeamName(fixture.getHomeTeam().getName())
+                        .awayTeamId(awayTeamId)
+                        .awayTeamName(fixture.getAwayTeam().getName())
+                        .matches(matches.size())
+                        .homeWins(homeWins)
+                        .draws(draws)
+                        .awayWins(awayWins)
+                        .homeGoals(homeGoals)
+                        .awayGoals(awayGoals)
+                        .build())
+                .recentMatches(matches.stream()
+                        .map(this::toHeadToHeadMatch)
+                        .toList())
+                .build();
+    }
+
+    @Transactional(readOnly = true)
     public CursorResponse<FixtureResponseDto.Summary> getRecentFixtures(Long cursorId, Integer season, Integer round,
-                                                                         LocalDate date, int size) {
+                                                                        LocalDate date, int size) {
         return getRecentFixtures(cursorId, season, round, date, null, null, null, size);
     }
 
     @Transactional(readOnly = true)
     public CursorResponse<FixtureResponseDto.Summary> getRecentFixtures(Long cursorId, Integer season, Integer round,
-                                                                         LocalDate date, LocalDate dateFrom,
-                                                                         LocalDate dateTo, Long teamId, int size) {
+                                                                        LocalDate date, LocalDate dateFrom,
+                                                                        LocalDate dateTo, Long teamId, int size) {
         DateRange dateRange = utcRangeForKoreaDates(date, dateFrom, dateTo);
         List<Fixture> fixtures = fixtureRepository.findRecentFixturesWithCursor(
                 cursorId, season, round, dateRange.startDateTime(), dateRange.endDateTime(), teamId, size);
@@ -109,6 +163,29 @@ public class FixtureService {
                 .build();
     }
 
+    private FixtureResponseDto.HeadToHeadMatch toHeadToHeadMatch(Fixture fixture) {
+        return FixtureResponseDto.HeadToHeadMatch.builder()
+                .fixtureId(fixture.getFixtureId())
+                .fixtureDate(DateTimeUtils.utcToKorea(fixture.getFixtureDate()))
+                .season(fixture.getSeason())
+                .round(fixture.getRound())
+                .homeTeamId(fixture.getHomeTeam().getTeamId())
+                .homeTeamName(fixture.getHomeTeam().getName())
+                .awayTeamId(fixture.getAwayTeam().getTeamId())
+                .awayTeamName(fixture.getAwayTeam().getName())
+                .homeScore(fixture.getHomeScore())
+                .awayScore(fixture.getAwayScore())
+                .fixtureStatus(fixture.getFixtureStatus())
+                .build();
+    }
+
+    private Scoreline scorelineForFixtureTeams(Fixture fixture, Long homeTeamId) {
+        if (homeTeamId.equals(fixture.getHomeTeam().getTeamId())) {
+            return new Scoreline(valueOf(fixture.getHomeScore()), valueOf(fixture.getAwayScore()));
+        }
+        return new Scoreline(valueOf(fixture.getAwayScore()), valueOf(fixture.getHomeScore()));
+    }
+
     private int valueOf(Integer value) {
         return value == null ? 0 : value;
     }
@@ -141,5 +218,8 @@ public class FixtureService {
     }
 
     private record DateRange(LocalDateTime startDateTime, LocalDateTime endDateTime) {
+    }
+
+    private record Scoreline(int homeTeamGoals, int awayTeamGoals) {
     }
 }
