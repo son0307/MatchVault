@@ -5,6 +5,7 @@ import { Link, useParams, useSearchParams } from "react-router-dom";
 import {
   fetchFixture,
   fetchFixtureEvents,
+  fetchFixtureHeadToHead,
   fetchFixtureLineups,
   fetchFixturePlayerStats,
   fetchFixtureStats,
@@ -12,6 +13,8 @@ import {
   type FixtureColorInfo,
   type FixtureEvent,
   type FixtureEventResponse,
+  type FixtureHeadToHead,
+  type FixtureHeadToHeadMatch,
   type FixtureLineupPlayer,
   type FixtureLineupResponse,
   type FixturePlayerStat,
@@ -27,7 +30,7 @@ import {
 import { parseKoreaDateTime } from "../dateUtils";
 import { displayTeamName } from "../teamNames";
 
-type DetailTab = "events" | "lineups" | "stats";
+type DetailTab = "events" | "lineups" | "stats" | "headToHead";
 type LoadState<T> = {
   data: T | null;
   error: string;
@@ -65,6 +68,7 @@ const detailTabs: Array<{ label: string; value: DetailTab }> = [
   { label: "이벤트", value: "events" },
   { label: "라인업", value: "lineups" },
   { label: "통계", value: "stats" },
+  { label: "최근 전적", value: "headToHead" },
 ];
 const UNSUPPORTED_MESSAGE = "해당 시즌에는 지원하지 않습니다.";
 
@@ -81,6 +85,7 @@ export function FixtureDetailPage({ currentUser }: { currentUser: CurrentUser | 
   const activeTab = detailTab(searchParams.get("tab")) ?? "events";
   const [fixtureState, setFixtureState] = useState<LoadState<FixtureSummary>>(initialLoadState);
   const [eventsState, setEventsState] = useState<LoadState<FixtureEventResponse>>(initialLoadState);
+  const [headToHeadState, setHeadToHeadState] = useState<LoadState<FixtureHeadToHead>>(initialLoadState);
   const [lineupsState, setLineupsState] = useState<LoadState<FixtureLineupResponse>>(initialLoadState);
   const [statsState, setStatsState] = useState<LoadState<FixtureStatResponse>>(initialLoadState);
   const [playerStatsState, setPlayerStatsState] = useState<LoadState<FixturePlayerStatResponse>>(initialLoadState);
@@ -126,6 +131,7 @@ export function FixtureDetailPage({ currentUser }: { currentUser: CurrentUser | 
     let isCurrent = true;
     setFixtureState(initialLoadState);
     setEventsState(initialLoadState);
+    setHeadToHeadState(initialLoadState);
     setLineupsState(initialLoadState);
     setStatsState(initialLoadState);
     setPlayerStatsState(initialLoadState);
@@ -145,6 +151,12 @@ export function FixtureDetailPage({ currentUser }: { currentUser: CurrentUser | 
           });
         }
       });
+    void loadSection(
+      fetchFixtureHeadToHead(numericFixtureId),
+      setHeadToHeadState,
+      "최근 전적을 불러오지 못했습니다.",
+      () => isCurrent,
+    );
 
     return () => {
       isCurrent = false;
@@ -274,7 +286,7 @@ export function FixtureDetailPage({ currentUser }: { currentUser: CurrentUser | 
         ))}
       </nav>
 
-      {coverageStatus === "error" ? (
+      {coverageStatus === "error" && activeTab !== "headToHead" ? (
         <div className="notice warning inline-retry">
           <span>시즌 지원 정보를 확인하지 못했습니다. 기본 상세 정보 조회를 시도합니다.</span>
           <button type="button" onClick={() => loadSeasonCoverages()}>
@@ -298,6 +310,7 @@ export function FixtureDetailPage({ currentUser }: { currentUser: CurrentUser | 
           statsState={statsState}
         />
       ) : null}
+      {activeTab === "headToHead" ? <HeadToHeadPanel state={headToHeadState} /> : null}
     </section>
   );
 }
@@ -414,6 +427,95 @@ type FixtureScorer = {
   minutes: string[];
   firstMinute: number;
 };
+
+function HeadToHeadPanel({ state }: { state: LoadState<FixtureHeadToHead> }) {
+  if (state.isLoading) {
+    return (
+      <article className="panel detail-panel h2h-panel">
+        <div className="detail-panel-heading">
+          <p className="eyebrow">Head to Head</p>
+          <h2>최근 10경기 전적</h2>
+        </div>
+        <p className="muted h2h-empty">최근 맞대결을 불러오는 중입니다.</p>
+      </article>
+    );
+  }
+
+  if (state.error || !state.data) {
+    return (
+      <article className="panel detail-panel h2h-panel">
+        <div className="detail-panel-heading">
+          <p className="eyebrow">Head to Head</p>
+          <h2>최근 10경기 전적</h2>
+        </div>
+        <p className="muted h2h-empty">{state.error || "최근 맞대결 정보를 표시할 수 없습니다."}</p>
+      </article>
+    );
+  }
+
+  const { summary, recentMatches } = state.data;
+  const homeTeamName = summary.homeTeamNameKo ?? summary.homeTeamName ?? "-";
+  const awayTeamName = summary.awayTeamNameKo ?? summary.awayTeamName ?? "-";
+
+  return (
+    <article className="panel detail-panel h2h-panel">
+      <div className="detail-panel-heading">
+        <p className="eyebrow">Head to Head</p>
+        <h2>최근 10경기 전적</h2>
+      </div>
+      <div className="h2h-summary-grid">
+        <div className="h2h-team-summary">
+          <strong>{homeTeamName}</strong>
+          <span>{summary.homeWins}승</span>
+          <small>{summary.homeGoals}득점</small>
+        </div>
+        <div className="h2h-draw-summary">
+          <small>{summary.matches}경기</small>
+          <span>{summary.draws}무</span>
+        </div>
+        <div className="h2h-team-summary">
+          <strong>{awayTeamName}</strong>
+          <span>{summary.awayWins}승</span>
+          <small>{summary.awayGoals}득점</small>
+        </div>
+      </div>
+      {recentMatches.length > 0 ? (
+        <div className="h2h-match-list">
+          {recentMatches.map((match) => (
+            <HeadToHeadMatchRow key={match.fixtureId} match={match} />
+          ))}
+        </div>
+      ) : (
+        <p className="muted h2h-empty">최근 맞대결 기록이 없습니다.</p>
+      )}
+    </article>
+  );
+}
+
+function HeadToHeadMatchRow({ match }: { match: FixtureHeadToHeadMatch }) {
+  const dateParts = fixtureDateParts(match.fixtureDate);
+  const homeTeamName = match.homeTeamNameKo ?? match.homeTeamName ?? "-";
+  const awayTeamName = match.awayTeamNameKo ?? match.awayTeamName ?? "-";
+
+  return (
+    <Link className="h2h-match-row" to={`/fixtures/${match.fixtureId}`}>
+      <time dateTime={match.fixtureDate ?? undefined}>
+        <span>{dateParts.date}</span>
+        <small>{match.season ? `${match.season}년` : dateParts.time}</small>
+      </time>
+      <strong>{homeTeamName}</strong>
+      <span className="h2h-score">{headToHeadScoreText(match)}</span>
+      <strong>{awayTeamName}</strong>
+    </Link>
+  );
+}
+
+function headToHeadScoreText(match: FixtureHeadToHeadMatch) {
+  if (match.homeScore === null || match.homeScore === undefined || match.awayScore === null || match.awayScore === undefined) {
+    return "-";
+  }
+  return `${match.homeScore}:${match.awayScore}`;
+}
 
 function fixtureScorers(
   events: FixtureEvent[],
@@ -1986,7 +2088,7 @@ function scoreText(fixture: FixtureSummary) {
 }
 
 function detailTab(value: string | null): DetailTab | null {
-  return value === "events" || value === "lineups" || value === "stats" ? value : null;
+  return value === "events" || value === "lineups" || value === "stats" || value === "headToHead" ? value : null;
 }
 
 function fixtureDateParts(value: string | null) {

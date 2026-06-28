@@ -255,6 +255,42 @@ export type FixturePlayerStat = {
   redCards: number | null;
 };
 
+export type FixtureHeadToHead = {
+  summary: FixtureHeadToHeadSummary;
+  recentMatches: FixtureHeadToHeadMatch[];
+};
+
+export type FixtureHeadToHeadSummary = {
+  homeTeamId: number | null;
+  homeTeamName: string | null;
+  homeTeamNameKo: string | null;
+  awayTeamId: number | null;
+  awayTeamName: string | null;
+  awayTeamNameKo: string | null;
+  matches: number;
+  homeWins: number;
+  draws: number;
+  awayWins: number;
+  homeGoals: number;
+  awayGoals: number;
+};
+
+export type FixtureHeadToHeadMatch = {
+  fixtureId: number;
+  fixtureDate: string | null;
+  season: number | null;
+  round: number | null;
+  homeTeamId: number | null;
+  homeTeamName: string | null;
+  homeTeamNameKo: string | null;
+  awayTeamId: number | null;
+  awayTeamName: string | null;
+  awayTeamNameKo: string | null;
+  homeScore: number | null;
+  awayScore: number | null;
+  fixtureStatus: string | null;
+};
+
 export type TeamSummary = {
   teamId: number;
   teamName: string | null;
@@ -636,6 +672,15 @@ export async function fetchFixture(fixtureId: number): Promise<FixtureSummary> {
   return cachedGetJson<FixtureSummary>(
     `/api/v1/fixtures/${fixtureId}`,
     "경기 정보를 불러오지 못했습니다.",
+    DETAIL_CACHE_TTL_MS,
+  );
+
+}
+
+export async function fetchFixtureHeadToHead(fixtureId: number): Promise<FixtureHeadToHead> {
+  return cachedGetJson<FixtureHeadToHead>(
+    `/api/v1/fixtures/${fixtureId}/head-to-head`,
+    "최근 전적을 불러오지 못했습니다.",
     DETAIL_CACHE_TTL_MS,
   );
 
