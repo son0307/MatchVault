@@ -677,9 +677,9 @@ export async function fetchFixture(fixtureId: number): Promise<FixtureSummary> {
 
 }
 
-export async function fetchFixtureHeadToHead(fixtureId: number, limit = 10): Promise<FixtureHeadToHead> {
+export async function fetchFixtureHeadToHead(fixtureId: number): Promise<FixtureHeadToHead> {
   return cachedGetJson<FixtureHeadToHead>(
-    `/api/v1/fixtures/${fixtureId}/head-to-head?limit=${limit}`,
+    `/api/v1/fixtures/${fixtureId}/head-to-head`,
     "최근 전적을 불러오지 못했습니다.",
     DETAIL_CACHE_TTL_MS,
   );

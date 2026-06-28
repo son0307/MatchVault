@@ -152,7 +152,7 @@ export function FixtureDetailPage({ currentUser }: { currentUser: CurrentUser | 
         }
       });
     void loadSection(
-      fetchFixtureHeadToHead(numericFixtureId, 10),
+      fetchFixtureHeadToHead(numericFixtureId),
       setHeadToHeadState,
       "최근 전적을 불러오지 못했습니다.",
       () => isCurrent,

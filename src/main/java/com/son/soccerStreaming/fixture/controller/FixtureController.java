@@ -85,10 +85,8 @@ public class FixtureController {
     @GetMapping("/{fixtureId}/head-to-head")
     public ResponseEntity<FixtureResponseDto.HeadToHead> getHeadToHead(
             @Parameter(description = "Fixture API ID", example = "1208000")
-            @PathVariable Long fixtureId,
-            @Parameter(description = "Recent match limit", example = "10")
-            @RequestParam(defaultValue = "10") int limit) {
-        return ResponseEntity.ok(fixtureService.getHeadToHead(fixtureId, limit));
+            @PathVariable Long fixtureId) {
+        return ResponseEntity.ok(fixtureService.getHeadToHead(fixtureId));
     }
 
     @Operation(summary = "특정 경기 라인업 조회", description = "선발, 교체, 결장 선수 정보를 팀별로 조회합니다.")

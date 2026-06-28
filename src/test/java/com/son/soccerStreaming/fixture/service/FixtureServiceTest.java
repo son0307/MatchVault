@@ -141,10 +141,10 @@ class FixtureServiceTest {
                 org.mockito.ArgumentMatchers.eq(47L),
                 org.mockito.ArgumentMatchers.eq(49L),
                 org.mockito.ArgumentMatchers.eq(List.of("FINISHED", "FT", "AET", "PEN")),
-                org.mockito.ArgumentMatchers.eq(5)
+                org.mockito.ArgumentMatchers.eq(10)
         )).thenReturn(List.of(homeWin, awayWinWithSidesReversed, draw));
 
-        var response = fixtureService.getHeadToHead(100L, 5);
+        var response = fixtureService.getHeadToHead(100L);
 
         assertThat(response.getSummary().getMatches()).isEqualTo(3);
         assertThat(response.getSummary().getHomeWins()).isEqualTo(2);

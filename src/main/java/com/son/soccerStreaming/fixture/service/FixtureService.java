@@ -25,6 +25,7 @@ public class FixtureService {
 
     private static final ZoneId KOREA_ZONE = ZoneId.of("Asia/Seoul");
     private static final List<String> FINISHED_FIXTURE_STATUSES = List.of("FINISHED", "FT", "AET", "PEN");
+    private static final int HEAD_TO_HEAD_MATCH_LIMIT = 10;
 
     private final FixtureRepository fixtureRepository;
     private final MediaUrlService mediaUrlService;
@@ -38,10 +39,9 @@ public class FixtureService {
     }
 
     @Transactional(readOnly = true)
-    public FixtureResponseDto.HeadToHead getHeadToHead(Long fixtureId, int limit) {
+    public FixtureResponseDto.HeadToHead getHeadToHead(Long fixtureId) {
         Fixture fixture = fixtureRepository.findWithTeamsByFixtureId(fixtureId)
                 .orElseThrow(() -> new CustomException(ErrorCode.FIXTURE_NOT_FOUND));
-        int normalizedLimit = Math.max(1, Math.min(limit, 10));
         Long homeTeamId = fixture.getHomeTeam().getTeamId();
         Long awayTeamId = fixture.getAwayTeam().getTeamId();
         List<Fixture> matches = fixtureRepository.findHeadToHeadFixtures(
@@ -50,7 +50,7 @@ public class FixtureService {
                 homeTeamId,
                 awayTeamId,
                 FINISHED_FIXTURE_STATUSES,
-                normalizedLimit
+                HEAD_TO_HEAD_MATCH_LIMIT
         );
 
         int homeWins = 0;
