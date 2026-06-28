@@ -34,10 +34,12 @@ public class LeaguePlayerRankingResponseDto {
         private Integer rank;
         private Long playerId;
         private String playerName;
+        private String playerNameKo;
         private String photoUrl;
         private String position;
         private Long teamId;
         private String teamName;
+        private String teamNameKo;
         private String teamLogoUrl;
         private Integer teamRank;
         private int appearances;
@@ -56,5 +58,63 @@ public class LeaguePlayerRankingResponseDto {
         private int conceded;
         private int cleanSheets;
         private Double savePercentage;
+
+        public Row(
+                Integer rank,
+                Long playerId,
+                String playerName,
+                String photoUrl,
+                String position,
+                Long teamId,
+                String teamName,
+                String teamLogoUrl,
+                Integer teamRank,
+                int appearances,
+                int minutes,
+                double rating,
+                int goals,
+                int penaltyGoals,
+                int assists,
+                int attackPoints,
+                int goalMatches,
+                int assistMatches,
+                int attackPointMatches,
+                int yellowCards,
+                int redCards,
+                int saves,
+                int conceded,
+                int cleanSheets,
+                Double savePercentage
+        ) {
+            this(
+                    rank,
+                    playerId,
+                    playerName,
+                    null,
+                    photoUrl,
+                    position,
+                    teamId,
+                    teamName,
+                    null,
+                    teamLogoUrl,
+                    teamRank,
+                    appearances,
+                    minutes,
+                    rating,
+                    goals,
+                    penaltyGoals,
+                    assists,
+                    attackPoints,
+                    goalMatches,
+                    assistMatches,
+                    attackPointMatches,
+                    yellowCards,
+                    redCards,
+                    saves,
+                    conceded,
+                    cleanSheets,
+                    savePercentage
+            );
+        }
     }
 }

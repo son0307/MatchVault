@@ -14,6 +14,7 @@ public class TeamResponseDto {
     public static class Summary {
         private Long teamId;
         private String teamName;
+        private String teamNameKo;
         private String code;
         private String logoUrl;
     }
@@ -23,6 +24,7 @@ public class TeamResponseDto {
     public static class Details {
         private Long teamId;
         private String teamName;
+        private String teamNameKo;
         private String code;
         private String country;
         private Integer founded;
@@ -57,6 +59,7 @@ public class TeamResponseDto {
     public static class PlayerRanking {
         private Long playerId;
         private String playerName;
+        private String playerNameKo;
         private String photoUrl;
         private String position;
         private int goals;

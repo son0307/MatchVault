@@ -45,5 +45,6 @@ public class FixtureEventResponseDto {
     public static class PlayerInfo {
         private Long id;
         private String name;
+        private String nameKo;
     }
 }

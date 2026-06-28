@@ -60,6 +60,7 @@ public class TeamStandingService {
                 .team(TeamStandingResponseDto.TeamInfo.builder()
                         .id(standing.getTeamId())
                         .name(standing.getTeamName())
+                        .nameKo(standing.getTeamNameKo())
                         .logo(standing.getTeamLogoUrl())
                         .build())
                 .points(standing.getPoints())
@@ -190,6 +191,7 @@ public class TeamStandingService {
         private Integer rank;
         private final Long teamId;
         private final String teamName;
+        private final String teamNameKo;
         private final String teamLogoUrl;
         private Integer points;
         private Integer goalsDiff;
@@ -223,6 +225,7 @@ public class TeamStandingService {
             this.rank = standing.getRank();
             this.teamId = team.getTeamId();
             this.teamName = team.getName();
+            this.teamNameKo = team.getKoreanName();
             this.teamLogoUrl = mediaUrlService.teamLogoUrl(team);
             this.points = standing.getPoints();
             this.goalsDiff = standing.getGoalsDiff();

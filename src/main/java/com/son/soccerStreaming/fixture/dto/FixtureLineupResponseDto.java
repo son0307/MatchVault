@@ -20,6 +20,7 @@ public class FixtureLineupResponseDto {
     public static class TeamLineup {
         private Long teamId;
         private String teamName;
+        private String teamNameKo;
         private String formation;
         private String coachName;
         private UniformColors colors;
@@ -48,6 +49,7 @@ public class FixtureLineupResponseDto {
     public static class PlayerLineup {
         private Long playerId;
         private String playerName;
+        private String playerNameKo;
         private String photoUrl;
         private Integer backNumber;
         private String position;
@@ -60,8 +62,10 @@ public class FixtureLineupResponseDto {
     public static class PlayerAbsenceInfo {
         private Long playerId;
         private String playerName;
+        private String playerNameKo;
         private Long teamId;
         private String teamName;
+        private String teamNameKo;
         private String absenceType;
         private String reason;
     }

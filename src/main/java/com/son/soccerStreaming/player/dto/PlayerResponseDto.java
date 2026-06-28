@@ -14,6 +14,7 @@ public class PlayerResponseDto {
     public static class Summary {
         private Long playerId;
         private String playerName;
+        private String playerNameKo;
         private Integer backNumber;
         private String position;
         private String photoUrl;
@@ -24,6 +25,7 @@ public class PlayerResponseDto {
     public static class Details {
         private Long playerId;
         private String playerName;
+        private String playerNameKo;
         private String firstname;
         private String lastname;
         private Integer backNumber;
@@ -38,6 +40,7 @@ public class PlayerResponseDto {
         private String photoUrl;
         private Long teamId;
         private String teamName;
+        private String teamNameKo;
         private String teamLogoUrl;
     }
 
@@ -74,6 +77,7 @@ public class PlayerResponseDto {
     public static class TeamSeasonSummary {
         private Long teamId;
         private String teamName;
+        private String teamNameKo;
         private String teamLogoUrl;
         private long totalFixtures;
         private int minutesPlayed;
@@ -99,14 +103,18 @@ public class PlayerResponseDto {
         private Integer round;
         private Long teamId;
         private String teamName;
+        private String teamNameKo;
         private Long opponentTeamId;
         private String opponentTeamName;
+        private String opponentTeamNameKo;
         private Integer teamScore;
         private Integer opponentScore;
         private Long homeTeamId;
         private String homeTeamName;
+        private String homeTeamNameKo;
         private Long awayTeamId;
         private String awayTeamName;
+        private String awayTeamNameKo;
         private Integer homeScore;
         private Integer awayScore;
         private Integer minutesPlayed;

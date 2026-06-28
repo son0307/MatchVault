@@ -77,6 +77,7 @@ public class FixtureEventService {
         return FixtureEventResponseDto.PlayerInfo.builder()
                 .id(player.getPlayerId())
                 .name(player.getName())
+                .nameKo(player.getKoreanName())
                 .build();
     }
 }

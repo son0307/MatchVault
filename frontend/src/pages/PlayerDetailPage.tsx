@@ -17,7 +17,7 @@ import {
 } from "../api";
 import type { AuthStatus } from "../App";
 import { formatFixtureDate, parseKoreaDateTime } from "../dateUtils";
-import { displayTeamName } from "../teamNames";
+import { displayLocalizedName } from "../teamNames";
 
 type LoadState<T> = {
   data: T | null;
@@ -300,7 +300,7 @@ function PlayerHero({
       <div className="player-hero-main">
         <p className="eyebrow">{profile.position ?? "Player"}</p>
         <div className="detail-title-row">
-          <h2>{profile.playerName ?? "-"}</h2>
+          <h2>{displayLocalizedName(profile.playerNameKo, profile.playerName)}</h2>
           {canUseFavorite ? (
             <FavoriteToggleButton
               isActive={isFavorite}
@@ -377,7 +377,7 @@ function SeasonTeamSummary({ state }: { state: LoadState<PlayerSeasonSummary> })
             ) : (
               <span className="team-logo large placeholder" aria-hidden="true" />
             )}
-            <span>{displayTeamName(team.teamId, team.teamName)}</span>
+            <span>{displayLocalizedName(team.teamNameKo, team.teamName)}</span>
           </Link>
         ))}
       </div>
@@ -514,7 +514,7 @@ function SeasonTeamStats({
               <span className="team-logo placeholder" aria-hidden="true" />
             )}
             <Link className="team-name-link" to={`/teams/${team.teamId}`}>
-              {displayTeamName(team.teamId, team.teamName)}
+              {displayLocalizedName(team.teamNameKo, team.teamName)}
             </Link>
             <span>
               {isGoalkeeper
@@ -604,8 +604,8 @@ function SectionError({ title, message, onRetry }: { title: string; message: str
 }
 
 function PlayerMatchRow({ match }: { match: PlayerMatchStat }) {
-  const homeTeamName = displayTeamName(match.homeTeamId, match.homeTeamName ?? inferHomeTeam(match));
-  const awayTeamName = displayTeamName(match.awayTeamId, match.awayTeamName ?? inferAwayTeam(match));
+  const homeTeamName = displayLocalizedName(match.homeTeamNameKo, match.homeTeamName ?? inferHomeTeam(match));
+  const awayTeamName = displayLocalizedName(match.awayTeamNameKo, match.awayTeamName ?? inferAwayTeam(match));
   const homeScore = match.homeScore ?? inferHomeScore(match);
   const awayScore = match.awayScore ?? inferAwayScore(match);
 

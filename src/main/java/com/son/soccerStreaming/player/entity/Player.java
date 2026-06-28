@@ -22,6 +22,7 @@ public class Player {
 
     @Column(nullable = false)
     private String name;
+    private String koreanName;
     private String firstname;
     private String lastname;
 
@@ -72,6 +73,10 @@ public class Player {
         if (number != null) {
             this.number = number;
         }
+    }
+
+    public void updateKoreanName(String koreanName) {
+        this.koreanName = koreanName;
     }
 
     public void updatePhotoUrl(String photoUrl) {

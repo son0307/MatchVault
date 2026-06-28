@@ -54,14 +54,14 @@ public class SearchService {
     }
 
     private List<SearchResponseDto.TeamResult> searchTeams(String keyword) {
-        return teamRepository.findTop20ByNameContainingIgnoreCaseOrderByNameAsc(keyword).stream()
+        return teamRepository.findTop20ByNameOrKoreanNameContainingIgnoreCaseOrderByNameAsc(keyword).stream()
                 .limit(RESULT_LIMIT)
                 .map(this::toTeamResult)
                 .toList();
     }
 
     private List<SearchResponseDto.PlayerResult> searchPlayers(String keyword) {
-        return playerRepository.findTop20ByNameContainingIgnoreCaseOrderByNameAsc(keyword).stream()
+        return playerRepository.findTop20ByNameOrKoreanNameContainingIgnoreCaseOrderByNameAsc(keyword).stream()
                 .limit(RESULT_LIMIT)
                 .map(this::toPlayerResult)
                 .toList();
@@ -87,6 +87,7 @@ public class SearchService {
         return SearchResponseDto.TeamResult.builder()
                 .teamId(team.getTeamId())
                 .teamName(team.getName())
+                .teamNameKo(team.getKoreanName())
                 .code(team.getCode())
                 .logoUrl(mediaUrlService.teamLogoUrl(team))
                 .build();
@@ -96,6 +97,7 @@ public class SearchService {
         return SearchResponseDto.PlayerResult.builder()
                 .playerId(player.getPlayerId())
                 .playerName(player.getName())
+                .playerNameKo(player.getKoreanName())
                 .position(player.getPosition())
                 .photoUrl(mediaUrlService.playerPhotoUrl(player))
                 .build();
@@ -106,7 +108,9 @@ public class SearchService {
                 .fixtureId(fixture.getFixtureId())
                 .fixtureDate(DateTimeUtils.utcToKorea(fixture.getFixtureDate()))
                 .homeTeamName(fixture.getHomeTeam().getName())
+                .homeTeamNameKo(fixture.getHomeTeam().getKoreanName())
                 .awayTeamName(fixture.getAwayTeam().getName())
+                .awayTeamNameKo(fixture.getAwayTeam().getKoreanName())
                 .homeScore(fixture.getHomeScore())
                 .awayScore(fixture.getAwayScore())
                 .fixtureStatus(fixture.getFixtureStatus())

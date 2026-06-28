@@ -31,6 +31,7 @@ public class FavoriteDashboardResponseDto {
     public static class TeamCard {
         private Long teamId;
         private String teamName;
+        private String teamNameKo;
         private String logoUrl;
         private Integer rank;
         private Integer points;
@@ -48,7 +49,9 @@ public class FavoriteDashboardResponseDto {
         private Long fixtureId;
         private LocalDateTime fixtureDate;
         private String homeTeamName;
+        private String homeTeamNameKo;
         private String awayTeamName;
+        private String awayTeamNameKo;
         private Integer homeScore;
         private Integer awayScore;
         private String fixtureStatus;
@@ -63,7 +66,9 @@ public class FavoriteDashboardResponseDto {
         private Long fixtureId;
         private LocalDateTime fixtureDate;
         private String homeTeamName;
+        private String homeTeamNameKo;
         private String awayTeamName;
+        private String awayTeamNameKo;
         private Integer homeScore;
         private Integer awayScore;
         private String fixtureStatus;
@@ -79,10 +84,22 @@ public class FavoriteDashboardResponseDto {
     public static class PlayerCard {
         private Long playerId;
         private String playerName;
+        private String playerNameKo;
         private String photoUrl;
         private String position;
         private RecentPlayerMatch recentMatch;
         private PlayerSeasonStat seasonStat;
+
+        public PlayerCard(
+                Long playerId,
+                String playerName,
+                String photoUrl,
+                String position,
+                RecentPlayerMatch recentMatch,
+                PlayerSeasonStat seasonStat
+        ) {
+            this(playerId, playerName, null, photoUrl, position, recentMatch, seasonStat);
+        }
     }
 
     @Getter
@@ -93,7 +110,9 @@ public class FavoriteDashboardResponseDto {
         private Long fixtureId;
         private LocalDateTime fixtureDate;
         private String teamName;
+        private String teamNameKo;
         private String opponentTeamName;
+        private String opponentTeamNameKo;
         private Integer teamScore;
         private Integer opponentScore;
         private Integer minutesPlayed;
@@ -109,6 +128,7 @@ public class FavoriteDashboardResponseDto {
     public static class PlayerSeasonStat {
         private Integer season;
         private String teamName;
+        private String teamNameKo;
         private String teamLogoUrl;
         private Integer teamCount;
         private Boolean aggregated;

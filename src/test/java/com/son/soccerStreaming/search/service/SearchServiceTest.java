@@ -44,20 +44,22 @@ class SearchServiceTest {
         Team team = Team.builder()
                 .teamId(47L)
                 .name("Tottenham")
+                .koreanName("토트넘")
                 .code("TOT")
                 .logoUrl("tottenham.png")
                 .build();
         Player player = Player.builder()
                 .playerId(1L)
                 .name("Son Heung-min")
+                .koreanName("손흥민")
                 .position("Attacker")
                 .photoUrl("son.png")
                 .build();
         Fixture fixture = fixture(100L, team, team);
 
-        when(teamRepository.findTop20ByNameContainingIgnoreCaseOrderByNameAsc("tottenham"))
+        when(teamRepository.findTop20ByNameOrKoreanNameContainingIgnoreCaseOrderByNameAsc("tottenham"))
                 .thenReturn(List.of(team));
-        when(playerRepository.findTop20ByNameContainingIgnoreCaseOrderByNameAsc("tottenham"))
+        when(playerRepository.findTop20ByNameOrKoreanNameContainingIgnoreCaseOrderByNameAsc("tottenham"))
                 .thenReturn(List.of(player));
         when(fixtureRepository.searchByTeamNameTokens(List.of("tottenham"), 10))
                 .thenReturn(List.of(fixture));
@@ -66,8 +68,12 @@ class SearchServiceTest {
 
         assertThat(response.getTeams()).extracting(SearchResponseDto.TeamResult::getTeamName)
                 .containsExactly("Tottenham");
+        assertThat(response.getTeams()).extracting(SearchResponseDto.TeamResult::getTeamNameKo)
+                .containsExactly("토트넘");
         assertThat(response.getPlayers()).extracting(SearchResponseDto.PlayerResult::getPlayerName)
                 .containsExactly("Son Heung-min");
+        assertThat(response.getPlayers()).extracting(SearchResponseDto.PlayerResult::getPlayerNameKo)
+                .containsExactly("손흥민");
         assertThat(response.getFixtures()).extracting(SearchResponseDto.FixtureResult::getFixtureId)
                 .containsExactly(100L);
     }
@@ -78,9 +84,9 @@ class SearchServiceTest {
         Team chelsea = Team.builder().teamId(49L).name("Chelsea").build();
         Fixture fixture = fixture(200L, tottenham, chelsea);
 
-        when(teamRepository.findTop20ByNameContainingIgnoreCaseOrderByNameAsc("tottenham chelsea"))
+        when(teamRepository.findTop20ByNameOrKoreanNameContainingIgnoreCaseOrderByNameAsc("tottenham chelsea"))
                 .thenReturn(List.of());
-        when(playerRepository.findTop20ByNameContainingIgnoreCaseOrderByNameAsc("tottenham chelsea"))
+        when(playerRepository.findTop20ByNameOrKoreanNameContainingIgnoreCaseOrderByNameAsc("tottenham chelsea"))
                 .thenReturn(List.of());
         when(fixtureRepository.searchByTeamNameTokens(List.of("tottenham", "chelsea"), 10))
                 .thenReturn(List.of(fixture));
@@ -103,8 +109,8 @@ class SearchServiceTest {
                 .mapToObj(index -> Player.builder().playerId((long) index).name("Player " + index).build())
                 .toList();
 
-        when(teamRepository.findTop20ByNameContainingIgnoreCaseOrderByNameAsc("a")).thenReturn(teams);
-        when(playerRepository.findTop20ByNameContainingIgnoreCaseOrderByNameAsc("a")).thenReturn(players);
+        when(teamRepository.findTop20ByNameOrKoreanNameContainingIgnoreCaseOrderByNameAsc("a")).thenReturn(teams);
+        when(playerRepository.findTop20ByNameOrKoreanNameContainingIgnoreCaseOrderByNameAsc("a")).thenReturn(players);
         when(fixtureRepository.searchByTeamNameTokens(List.of("a"), 10)).thenReturn(List.of());
 
         SearchResponseDto response = searchService.search("a");
@@ -120,7 +126,7 @@ class SearchServiceTest {
                 .name("Tottenham")
                 .build();
 
-        when(teamRepository.findTop20ByNameContainingIgnoreCaseOrderByNameAsc("tottenham"))
+        when(teamRepository.findTop20ByNameOrKoreanNameContainingIgnoreCaseOrderByNameAsc("tottenham"))
                 .thenReturn(List.of(team));
 
         SearchResponseDto response = searchService.search("tottenham", SearchType.TEAM);
@@ -128,7 +134,7 @@ class SearchServiceTest {
         assertThat(response.getTeams()).hasSize(1);
         assertThat(response.getPlayers()).isEmpty();
         assertThat(response.getFixtures()).isEmpty();
-        verify(playerRepository, never()).findTop20ByNameContainingIgnoreCaseOrderByNameAsc(org.mockito.ArgumentMatchers.anyString());
+        verify(playerRepository, never()).findTop20ByNameOrKoreanNameContainingIgnoreCaseOrderByNameAsc(org.mockito.ArgumentMatchers.anyString());
         verify(fixtureRepository, never()).searchByTeamNameTokens(org.mockito.ArgumentMatchers.anyList(), org.mockito.ArgumentMatchers.anyInt());
     }
 
@@ -147,8 +153,8 @@ class SearchServiceTest {
         assertThat(response.getPlayers()).isEmpty();
         assertThat(response.getFixtures()).extracting(SearchResponseDto.FixtureResult::getFixtureId)
                 .containsExactly(200L);
-        verify(teamRepository, never()).findTop20ByNameContainingIgnoreCaseOrderByNameAsc(org.mockito.ArgumentMatchers.anyString());
-        verify(playerRepository, never()).findTop20ByNameContainingIgnoreCaseOrderByNameAsc(org.mockito.ArgumentMatchers.anyString());
+        verify(teamRepository, never()).findTop20ByNameOrKoreanNameContainingIgnoreCaseOrderByNameAsc(org.mockito.ArgumentMatchers.anyString());
+        verify(playerRepository, never()).findTop20ByNameOrKoreanNameContainingIgnoreCaseOrderByNameAsc(org.mockito.ArgumentMatchers.anyString());
     }
 
     @Test
@@ -158,8 +164,8 @@ class SearchServiceTest {
         assertThat(response.getTeams()).isEmpty();
         assertThat(response.getPlayers()).isEmpty();
         assertThat(response.getFixtures()).isEmpty();
-        verify(teamRepository, never()).findTop20ByNameContainingIgnoreCaseOrderByNameAsc(org.mockito.ArgumentMatchers.anyString());
-        verify(playerRepository, never()).findTop20ByNameContainingIgnoreCaseOrderByNameAsc(org.mockito.ArgumentMatchers.anyString());
+        verify(teamRepository, never()).findTop20ByNameOrKoreanNameContainingIgnoreCaseOrderByNameAsc(org.mockito.ArgumentMatchers.anyString());
+        verify(playerRepository, never()).findTop20ByNameOrKoreanNameContainingIgnoreCaseOrderByNameAsc(org.mockito.ArgumentMatchers.anyString());
         verify(fixtureRepository, never()).searchByTeamNameTokens(org.mockito.ArgumentMatchers.anyList(), org.mockito.ArgumentMatchers.anyInt());
     }
 

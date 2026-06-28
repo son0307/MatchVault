@@ -18,7 +18,9 @@ public class FixtureResponseDto {
         private Long homeTeamId;
         private Long awayTeamId;
         private String homeTeamName;
+        private String homeTeamNameKo;
         private String awayTeamName;
+        private String awayTeamNameKo;
         private String homeTeamLogoUrl;
         private String awayTeamLogoUrl;
         private int homeScore;

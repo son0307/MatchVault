@@ -17,6 +17,7 @@ public class AdminDto {
     @AllArgsConstructor
     public static class TeamUpdateRequest {
         private String name;
+        private String koreanName;
         private String code;
         private String country;
         private Integer founded;
@@ -35,6 +36,7 @@ public class AdminDto {
     @AllArgsConstructor
     public static class PlayerUpdateRequest {
         private String name;
+        private String koreanName;
         private String firstname;
         private String lastname;
         private Integer age;
@@ -188,6 +190,7 @@ public class AdminDto {
     public static class TeamAdminResponse {
         private Long teamId;
         private String name;
+        private String koreanName;
         private String code;
         private String country;
         private Integer founded;
@@ -207,6 +210,7 @@ public class AdminDto {
     public static class PlayerAdminResponse {
         private Long playerId;
         private String name;
+        private String koreanName;
         private String firstname;
         private String lastname;
         private Integer age;
@@ -231,8 +235,10 @@ public class AdminDto {
         private Integer round;
         private Long homeTeamId;
         private String homeTeamName;
+        private String homeTeamNameKo;
         private Long awayTeamId;
         private String awayTeamName;
+        private String awayTeamNameKo;
         private Integer homeScore;
         private Integer awayScore;
         private String fixtureStatus;
@@ -243,6 +249,7 @@ public class AdminDto {
     public static class FixtureTeamOptionResponse {
         private Long teamId;
         private String name;
+        private String koreanName;
     }
 
     @Getter
@@ -288,8 +295,10 @@ public class AdminDto {
         private Integer penaltyAwayScore;
         private Long homeTeamId;
         private String homeTeamName;
+        private String homeTeamNameKo;
         private Long awayTeamId;
         private String awayTeamName;
+        private String awayTeamNameKo;
         private String homeFormation;
         private String awayFormation;
         private String homeCoachName;
@@ -316,10 +325,13 @@ public class AdminDto {
         private Integer extra;
         private Long teamId;
         private String teamName;
+        private String teamNameKo;
         private Long playerId;
         private String playerName;
+        private String playerNameKo;
         private Long assistPlayerId;
         private String assistPlayerName;
+        private String assistPlayerNameKo;
         private String eventType;
         private String eventDetail;
         private String comments;
@@ -330,8 +342,10 @@ public class AdminDto {
     public static class FixtureLineupAdminResponse {
         private Long teamId;
         private String teamName;
+        private String teamNameKo;
         private Long playerId;
         private String playerName;
+        private String playerNameKo;
         private Integer jerseyNumber;
         private String position;
         private String grid;
@@ -343,6 +357,7 @@ public class AdminDto {
     public static class FixtureTeamStatAdminResponse {
         private Long teamId;
         private String teamName;
+        private String teamNameKo;
         private Integer shotsOnGoal;
         private Integer shotsOffGoal;
         private Integer totalShots;
@@ -367,8 +382,10 @@ public class AdminDto {
     public static class FixturePlayerStatAdminResponse {
         private Long playerId;
         private String playerName;
+        private String playerNameKo;
         private Long teamId;
         private String teamName;
+        private String teamNameKo;
         private Integer minutesPlayed;
         private Double rating;
         private Boolean captain;

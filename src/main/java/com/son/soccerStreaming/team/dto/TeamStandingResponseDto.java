@@ -30,6 +30,7 @@ public class TeamStandingResponseDto {
     public static class TeamInfo {
         private Long id;
         private String name;
+        private String nameKo;
         private String logo;
     }
 

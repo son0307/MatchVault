@@ -30,7 +30,7 @@ public class LeagueTeamRankingService {
     @Cacheable(
             cacheManager = RedisCacheConfig.RANKINGS_CACHE_MANAGER,
             cacheNames = RedisCacheConfig.LEAGUE_TEAM_RANKINGS_CACHE,
-            key = "'v2:league:' + #leagueId + ':season:' + #season",
+            key = "'v3:league:' + #leagueId + ':season:' + #season",
             sync = true
     )
     public LeagueTeamRankingResponseDto getRankings(Integer leagueId, Integer season) {
@@ -72,6 +72,7 @@ public class LeagueTeamRankingService {
         return LeagueTeamRankingResponseDto.Row.builder()
                 .teamId(standing.getTeam().getTeamId())
                 .teamName(standing.getTeam().getName())
+                .teamNameKo(standing.getTeam().getKoreanName())
                 .teamLogoUrl(mediaUrlService.teamLogoUrl(standing.getTeam()))
                 .teamRank(standing.getRank())
                 .played(played)

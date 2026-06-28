@@ -27,6 +27,7 @@ import {
   type TeamSearchResult,
 } from "./api";
 import { formatFixtureDateTime } from "./dateUtils";
+import { displayLocalizedName } from "./teamNames";
 import { AuthPage } from "./pages/AuthPage";
 import { AdminPage } from "./pages/AdminPage";
 import { FixtureDetailPage } from "./pages/FixtureDetailPage";
@@ -313,11 +314,12 @@ function SearchSection({ title, children }: { title: string; children: ReactNode
 }
 
 function TeamSearchButton({ team, onSelect }: { team: TeamSearchResult; onSelect: (path: string) => void }) {
+  const teamName = displayLocalizedName(team.teamNameKo, team.teamName);
   return (
     <button type="button" className="global-search-result" onClick={() => onSelect(`/teams/${team.teamId}`)}>
-      <SearchImage src={team.logoUrl} alt={team.teamName} className="team-logo" />
+      <SearchImage src={team.logoUrl} alt={teamName} className="team-logo" />
       <span>
-        <strong>{team.teamName ?? "-"}</strong>
+        <strong>{teamName}</strong>
         <small>{team.code ?? "Team"}</small>
       </span>
     </button>
@@ -325,11 +327,12 @@ function TeamSearchButton({ team, onSelect }: { team: TeamSearchResult; onSelect
 }
 
 function PlayerSearchButton({ player, onSelect }: { player: PlayerSearchResult; onSelect: (path: string) => void }) {
+  const playerName = displayLocalizedName(player.playerNameKo, player.playerName);
   return (
     <button type="button" className="global-search-result" onClick={() => onSelect(`/players/${player.playerId}`)}>
-      <SearchImage src={player.photoUrl} alt={player.playerName} className="player-thumb" />
+      <SearchImage src={player.photoUrl} alt={playerName} className="player-thumb" />
       <span>
-        <strong>{player.playerName ?? "-"}</strong>
+        <strong>{playerName}</strong>
         <small>{player.position ?? "Player"}</small>
       </span>
     </button>
@@ -343,6 +346,8 @@ function FixtureSearchButton({
   fixture: FixtureSearchResult;
   onSelect: (path: string) => void;
 }) {
+  const homeTeamName = displayLocalizedName(fixture.homeTeamNameKo, fixture.homeTeamName);
+  const awayTeamName = displayLocalizedName(fixture.awayTeamNameKo, fixture.awayTeamName);
   return (
     <button
       type="button"
@@ -351,7 +356,7 @@ function FixtureSearchButton({
     >
       <span>
         <strong>
-          {fixture.homeTeamName ?? "-"} vs {fixture.awayTeamName ?? "-"}
+          {homeTeamName} vs {awayTeamName}
         </strong>
         <small>
           {formatFixtureDateTime(fixture.fixtureDate, "날짜 미정")} · {fixture.fixtureStatus ?? "Fixture"}
