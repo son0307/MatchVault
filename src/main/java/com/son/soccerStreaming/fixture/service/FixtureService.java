@@ -45,7 +45,6 @@ public class FixtureService {
         Long homeTeamId = fixture.getHomeTeam().getTeamId();
         Long awayTeamId = fixture.getAwayTeam().getTeamId();
         List<Fixture> matches = fixtureRepository.findHeadToHeadFixtures(
-                fixture.getFixtureId(),
                 fixture.getLeagueId(),
                 homeTeamId,
                 awayTeamId,
@@ -143,6 +142,8 @@ public class FixtureService {
                 .fixtureDate(DateTimeUtils.utcToKorea(fixture.getFixtureDate()))
                 .season(fixture.getSeason())
                 .round(fixture.getRound())
+                .referee(fixture.getReferee())
+                .venueName(fixture.getVenueName())
                 .homeTeamId(fixture.getHomeTeam().getTeamId())
                 .awayTeamId(fixture.getAwayTeam().getTeamId())
                 .homeTeamName(fixture.getHomeTeam().getName())

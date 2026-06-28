@@ -50,7 +50,10 @@ class FixtureServiceTest {
                 .id(1L)
                 .fixtureId(100L)
                 .fixtureDate(LocalDateTime.of(2026, 5, 22, 12, 0))
+                .season(2025)
                 .round(38)
+                .referee("Michael Oliver")
+                .venueName("Tottenham Hotspur Stadium")
                 .homeTeam(homeTeam)
                 .awayTeam(awayTeam)
                 .homeScore(2)
@@ -72,6 +75,9 @@ class FixtureServiceTest {
         assertThat(response.getHomeScore()).isEqualTo(2);
         assertThat(response.getAwayScore()).isEqualTo(1);
         assertThat(response.getRound()).isEqualTo(38);
+        assertThat(response.getSeason()).isEqualTo(2025);
+        assertThat(response.getReferee()).isEqualTo("Michael Oliver");
+        assertThat(response.getVenueName()).isEqualTo("Tottenham Hotspur Stadium");
         assertThat(response.getFixtureStatus()).isEqualTo("FINISHED");
     }
 
@@ -84,7 +90,7 @@ class FixtureServiceTest {
     }
 
     @Test
-    void getHeadToHeadAggregatesFinishedMatchesFromCurrentHomeTeamPerspective() {
+    void getHeadToHeadIncludesSelectedFinishedFixtureAndAggregatesFromCurrentHomeTeamPerspective() {
         Team tottenham = Team.builder()
                 .id(1L)
                 .teamId(47L)
@@ -101,7 +107,9 @@ class FixtureServiceTest {
                 .fixtureDate(LocalDateTime.of(2026, 5, 22, 12, 0))
                 .homeTeam(tottenham)
                 .awayTeam(chelsea)
-                .fixtureStatus("SCHEDULED")
+                .homeScore(1)
+                .awayScore(0)
+                .fixtureStatus("FINISHED")
                 .build();
         Fixture homeWin = Fixture.builder()
                 .fixtureId(90L)
@@ -136,24 +144,23 @@ class FixtureServiceTest {
 
         when(fixtureRepository.findWithTeamsByFixtureId(100L)).thenReturn(Optional.of(current));
         when(fixtureRepository.findHeadToHeadFixtures(
-                org.mockito.ArgumentMatchers.eq(100L),
                 org.mockito.ArgumentMatchers.eq(39),
                 org.mockito.ArgumentMatchers.eq(47L),
                 org.mockito.ArgumentMatchers.eq(49L),
                 org.mockito.ArgumentMatchers.eq(List.of("FINISHED", "FT", "AET", "PEN")),
                 org.mockito.ArgumentMatchers.eq(10)
-        )).thenReturn(List.of(homeWin, awayWinWithSidesReversed, draw));
+        )).thenReturn(List.of(current, homeWin, awayWinWithSidesReversed, draw));
 
         var response = fixtureService.getHeadToHead(100L);
 
-        assertThat(response.getSummary().getMatches()).isEqualTo(3);
-        assertThat(response.getSummary().getHomeWins()).isEqualTo(2);
+        assertThat(response.getSummary().getMatches()).isEqualTo(4);
+        assertThat(response.getSummary().getHomeWins()).isEqualTo(3);
         assertThat(response.getSummary().getDraws()).isEqualTo(1);
         assertThat(response.getSummary().getAwayWins()).isZero();
-        assertThat(response.getSummary().getHomeGoals()).isEqualTo(5);
+        assertThat(response.getSummary().getHomeGoals()).isEqualTo(6);
         assertThat(response.getSummary().getAwayGoals()).isEqualTo(2);
         assertThat(response.getRecentMatches()).extracting(FixtureResponseDto.HeadToHeadMatch::getFixtureId)
-                .containsExactly(90L, 80L, 70L);
+                .containsExactly(100L, 90L, 80L, 70L);
     }
 
     @Test

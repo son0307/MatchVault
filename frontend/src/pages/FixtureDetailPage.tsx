@@ -384,6 +384,7 @@ function FixtureDetailHero({
           <span>{dateParts.date}</span>
           {dateParts.time ? <span>{dateParts.time}</span> : null}
           {fixture.round ? <span>{fixture.round}라운드</span> : null}
+          {fixture.season ? <span>{formatSeasonLabel(fixture.season)}</span> : null}
         </p>
         <strong>{scoreText(fixture)}</strong>
         {false && isAdmin ? (
@@ -416,6 +417,16 @@ function FixtureDetailHero({
           )}
         </div>
       </div>
+      <dl className="fixture-detail-additional-meta">
+        <div>
+          <dt>심판</dt>
+          <dd>{fixtureInfo(fixture.referee, "미정")}</dd>
+        </div>
+        <div>
+          <dt>경기장</dt>
+          <dd>{fixtureInfo(fixture.venueName, "미정")}</dd>
+        </div>
+      </dl>
     </article>
   );
 }
@@ -501,7 +512,7 @@ function HeadToHeadMatchRow({ match }: { match: FixtureHeadToHeadMatch }) {
     <Link className="h2h-match-row" to={`/fixtures/${match.fixtureId}`}>
       <time dateTime={match.fixtureDate ?? undefined}>
         <span>{dateParts.date}</span>
-        <small>{match.season ? `${match.season}년` : dateParts.time}</small>
+        <small>{match.season ? formatSeasonLabel(match.season) : dateParts.time}</small>
       </time>
       <strong>{homeTeamName}</strong>
       <span className="h2h-score">{headToHeadScoreText(match)}</span>
@@ -594,6 +605,7 @@ function FixtureScorerList({ scorers }: { scorers: FixtureScorer[] }) {
           key={`${scorer.playerId ?? scorer.playerName}-${scorer.ownGoal}`}
         >
           <span className="fixture-scorer-name">
+            <span aria-label="골" className="fixture-goal-icon" role="img">⚽</span>
             {scorer.playerId ? (
               <Link to={`/players/${scorer.playerId}`}>{scorer.playerName}</Link>
             ) : (
@@ -2105,6 +2117,16 @@ function scoreText(fixture: FixtureSummary) {
 
 function detailTab(value: string | null): DetailTab | null {
   return value === "events" || value === "lineups" || value === "stats" || value === "headToHead" ? value : null;
+}
+
+function formatSeasonLabel(season: number) {
+  const startYear = String(season).slice(-2).padStart(2, "0");
+  const endYear = String(season + 1).slice(-2).padStart(2, "0");
+  return `${startYear}/${endYear} 시즌`;
+}
+
+function fixtureInfo(value: string | null, fallback: string) {
+  return value?.trim() || fallback;
 }
 
 function fixtureDateParts(value: string | null) {

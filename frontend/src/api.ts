@@ -3,6 +3,8 @@ export type FixtureSummary = {
   fixtureDate: string | null;
   season: number | null;
   round: number | null;
+  referee: string | null;
+  venueName: string | null;
   homeTeamId: number | null;
   awayTeamId: number | null;
   homeTeamName: string | null;

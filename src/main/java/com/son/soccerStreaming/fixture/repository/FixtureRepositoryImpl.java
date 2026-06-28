@@ -58,14 +58,13 @@ public class FixtureRepositoryImpl implements FixtureRepositoryCustom {
     }
 
     @Override
-    public List<Fixture> findHeadToHeadFixtures(Long fixtureId, Integer leagueId, Long homeTeamId, Long awayTeamId,
+    public List<Fixture> findHeadToHeadFixtures(Integer leagueId, Long homeTeamId, Long awayTeamId,
                                                 List<String> finishedStatuses, int limit) {
         return queryFactory
                 .selectFrom(fixture)
                 .join(fixture.homeTeam).fetchJoin()
                 .join(fixture.awayTeam).fetchJoin()
                 .where(
-                        fixture.fixtureId.ne(fixtureId),
                         fixture.leagueId.eq(leagueId),
                         sameTeams(homeTeamId, awayTeamId),
                         fixture.homeScore.isNotNull(),
