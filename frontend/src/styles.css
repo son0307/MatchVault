@@ -3035,12 +3035,23 @@ h2 {
   padding: 16px 18px 18px;
 }
 
-.team-stat-head,
+.team-stat-head {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 14px;
+  align-items: center;
+}
+
 .team-stat-values {
   display: grid;
   grid-template-columns: 1fr 150px 1fr;
   gap: 14px;
   align-items: center;
+}
+
+.team-stat-head strong {
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .team-stat-head strong:last-child,
@@ -4920,6 +4931,10 @@ h2 {
   .team-stat-head,
   .team-stat-values {
     grid-template-columns: 1fr 104px 1fr;
+    gap: 8px;
+  }
+
+  .team-stat-head {
     gap: 8px;
   }
 

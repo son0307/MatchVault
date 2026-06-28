@@ -103,7 +103,9 @@ public class FixtureRepositoryImpl implements FixtureRepositoryCustom {
 
     private BooleanExpression containsHomeOrAwayTeamName(String token) {
         return fixture.homeTeam.name.containsIgnoreCase(token)
-                .or(fixture.awayTeam.name.containsIgnoreCase(token));
+                .or(fixture.awayTeam.name.containsIgnoreCase(token))
+                .or(fixture.homeTeam.koreanName.containsIgnoreCase(token))
+                .or(fixture.awayTeam.koreanName.containsIgnoreCase(token));
     }
 
     private BooleanExpression sameTeams(Long homeTeamId, Long awayTeamId) {

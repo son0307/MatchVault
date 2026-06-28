@@ -27,6 +27,7 @@ public class SearchResponseDto {
     public static class TeamResult {
         private Long teamId;
         private String teamName;
+        private String teamNameKo;
         private String code;
         private String logoUrl;
     }
@@ -36,6 +37,7 @@ public class SearchResponseDto {
     public static class PlayerResult {
         private Long playerId;
         private String playerName;
+        private String playerNameKo;
         private String position;
         private String photoUrl;
     }
@@ -46,7 +48,9 @@ public class SearchResponseDto {
         private Long fixtureId;
         private LocalDateTime fixtureDate;
         private String homeTeamName;
+        private String homeTeamNameKo;
         private String awayTeamName;
+        private String awayTeamNameKo;
         private Integer homeScore;
         private Integer awayScore;
         private String fixtureStatus;

@@ -47,6 +47,7 @@ type AdminOverride = {
 type TeamAdmin = Record<string, unknown> & {
   teamId: number;
   name: string | null;
+  koreanName: string | null;
   manualOverrides?: AdminOverride[];
 };
 
@@ -59,6 +60,7 @@ type TeamSelectionState = {
 type PlayerAdmin = Record<string, unknown> & {
   playerId: number;
   name: string | null;
+  koreanName: string | null;
   manualOverrides?: AdminOverride[];
 };
 
@@ -99,6 +101,7 @@ type FixtureListStatus = "idle" | "loading" | "ready" | "error";
 type FixtureTeamOption = {
   teamId: number;
   name: string | null;
+  koreanName: string | null;
 };
 
 type FixtureAdmin = Record<string, unknown> & {
@@ -112,6 +115,7 @@ type FixtureAdmin = Record<string, unknown> & {
 type FixtureEventAdmin = Record<string, unknown> & {
   eventSequence: number;
   playerName: string | null;
+  playerNameKo: string | null;
   eventType: string | null;
   eventDetail: string | null;
 };
@@ -119,8 +123,10 @@ type FixtureEventAdmin = Record<string, unknown> & {
 type FixtureLineupAdmin = Record<string, unknown> & {
   teamId: number;
   teamName: string | null;
+  teamNameKo: string | null;
   playerId: number;
   playerName: string | null;
+  playerNameKo: string | null;
 };
 
 type FixtureTeamStatAdmin = Record<string, unknown> & {
@@ -131,7 +137,9 @@ type FixtureTeamStatAdmin = Record<string, unknown> & {
 type FixturePlayerStatAdmin = Record<string, unknown> & {
   playerId: number;
   playerName: string | null;
+  playerNameKo: string | null;
   teamName: string | null;
+  teamNameKo: string | null;
 };
 
 type AuditLog = {
@@ -168,6 +176,7 @@ const MANUAL_SYNC_COOLDOWN_MS = 30_000;
 
 const teamFields: FieldConfig[] = [
   { name: "name", label: "Name" },
+  { name: "koreanName", label: "Korean Name" },
   { name: "code", label: "Code" },
   { name: "country", label: "Country" },
   { name: "founded", label: "Founded", kind: "number" },
@@ -183,6 +192,7 @@ const teamFields: FieldConfig[] = [
 
 const playerFields: FieldConfig[] = [
   { name: "name", label: "Name" },
+  { name: "koreanName", label: "Korean Name" },
   { name: "firstname", label: "Firstname" },
   { name: "lastname", label: "Lastname" },
   { name: "age", label: "Age", kind: "number" },
@@ -904,7 +914,7 @@ export function AdminPage({ authState }: AdminPageProps) {
             >
               <option value="">{fixtureTeamStatus === "loading" ? "팀 목록 불러오는 중..." : "팀을 선택하세요"}</option>
               {fixtureTeams.map((team) => (
-                <option key={team.teamId} value={team.teamId}>{team.name ?? `#${team.teamId}`}</option>
+                <option key={team.teamId} value={team.teamId}>{adminDisplayName(team.koreanName, team.name, team.teamId)}</option>
               ))}
             </select>
           </label>
@@ -913,7 +923,7 @@ export function AdminPage({ authState }: AdminPageProps) {
           <ResultList
             items={teams}
             getKey={(team) => team.teamId}
-            render={(team) => `${team.name ?? "-"} #${team.teamId}`}
+            render={(team) => adminDisplayName(team.koreanName, team.name, team.teamId)}
             onSelect={(team) => void selectTeam(team.teamId)}
             disabled={savingKey !== null}
           />
@@ -949,7 +959,7 @@ export function AdminPage({ authState }: AdminPageProps) {
               >
                 <option value="">{fixtureTeamStatus === "loading" ? "팀 목록 불러오는 중..." : "팀을 선택하세요"}</option>
                 {fixtureTeams.map((team) => (
-                  <option key={team.teamId} value={team.teamId}>{team.name ?? `#${team.teamId}`}</option>
+                  <option key={team.teamId} value={team.teamId}>{adminDisplayName(team.koreanName, team.name, team.teamId)}</option>
                 ))}
               </select>
             </label>
@@ -960,7 +970,7 @@ export function AdminPage({ authState }: AdminPageProps) {
               <ResultList
                 items={teamPlayers}
                 getKey={(player) => player.playerId}
-                render={(player) => `${player.playerName ?? "-"} #${player.playerId}`}
+                render={(player) => adminDisplayName(player.playerNameKo, player.playerName, player.playerId)}
                 onSelect={(player) => void selectPlayer(player.playerId)}
                 disabled={savingKey !== null}
               />
@@ -971,7 +981,7 @@ export function AdminPage({ authState }: AdminPageProps) {
           <ResultList
             items={players}
             getKey={(player) => player.playerId}
-            render={(player) => `${player.name ?? "-"} #${player.playerId}`}
+            render={(player) => adminDisplayName(player.koreanName, player.name, player.playerId)}
             onSelect={(player) => void selectPlayer(player.playerId)}
             disabled={savingKey !== null}
           />
@@ -1007,7 +1017,7 @@ export function AdminPage({ authState }: AdminPageProps) {
             >
               <option value="">{fixtureTeamStatus === "loading" ? "팀 목록 불러오는 중..." : "팀을 선택하세요"}</option>
               {fixtureTeams.map((team) => (
-                <option key={team.teamId} value={team.teamId}>{team.name ?? `#${team.teamId}`}</option>
+              <option key={team.teamId} value={team.teamId}>{adminDisplayName(team.koreanName, team.name, team.teamId)}</option>
               ))}
             </select>
           </label>
@@ -1314,9 +1324,9 @@ function FixtureEditor({
         ) : null}
         {detail.events.map((event) => (
           <details className="nested-admin-item" key={event.eventSequence}>
-            <summary>#{event.eventSequence} {event.eventType ?? ""} {event.playerName ?? ""}</summary>
+            <summary>#{event.eventSequence} {event.eventType ?? ""} {adminName(event.playerNameKo, event.playerName)}</summary>
             <EventAdminForm
-              title={`#${event.eventSequence} ${event.eventType ?? ""} ${event.playerName ?? ""}`}
+              title={`#${event.eventSequence} ${event.eventType ?? ""} ${adminName(event.playerNameKo, event.playerName)}`}
               detail={detail}
               value={event}
               submitLabel="Save Event"
@@ -1336,9 +1346,9 @@ function FixtureEditor({
       <NestedAdminSection title="Lineups" count={detail.lineups.length}>
         {detail.lineups.map((lineup) => (
           <details className="nested-admin-item" key={`${lineup.teamId}-${lineup.playerId}`}>
-            <summary>{lineup.teamName ?? "-"} · {lineup.playerName ?? "-"}</summary>
+            <summary>{adminName(lineup.teamNameKo, lineup.teamName)} · {adminName(lineup.playerNameKo, lineup.playerName)}</summary>
             <AdminForm
-            title={`${lineup.teamName ?? "-"} · ${lineup.playerName ?? "-"}`}
+            title={`${adminName(lineup.teamNameKo, lineup.teamName)} · ${adminName(lineup.playerNameKo, lineup.playerName)}`}
             fields={lineupFields}
             value={lineup}
             submitLabel="Save Lineup"
@@ -1384,9 +1394,9 @@ function FixtureEditor({
       <NestedAdminSection title="Player Stats" count={detail.playerStats.length}>
         {detail.playerStats.map((stat) => (
           <details className="nested-admin-item" key={stat.playerId}>
-            <summary>{stat.playerName ?? "-"} · {stat.teamName ?? "-"}</summary>
+            <summary>{adminName(stat.playerNameKo, stat.playerName)} · {adminName(stat.teamNameKo, stat.teamName)}</summary>
             <AdminForm
-            title={`${stat.playerName ?? "-"} · ${stat.teamName ?? "-"}`}
+            title={`${adminName(stat.playerNameKo, stat.playerName)} · ${adminName(stat.teamNameKo, stat.teamName)}`}
             fields={playerStatFields}
             value={stat}
             submitLabel="Save Player Stat"
@@ -1581,12 +1591,12 @@ function fixturePlayerOptions(detail: FixtureDetailAdmin): FieldOption[] {
   const players = new Map<number, string>();
   detail.lineups.forEach((lineup) => {
     if (Number.isFinite(lineup.playerId)) {
-      players.set(lineup.playerId, `${lineup.playerName ?? "-"} · ${lineup.teamName ?? "-"}`);
+      players.set(lineup.playerId, `${adminName(lineup.playerNameKo, lineup.playerName)} · ${adminName(lineup.teamNameKo, lineup.teamName)}`);
     }
   });
   detail.playerStats.forEach((stat) => {
     if (Number.isFinite(stat.playerId) && !players.has(stat.playerId)) {
-      players.set(stat.playerId, `${stat.playerName ?? "-"} · ${stat.teamName ?? "-"}`);
+      players.set(stat.playerId, `${adminName(stat.playerNameKo, stat.playerName)} · ${adminName(stat.teamNameKo, stat.teamName)}`);
     }
   });
 
@@ -1713,6 +1723,20 @@ function formBody(form: HTMLFormElement, fields: FieldConfig[]) {
     body[field.name] = coerceValue(value, field.kind);
   });
   return body;
+}
+
+function adminDisplayName(koreanName: string | null | undefined, name: string | null | undefined, id: number) {
+  const primary = koreanName?.trim() || name?.trim();
+  if (!primary) {
+    return `#${id}`;
+  }
+  return koreanName?.trim() && name?.trim() && koreanName.trim() !== name.trim()
+    ? `${koreanName.trim()} (${name.trim()}) #${id}`
+    : `${primary} #${id}`;
+}
+
+function adminName(koreanName: string | null | undefined, name: string | null | undefined) {
+  return koreanName?.trim() || name?.trim() || "-";
 }
 
 function coerceValue(value: unknown, kind: FieldKind = "text") {

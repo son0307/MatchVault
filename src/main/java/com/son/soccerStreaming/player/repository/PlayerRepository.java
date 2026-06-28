@@ -14,7 +14,14 @@ public interface PlayerRepository extends JpaRepository<Player, Long> {
 
     boolean existsByPlayerId(Long playerId);
 
-    List<Player> findTop20ByNameContainingIgnoreCaseOrderByNameAsc(String keyword);
+    @Query("""
+            select p
+            from Player p
+            where lower(p.name) like lower(concat('%', :keyword, '%'))
+               or lower(coalesce(p.koreanName, '')) like lower(concat('%', :keyword, '%'))
+            order by p.name asc
+            """)
+    List<Player> findTop20ByNameOrKoreanNameContainingIgnoreCaseOrderByNameAsc(String keyword);
 
     @Query("""
             select p.id

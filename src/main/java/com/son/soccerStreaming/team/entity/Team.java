@@ -21,6 +21,7 @@ public class Team {
 
     @Column(nullable = false)
     private String name;
+    private String koreanName;
     private String code;
     private String country;
     private Integer founded;
@@ -40,6 +41,10 @@ public class Team {
         this.country = country;
         this.founded = founded;
         updateLogoUrl(logoUrl);
+    }
+
+    public void updateKoreanName(String koreanName) {
+        this.koreanName = koreanName;
     }
 
     public void updateVenue(Venue venue) {

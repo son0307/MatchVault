@@ -13,6 +13,7 @@ import {
   type FavoritePlayerCard,
   type FavoriteTeamCard,
 } from "../api";
+import { displayLocalizedName } from "../teamNames";
 
 const MIN_PASSWORD_LENGTH = 8;
 const MAX_PASSWORD_LENGTH = 20;
@@ -389,16 +390,16 @@ function FavoriteTeamManageList({
                 {team.logoUrl ? <img src={team.logoUrl} alt="" className="team-logo" /> : <span className="team-logo placeholder" />}
                 <div>
                   <Link className="team-name-link" to={`/teams/${team.teamId}`}>
-                    {team.teamName ?? "-"}
+                    {displayLocalizedName(team.teamNameKo, team.teamName)}
                   </Link>
                   <p>{numberText(team.rank)}위 · {numberText(team.points)}점 · 최근 {team.form ?? "-"}</p>
                 </div>
               </div>
               <p className="favorite-line">
                 {team.liveFixture
-                  ? `LIVE ${team.liveFixture.homeTeamName} ${team.liveFixture.homeScore}:${team.liveFixture.awayScore} ${team.liveFixture.awayTeamName}`
+                  ? `LIVE ${displayLocalizedName(team.liveFixture.homeTeamNameKo, team.liveFixture.homeTeamName)} ${team.liveFixture.homeScore}:${team.liveFixture.awayScore} ${displayLocalizedName(team.liveFixture.awayTeamNameKo, team.liveFixture.awayTeamName)}`
                   : team.nextFixture
-                    ? `다음 경기 · ${team.nextFixture.homeTeamName} vs ${team.nextFixture.awayTeamName}`
+                    ? `다음 경기 · ${displayLocalizedName(team.nextFixture.homeTeamNameKo, team.nextFixture.homeTeamName)} vs ${displayLocalizedName(team.nextFixture.awayTeamNameKo, team.nextFixture.awayTeamName)}`
                     : "예정된 경기 정보가 없습니다."}
               </p>
               <button
@@ -466,9 +467,9 @@ function FavoritePlayerManageCard({
         {player.photoUrl ? <img src={player.photoUrl} alt="" className="player-thumb" /> : <span className="player-thumb placeholder" />}
         <div>
           <Link className="favorite-player-link" to={`/players/${player.playerId}`}>
-            {player.playerName ?? "-"}
+            {displayLocalizedName(player.playerNameKo, player.playerName)}
           </Link>
-          <p>{player.position ?? "Player"} · {seasonStat?.teamName ?? "-"}</p>
+          <p>{player.position ?? "Player"} · {displayLocalizedName(seasonStat?.teamNameKo, seasonStat?.teamName)}</p>
         </div>
       </div>
       {seasonStat ? (

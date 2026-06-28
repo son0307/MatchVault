@@ -20,6 +20,8 @@ public class FixtureStatResponseDto {
     @AllArgsConstructor
     public static class TeamStatSummary {
         private Long teamId;
+        private String teamName;
+        private String teamNameKo;
         private int score;
         private int shotsOnGoal;
         private int shotsOffGoal;

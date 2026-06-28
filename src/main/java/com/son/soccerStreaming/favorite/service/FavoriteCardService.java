@@ -47,7 +47,7 @@ public class FavoriteCardService {
 
     @Cacheable(
             cacheNames = RedisCacheConfig.FAVORITE_TEAM_CARD_CACHE,
-            key = "'team:' + #teamId + ':season:' + #season"
+            key = "'v2:team:' + #teamId + ':season:' + #season"
     )
     public FavoriteDashboardResponseDto.TeamCard getTeamCard(Long teamId, Integer season) {
         Team team = teamRepository.findByTeamId(teamId)
@@ -82,6 +82,7 @@ public class FavoriteCardService {
         return FavoriteDashboardResponseDto.TeamCard.builder()
                 .teamId(team.getTeamId())
                 .teamName(team.getName())
+                .teamNameKo(team.getKoreanName())
                 .logoUrl(mediaUrlService.teamLogoUrl(team))
                 .rank(standing != null ? standing.getRank() : null)
                 .points(standing != null ? standing.getPoints() : null)
@@ -94,7 +95,7 @@ public class FavoriteCardService {
 
     @Cacheable(
             cacheNames = RedisCacheConfig.FAVORITE_PLAYER_CARD_CACHE,
-            key = "'player:' + #playerId + ':season:' + #season"
+            key = "'v2:player:' + #playerId + ':season:' + #season"
     )
     public FavoriteDashboardResponseDto.PlayerCard getPlayerCard(Long playerId, Integer season) {
         Player player = playerRepository.findByPlayerId(playerId)
@@ -110,6 +111,7 @@ public class FavoriteCardService {
         return FavoriteDashboardResponseDto.PlayerCard.builder()
                 .playerId(player.getPlayerId())
                 .playerName(player.getName())
+                .playerNameKo(player.getKoreanName())
                 .photoUrl(mediaUrlService.playerPhotoUrl(player))
                 .position(player.getPosition())
                 .recentMatch(recentMatch != null ? toRecentPlayerMatch(recentMatch) : null)
@@ -122,7 +124,9 @@ public class FavoriteCardService {
                 .fixtureId(fixture.getFixtureId())
                 .fixtureDate(DateTimeUtils.utcToKorea(fixture.getFixtureDate()))
                 .homeTeamName(fixture.getHomeTeam().getName())
+                .homeTeamNameKo(fixture.getHomeTeam().getKoreanName())
                 .awayTeamName(fixture.getAwayTeam().getName())
+                .awayTeamNameKo(fixture.getAwayTeam().getKoreanName())
                 .homeScore(fixture.getHomeScore())
                 .awayScore(fixture.getAwayScore())
                 .fixtureStatus(fixture.getFixtureStatus())
@@ -135,7 +139,9 @@ public class FavoriteCardService {
                 .fixtureId(fixture.getFixtureId())
                 .fixtureDate(DateTimeUtils.utcToKorea(fixture.getFixtureDate()))
                 .homeTeamName(fixture.getHomeTeam().getName())
+                .homeTeamNameKo(fixture.getHomeTeam().getKoreanName())
                 .awayTeamName(fixture.getAwayTeam().getName())
+                .awayTeamNameKo(fixture.getAwayTeam().getKoreanName())
                 .homeScore(fixture.getHomeScore())
                 .awayScore(fixture.getAwayScore())
                 .fixtureStatus(fixture.getFixtureStatus())
@@ -154,7 +160,9 @@ public class FavoriteCardService {
                 .fixtureId(fixture.getFixtureId())
                 .fixtureDate(DateTimeUtils.utcToKorea(fixture.getFixtureDate()))
                 .teamName(team.getName())
+                .teamNameKo(team.getKoreanName())
                 .opponentTeamName(opponent != null ? opponent.getName() : null)
+                .opponentTeamNameKo(opponent != null ? opponent.getKoreanName() : null)
                 .teamScore(scoreOf(fixture, team))
                 .opponentScore(opponent != null ? scoreOf(fixture, opponent) : null)
                 .minutesPlayed(stat.getMinutesPlayed())
@@ -184,6 +192,7 @@ public class FavoriteCardService {
         return FavoriteDashboardResponseDto.PlayerSeasonStat.builder()
                 .season(season)
                 .teamName(teamDisplayName(primaryStat, teamCount))
+                .teamNameKo(teamDisplayNameKo(primaryStat, teamCount))
                 .teamLogoUrl(primaryStat != null ? mediaUrlService.teamLogoUrl(primaryStat.getTeam()) : null)
                 .teamCount((int) teamCount)
                 .aggregated(teamCount > 1)
@@ -205,6 +214,20 @@ public class FavoriteCardService {
             return primaryStat.getTeam().getName();
         }
         return primaryStat.getTeam().getName() + " 외 " + (teamCount - 1) + "팀";
+    }
+
+    private String teamDisplayNameKo(PlayerTeamSeasonStat primaryStat, long teamCount) {
+        if (primaryStat == null) {
+            return null;
+        }
+        String teamName = primaryStat.getTeam().getKoreanName();
+        if (teamName == null || teamName.isBlank()) {
+            return null;
+        }
+        if (teamCount <= 1) {
+            return teamName;
+        }
+        return teamName + " 외 " + (teamCount - 1) + "팀";
     }
 
     private double roundToOneDecimal(double value) {

@@ -24,6 +24,7 @@ public class FixturePlayerStatResponseDto {
     public static class TeamPlayerStats {
         private Long teamId;
         private String teamName;
+        private String teamNameKo;
         private List<PlayerStat> players;
     }
 
@@ -34,6 +35,7 @@ public class FixturePlayerStatResponseDto {
     public static class PlayerStat {
         private Long playerId;
         private String playerName;
+        private String playerNameKo;
         private Integer jerseyNumber;
         private String position;
         private Integer minutesPlayed;

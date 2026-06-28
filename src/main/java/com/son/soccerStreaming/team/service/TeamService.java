@@ -44,6 +44,7 @@ public class TeamService {
         return TeamResponseDto.Details.builder()
                 .teamId(team.getTeamId())
                 .teamName(team.getName())
+                .teamNameKo(team.getKoreanName())
                 .code(team.getCode())
                 .country(team.getCountry())
                 .founded(team.getFounded())
@@ -130,6 +131,7 @@ public class TeamService {
         return PlayerResponseDto.Summary.builder()
                 .playerId(stat.getPlayer().getPlayerId())
                 .playerName(stat.getPlayer().getName())
+                .playerNameKo(stat.getPlayer().getKoreanName())
                 .backNumber(stat.getBackNumber())
                 .position(stat.getPosition() != null ? stat.getPosition() : stat.getPlayer().getPosition())
                 .photoUrl(mediaUrlService.playerPhotoUrl(stat.getPlayer()))
@@ -140,6 +142,7 @@ public class TeamService {
         return TeamResponseDto.Summary.builder()
                 .teamId(team.getTeamId())
                 .teamName(team.getName())
+                .teamNameKo(team.getKoreanName())
                 .code(team.getCode())
                 .logoUrl(mediaUrlService.teamLogoUrl(team))
                 .build();

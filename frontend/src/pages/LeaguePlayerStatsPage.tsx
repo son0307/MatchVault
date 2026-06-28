@@ -6,6 +6,7 @@ import {
   type LeaguePlayerRankings,
 } from "../api";
 import { RankingInfoButton } from "../components/RankingInfoButton";
+import { displayLocalizedName } from "../teamNames";
 
 type RankingKey = keyof Pick<
   LeaguePlayerRankings,
@@ -307,9 +308,9 @@ function PlayerIdentity({ row }: { row: LeaguePlayerRankingRow }) {
         <span className="player-ranking-photo-placeholder" aria-hidden="true" />
       )}
       <div>
-        <Link to={`/players/${row.playerId}`}>{row.playerName ?? "-"}</Link>
+        <Link to={`/players/${row.playerId}`}>{displayLocalizedName(row.playerNameKo, row.playerName)}</Link>
         <span className="player-ranking-mobile-meta">
-          {row.teamName ?? "-"} · {positionLabel(row.position)}
+          {displayLocalizedName(row.teamNameKo, row.teamName)} · {positionLabel(row.position)}
         </span>
       </div>
     </div>
@@ -326,7 +327,7 @@ function TeamIdentity({ row }: { row: LeaguePlayerRankingRow }) {
       ) : (
         <span className="player-ranking-logo-placeholder" aria-hidden="true" />
       )}
-      <span>{row.teamName ?? "-"}</span>
+      <span>{displayLocalizedName(row.teamNameKo, row.teamName)}</span>
     </Link>
   );
 }

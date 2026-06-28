@@ -28,7 +28,7 @@ import {
   type CurrentUser,
 } from "../api";
 import { parseKoreaDateTime } from "../dateUtils";
-import { displayTeamName } from "../teamNames";
+import { displayLocalizedName } from "../teamNames";
 
 type DetailTab = "events" | "lineups" | "stats" | "headToHead";
 type LoadState<T> = {
@@ -358,8 +358,8 @@ function FixtureDetailHero({
   const awayScorers = fixtureScorers(events, awayTeamId, fixture.awayTeamName, playerTeamIds);
   const homeRedCards = fixtureRedCards(events, homeTeamId, fixture.homeTeamName);
   const awayRedCards = fixtureRedCards(events, awayTeamId, fixture.awayTeamName);
-  const homeTeamName = displayTeamName(homeTeamId, fixture.homeTeamName);
-  const awayTeamName = displayTeamName(awayTeamId, fixture.awayTeamName);
+  const homeTeamName = displayLocalizedName(fixture.homeTeamNameKo, fixture.homeTeamName);
+  const awayTeamName = displayLocalizedName(fixture.awayTeamNameKo, fixture.awayTeamName);
 
   return (
     <article className="panel fixture-detail-hero">
@@ -546,7 +546,7 @@ function fixtureScorers(
     .forEach((event) => {
       const ownGoal = isOwnGoalEvent(event);
       const playerId = event.player?.id ?? null;
-      const playerName = event.player?.name ?? "선수 정보 없음";
+      const playerName = displayEventPlayerName(event.player, "선수 정보 없음");
       const key = `${playerId ?? playerName}-${ownGoal ? "own" : "goal"}`;
       const current = scorers.get(key);
       const minute = eventMinute(event);
@@ -632,7 +632,7 @@ function fixtureRedCards(
     })
     .forEach((event) => {
       const playerId = event.player?.id ?? null;
-      const playerName = event.player?.name ?? "선수 정보 없음";
+      const playerName = displayEventPlayerName(event.player, "선수 정보 없음");
       const key = `${playerId ?? playerName}`;
       const current = redCards.get(key);
       const minute = eventMinute(event);
@@ -741,7 +741,7 @@ function eventMarkup(item: EventTimelineEventItem) {
   if (category === "substitution") {
     return (
       <div className="event-substitution">
-        {event.assist?.name ? (
+        {hasEventPlayerName(event.assist) ? (
           <p className="event-in">
             <span>IN</span> <EventPlayerLink player={event.assist} />
           </p>
@@ -761,7 +761,7 @@ function eventMarkup(item: EventTimelineEventItem) {
     );
   }
 
-  const player = event.player?.name
+  const player = hasEventPlayerName(event.player)
     ? <EventPlayerLink player={event.player} />
     : <>{event.team?.name ?? "이벤트 정보 없음"}</>;
 
@@ -771,7 +771,7 @@ function eventMarkup(item: EventTimelineEventItem) {
         <strong>{player}</strong>
         {score ? <span className="event-score">({score.home} - {score.away})</span> : null}
       </p>
-      {category === "goal" && event.assist?.name ? (
+      {category === "goal" && hasEventPlayerName(event.assist) ? (
         <p className="event-assist">
           <EventPlayerLink player={event.assist} />의 도움
         </p>
@@ -784,14 +784,26 @@ function eventMarkup(item: EventTimelineEventItem) {
   );
 }
 
-function EventPlayerLink({ player }: { player: { id: number; name: string | null } | null }) {
+function displayEventPlayerName(
+  player: { name: string | null; nameKo?: string | null } | null | undefined,
+  fallback = "-",
+) {
+  return displayLocalizedName(player?.nameKo, player?.name) || fallback;
+}
+
+function hasEventPlayerName(player: { name: string | null; nameKo?: string | null } | null | undefined) {
+  return Boolean(player?.nameKo?.trim() || player?.name?.trim());
+}
+
+function EventPlayerLink({ player }: { player: { id: number; name: string | null; nameKo?: string | null } | null }) {
+  const playerName = displayEventPlayerName(player);
   if (!player?.id) {
-    return <>{player?.name ?? "-"}</>;
+    return <>{playerName}</>;
   }
 
   return (
     <Link className="event-player-link" to={`/players/${player.id}`}>
-      {player.name ?? "-"}
+      {playerName}
     </Link>
   );
 }
@@ -921,11 +933,11 @@ function MobileLineupPitch({
       <div className="mobile-pitch-box top" />
       <div className="mobile-pitch-box bottom" />
       <div className="mobile-formation-label home">
-        <strong>{homeTeam?.teamName ?? "홈팀"}</strong>
+        <strong>{displayLocalizedName(homeTeam?.teamNameKo, homeTeam?.teamName ?? "홈팀")}</strong>
         <span>{homeTeam?.formation ?? "-"}</span>
       </div>
       <div className="mobile-formation-label away">
-        <strong>{awayTeam?.teamName ?? "원정팀"}</strong>
+        <strong>{displayLocalizedName(awayTeam?.teamNameKo, awayTeam?.teamName ?? "원정팀")}</strong>
         <span>{awayTeam?.formation ?? "-"}</span>
       </div>
       {players.map((player) => (
@@ -943,10 +955,14 @@ function MobileLineupPitch({
 function FormationLabel({ side, team }: { side: Side; team: FixtureTeamLineup | null }) {
   return (
     <div className={`formation-label ${side}`}>
-      <strong>{team?.teamName ?? (side === "home" ? "홈팀" : "원정팀")}</strong>
+      <strong>{displayLocalizedName(team?.teamNameKo, team?.teamName ?? (side === "home" ? "홈팀" : "원정팀"))}</strong>
       <span>{team?.formation ?? "-"}</span>
     </div>
   );
+}
+
+function displayLineupPlayerName(player: FixtureLineupPlayer) {
+  return displayLocalizedName(player.playerNameKo, player.playerName);
 }
 
 function PitchPlayer({
@@ -971,7 +987,7 @@ function PitchPlayer({
     <Link
       className="pitch-player player-name-link"
       style={style}
-      title={player.player.playerName ?? undefined}
+      title={displayLineupPlayerName(player.player) || undefined}
       to={`/players/${player.player.playerId}`}
     >
       <div className="pitch-player-visual">
@@ -986,7 +1002,7 @@ function PitchPlayer({
           <small className="pitch-substitution-minute out">OUT {detail.subbedOutMinute}</small>
         ) : null}
       </div>
-      <strong>{shortName(player.player.playerName)}</strong>
+      <strong>{shortName(displayLineupPlayerName(player.player))}</strong>
       <LineupEventBadges detail={detail} compact />
     </Link>
   );
@@ -1015,7 +1031,7 @@ function LineupTeamCard({
     <article className={`panel lineup-team-card ${side}`}>
       <div className="lineup-team-heading">
         <div>
-          <h2>{team.teamName ?? "팀"}</h2>
+          <h2>{displayLocalizedName(team.teamNameKo, team.teamName ?? "팀")}</h2>
           <p className="muted">포메이션 {team.formation ?? "-"}</p>
         </div>
       </div>
@@ -1061,7 +1077,7 @@ function LineupList({
                 <div className="lineup-player-summary">
                   <div className="lineup-player-name-row">
                     <Link className="lineup-player-link" to={`/players/${player.playerId}`}>
-                      {player.playerName ?? "-"}
+                      {displayLineupPlayerName(player)}
                     </Link>
                     <LineupEventBadges detail={detail} />
                   </div>
@@ -1237,7 +1253,7 @@ function compareNumberAscending(left: number | null, right: number | null) {
 function PlayerPhoto({ player }: { player: FixtureLineupPlayer }) {
   const [imageFailed, setImageFailed] = useState(false);
   if (!player.photoUrl || imageFailed) {
-    return <span className="lineup-player-photo placeholder" aria-hidden="true">{shortName(player.playerName).slice(0, 1)}</span>;
+    return <span className="lineup-player-photo placeholder" aria-hidden="true">{shortName(displayLineupPlayerName(player)).slice(0, 1)}</span>;
   }
   return (
     <img
@@ -1320,7 +1336,7 @@ function AbsenceList({ team }: { team: FixtureTeamLineup }) {
             <div className="lineup-list-row absence" key={`absence-${absence.playerId}`}>
               <span>-</span>
               <Link className="lineup-player-link" to={`/players/${absence.playerId}`}>
-                {absence.playerName ?? "-"}
+                {displayLocalizedName(absence.playerNameKo, absence.playerName)}
               </Link>
               <em>{absence.reason ?? absence.absenceType ?? "-"}</em>
             </div>
@@ -1372,8 +1388,8 @@ function TeamStatsPanel({ fixture, state }: { fixture: FixtureSummary; state: Lo
       </div>
       <div className="team-stat-comparison">
         <div className="team-stat-head">
-          <strong>{displayTeamName(fixture.homeTeamId, fixture.homeTeamName ?? "홈팀")}</strong>
-          <strong>{displayTeamName(fixture.awayTeamId, fixture.awayTeamName ?? "원정팀")}</strong>
+          <strong>{displayLocalizedName(state.data.homeTeamStat?.teamNameKo ?? fixture.homeTeamNameKo, state.data.homeTeamStat?.teamName ?? fixture.homeTeamName ?? "홈팀")}</strong>
+          <strong>{displayLocalizedName(state.data.awayTeamStat?.teamNameKo ?? fixture.awayTeamNameKo, state.data.awayTeamStat?.teamName ?? fixture.awayTeamName ?? "원정팀")}</strong>
         </div>
         {rows.map((row) => (
           <StatCompareRow key={row.label} row={row} />
@@ -1447,7 +1463,7 @@ function PlayerStatTable({ group }: { group: FixtureTeamPlayerStats }) {
 
   return (
     <section className="player-stat-team">
-      <h3>{group.teamName ?? "팀"}</h3>
+      <h3>{displayLocalizedName(group.teamNameKo, group.teamName ?? "팀")}</h3>
       <div className="player-stat-table-wrap">
         <table className="player-stat-table">
           <thead>
@@ -1516,7 +1532,7 @@ function PlayerStatRow({ player }: { player: FixturePlayerStat }) {
       <td>
         <Link className="player-stat-link" to={`/players/${player.playerId}`}>
           {player.jerseyNumber ? `${player.jerseyNumber}. ` : ""}
-          {player.playerName ?? "-"}
+          {displayLocalizedName(player.playerNameKo, player.playerName)}
         </Link>
       </td>
       <td>{compactPosition(player.position)}</td>
@@ -2022,11 +2038,11 @@ function isVarGoalCancelledEvent(event: FixtureEvent) {
 }
 
 function varEventLabel(event: FixtureEvent) {
-  if (normalizedEventDetail(event) === "goal cancelled" && event.player?.name) {
-    return `${event.player.name}의 골 취소`;
+  if (normalizedEventDetail(event) === "goal cancelled" && hasEventPlayerName(event.player)) {
+    return `${displayEventPlayerName(event.player)}의 골 취소`;
   }
-  if (normalizedEventDetail(event) === "goal confirmed" && event.player?.name) {
-    return `${event.player.name}의 골 확정`;
+  if (normalizedEventDetail(event) === "goal confirmed" && hasEventPlayerName(event.player)) {
+    return `${displayEventPlayerName(event.player)}의 골 확정`;
   }
   const labels: Record<string, string> = {
     "goal cancelled": "골 취소",

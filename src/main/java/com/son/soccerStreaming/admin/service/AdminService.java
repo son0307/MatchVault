@@ -69,6 +69,7 @@ public class AdminService {
     private static final ZoneId KOREA_ZONE = ZoneId.of("Asia/Seoul");
     private static final Set<String> TEAM_OVERRIDE_FIELDS = Set.of(
             "name",
+            "koreanName",
             "code",
             "country",
             "founded",
@@ -83,6 +84,7 @@ public class AdminService {
     );
     private static final Set<String> PLAYER_OVERRIDE_FIELDS = Set.of(
             "name",
+            "koreanName",
             "firstname",
             "lastname",
             "age",
@@ -140,7 +142,7 @@ public class AdminService {
     @Transactional(readOnly = true)
     public List<AdminDto.TeamAdminResponse> searchTeams(String keyword) {
         String search = adminSearchKeyword(keyword);
-        return teamRepository.findTop20ByNameContainingIgnoreCaseOrderByNameAsc(search)
+        return teamRepository.findTop20ByNameOrKoreanNameContainingIgnoreCaseOrderByNameAsc(search)
                 .stream()
                 .map(this::toTeamResponse)
                 .toList();
@@ -156,7 +158,7 @@ public class AdminService {
     @Transactional(readOnly = true)
     public List<AdminDto.PlayerAdminResponse> searchPlayers(String keyword) {
         String search = adminSearchKeyword(keyword);
-        return playerRepository.findTop20ByNameContainingIgnoreCaseOrderByNameAsc(search)
+        return playerRepository.findTop20ByNameOrKoreanNameContainingIgnoreCaseOrderByNameAsc(search)
                 .stream()
                 .map(this::toPlayerResponse)
                 .toList();
@@ -176,6 +178,7 @@ public class AdminService {
                 .map(team -> AdminDto.FixtureTeamOptionResponse.builder()
                         .teamId(team.getTeamId())
                         .name(team.getName())
+                        .koreanName(team.getKoreanName())
                         .build())
                 .toList();
     }
@@ -440,6 +443,7 @@ public class AdminService {
                 request.getFounded(),
                 request.getLogoUrl()
         );
+        team.updateKoreanName(request.getKoreanName());
         upsertVenue(team, request);
         if (!changedFields.isEmpty()) {
             adminOverrideService.markOverrides(AdminOverrideTargetType.TEAM, team.getTeamId(), changedFields);
@@ -478,6 +482,7 @@ public class AdminService {
                 request.getNumber(),
                 request.getPhotoUrl()
         );
+        player.updateKoreanName(request.getKoreanName());
         if (!changedFields.isEmpty()) {
             adminOverrideService.markOverrides(AdminOverrideTargetType.PLAYER, player.getPlayerId(), changedFields);
         }
@@ -726,6 +731,7 @@ public class AdminService {
     private List<FieldChange> changedTeamFields(Team team, AdminDto.TeamUpdateRequest request) {
         List<FieldChange> changes = new ArrayList<>();
         addIfChanged(changes, "name", team.getName(), request.getName());
+        addIfChanged(changes, "koreanName", team.getKoreanName(), request.getKoreanName());
         addIfChanged(changes, "code", team.getCode(), request.getCode());
         addIfChanged(changes, "country", team.getCountry(), request.getCountry());
         addIfChanged(changes, "founded", team.getFounded(), request.getFounded());
@@ -748,6 +754,7 @@ public class AdminService {
     private List<FieldChange> changedPlayerFields(Player player, AdminDto.PlayerUpdateRequest request) {
         List<FieldChange> changes = new ArrayList<>();
         addIfChanged(changes, "name", player.getName(), request.getName());
+        addIfChanged(changes, "koreanName", player.getKoreanName(), request.getKoreanName());
         addIfChanged(changes, "firstname", player.getFirstname(), request.getFirstname());
         addIfChanged(changes, "lastname", player.getLastname(), request.getLastname());
         addIfChanged(changes, "age", player.getAge(), request.getAge());
@@ -967,6 +974,7 @@ public class AdminService {
         return AdminDto.TeamAdminResponse.builder()
                 .teamId(team.getTeamId())
                 .name(team.getName())
+                .koreanName(team.getKoreanName())
                 .code(team.getCode())
                 .country(team.getCountry())
                 .founded(team.getFounded())
@@ -986,6 +994,7 @@ public class AdminService {
         return AdminDto.PlayerAdminResponse.builder()
                 .playerId(player.getPlayerId())
                 .name(player.getName())
+                .koreanName(player.getKoreanName())
                 .firstname(player.getFirstname())
                 .lastname(player.getLastname())
                 .age(player.getAge())
@@ -1010,8 +1019,10 @@ public class AdminService {
                 .round(fixture.getRound())
                 .homeTeamId(fixture.getHomeTeam().getTeamId())
                 .homeTeamName(fixture.getHomeTeam().getName())
+                .homeTeamNameKo(fixture.getHomeTeam().getKoreanName())
                 .awayTeamId(fixture.getAwayTeam().getTeamId())
                 .awayTeamName(fixture.getAwayTeam().getName())
+                .awayTeamNameKo(fixture.getAwayTeam().getKoreanName())
                 .homeScore(fixture.getHomeScore())
                 .awayScore(fixture.getAwayScore())
                 .fixtureStatus(fixture.getFixtureStatus())
@@ -1073,8 +1084,10 @@ public class AdminService {
                 .penaltyAwayScore(fixture.getPenaltyAwayScore())
                 .homeTeamId(fixture.getHomeTeam().getTeamId())
                 .homeTeamName(fixture.getHomeTeam().getName())
+                .homeTeamNameKo(fixture.getHomeTeam().getKoreanName())
                 .awayTeamId(fixture.getAwayTeam().getTeamId())
                 .awayTeamName(fixture.getAwayTeam().getName())
+                .awayTeamNameKo(fixture.getAwayTeam().getKoreanName())
                 .homeFormation(fixture.getHomeFormation())
                 .awayFormation(fixture.getAwayFormation())
                 .homeCoachName(fixture.getHomeCoachName())
@@ -1101,10 +1114,13 @@ public class AdminService {
                 .extra(event.getExtra())
                 .teamId(event.getTeam() != null ? event.getTeam().getTeamId() : null)
                 .teamName(event.getTeam() != null ? event.getTeam().getName() : null)
+                .teamNameKo(event.getTeam() != null ? event.getTeam().getKoreanName() : null)
                 .playerId(event.getPlayer() != null ? event.getPlayer().getPlayerId() : null)
                 .playerName(event.getPlayer() != null ? event.getPlayer().getName() : null)
+                .playerNameKo(event.getPlayer() != null ? event.getPlayer().getKoreanName() : null)
                 .assistPlayerId(event.getAssistPlayer() != null ? event.getAssistPlayer().getPlayerId() : null)
                 .assistPlayerName(event.getAssistPlayer() != null ? event.getAssistPlayer().getName() : null)
+                .assistPlayerNameKo(event.getAssistPlayer() != null ? event.getAssistPlayer().getKoreanName() : null)
                 .eventType(event.getEventType())
                 .eventDetail(event.getEventDetail())
                 .comments(event.getComments())
@@ -1115,8 +1131,10 @@ public class AdminService {
         return AdminDto.FixtureLineupAdminResponse.builder()
                 .teamId(lineup.getTeam().getTeamId())
                 .teamName(lineup.getTeam().getName())
+                .teamNameKo(lineup.getTeam().getKoreanName())
                 .playerId(lineup.getPlayer().getPlayerId())
                 .playerName(lineup.getPlayer().getName())
+                .playerNameKo(lineup.getPlayer().getKoreanName())
                 .jerseyNumber(lineup.getJerseyNumber())
                 .position(lineup.getPosition())
                 .grid(lineup.getGrid())
@@ -1128,6 +1146,7 @@ public class AdminService {
         return AdminDto.FixtureTeamStatAdminResponse.builder()
                 .teamId(stat.getTeam().getTeamId())
                 .teamName(stat.getTeam().getName())
+                .teamNameKo(stat.getTeam().getKoreanName())
                 .shotsOnGoal(stat.getShotsOnGoal())
                 .shotsOffGoal(stat.getShotsOffGoal())
                 .totalShots(stat.getTotalShots())
@@ -1152,8 +1171,10 @@ public class AdminService {
         return AdminDto.FixturePlayerStatAdminResponse.builder()
                 .playerId(stat.getPlayer().getPlayerId())
                 .playerName(stat.getPlayer().getName())
+                .playerNameKo(stat.getPlayer().getKoreanName())
                 .teamId(stat.getTeam().getTeamId())
                 .teamName(stat.getTeam().getName())
+                .teamNameKo(stat.getTeam().getKoreanName())
                 .minutesPlayed(stat.getMinutesPlayed())
                 .rating(stat.getRating())
                 .captain(stat.getIsCaptain())
