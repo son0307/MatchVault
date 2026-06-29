@@ -27,6 +27,7 @@ public class Team {
     private Integer founded;
     private String logoUrl;
     private String logoObjectKey;
+    private String adminLogoObjectKey;
     private LocalDateTime logoCachedAt;
     private LocalDateTime logoCacheFailedAt;
     private String logoCacheFailureReason;
@@ -66,6 +67,14 @@ public class Team {
         this.logoCachedAt = cachedAt;
         this.logoCacheFailedAt = null;
         this.logoCacheFailureReason = null;
+    }
+
+    public void updateAdminLogoObjectKey(String objectKey) {
+        this.adminLogoObjectKey = objectKey;
+    }
+
+    public void clearAdminLogoObjectKey() {
+        this.adminLogoObjectKey = null;
     }
 
     public void markLogoCacheFailed(LocalDateTime failedAt, String failureReason) {

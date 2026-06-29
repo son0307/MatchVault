@@ -35,6 +35,7 @@ public class Venue {
     private String surface;
     private String venueImageUrl;
     private String venueImageObjectKey;
+    private String adminVenueImageObjectKey;
     private LocalDateTime venueImageCachedAt;
     private LocalDateTime venueImageCacheFailedAt;
     private String venueImageCacheFailureReason;
@@ -64,6 +65,14 @@ public class Venue {
         this.venueImageCachedAt = cachedAt;
         this.venueImageCacheFailedAt = null;
         this.venueImageCacheFailureReason = null;
+    }
+
+    public void updateAdminVenueImageObjectKey(String objectKey) {
+        this.adminVenueImageObjectKey = objectKey;
+    }
+
+    public void clearAdminVenueImageObjectKey() {
+        this.adminVenueImageObjectKey = null;
     }
 
     public void markVenueImageCacheFailed(LocalDateTime failedAt, String failureReason) {

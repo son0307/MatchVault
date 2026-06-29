@@ -18,6 +18,7 @@ public class MediaProperties {
     private String publicBaseUrl = "";
     private Cache cache = new Cache();
     private R2 r2 = new R2();
+    private AdminMediaCleanup adminMediaCleanup = new AdminMediaCleanup();
 
     @Getter
     @Setter
@@ -47,5 +48,12 @@ public class MediaProperties {
         private String region = "auto";
         private String accessKey = "";
         private String secretKey = "";
+    }
+
+    @Getter
+    @Setter
+    public static class AdminMediaCleanup {
+        private boolean enabled = false;
+        private Duration minimumAge = Duration.ofHours(1);
     }
 }

@@ -51,6 +51,11 @@ media:
       enabled: ${MEDIA_CACHE_SCHEDULER_ENABLED:false}
       cron: ${MEDIA_CACHE_SCHEDULER_CRON:0 30 * * * *}
       batch-size: ${MEDIA_CACHE_SCHEDULER_BATCH_SIZE:50}
+  admin-media-cleanup:
+    enabled: ${MEDIA_ADMIN_MEDIA_CLEANUP_ENABLED:true}
+    cron: ${MEDIA_ADMIN_MEDIA_CLEANUP_CRON:0 0 3 * * SUN}
+    zone: ${MEDIA_ADMIN_MEDIA_CLEANUP_ZONE:Asia/Seoul}
+    minimum-age: ${MEDIA_ADMIN_MEDIA_CLEANUP_MINIMUM_AGE:1h}
 
 api-football:
   sync:

@@ -16,6 +16,22 @@ type AdminPageProps = {
 };
 
 type AdminTab = "team" | "player" | "fixture";
+type AdminMediaTargetType = "PLAYER_PHOTO" | "TEAM_LOGO" | "VENUE_IMAGE";
+
+type AdminMediaPresignResponse = {
+  objectKey: string;
+  uploadUrl: string;
+  requiredHeaders: Record<string, string>;
+  expiresAt: string;
+};
+
+type AdminMediaResponse = {
+  targetType: AdminMediaTargetType;
+  targetId: number;
+  objectKey: string | null;
+  publicUrl: string | null;
+  adminImage: boolean;
+};
 
 function adminTab(value: string | null): AdminTab | null {
   return value === "team" || value === "player" || value === "fixture" ? value : null;
@@ -48,6 +64,11 @@ type TeamAdmin = Record<string, unknown> & {
   teamId: number;
   name: string | null;
   koreanName: string | null;
+  logoDisplayUrl: string | null;
+  adminLogo: boolean;
+  venueId: number | null;
+  venueImageDisplayUrl: string | null;
+  adminVenueImage: boolean;
   manualOverrides?: AdminOverride[];
 };
 
@@ -61,6 +82,8 @@ type PlayerAdmin = Record<string, unknown> & {
   playerId: number;
   name: string | null;
   koreanName: string | null;
+  photoDisplayUrl: string | null;
+  adminPhoto: boolean;
   manualOverrides?: AdminOverride[];
 };
 
@@ -173,6 +196,8 @@ type AuditLogPage = {
 const AUDIT_LOG_PAGE_SIZE = 20;
 const ADMIN_SEARCH_KEYWORD_MAX_LENGTH = 80;
 const MANUAL_SYNC_COOLDOWN_MS = 30_000;
+const ADMIN_IMAGE_MAX_BYTES = 2 * 1024 * 1024;
+const ADMIN_IMAGE_CONTENT_TYPES = new Set(["image/png", "image/jpeg", "image/webp"]);
 
 const teamFields: FieldConfig[] = [
   { name: "name", label: "Name" },
@@ -699,6 +724,100 @@ export function AdminPage({ authState }: AdminPageProps) {
     });
   }
 
+  async function uploadAdminMedia(targetType: AdminMediaTargetType, targetId: number, file: File) {
+    if (!ADMIN_IMAGE_CONTENT_TYPES.has(file.type) || file.size <= 0 || file.size > ADMIN_IMAGE_MAX_BYTES) {
+      setError("PNG, JPEG, WebP 형식의 2MB 이하 이미지만 업로드할 수 있습니다.");
+      return;
+    }
+
+    await runSave(`media:${targetType}:${targetId}`, async () => {
+      let presign: AdminMediaPresignResponse;
+      try {
+        presign = await adminJson<AdminMediaPresignResponse>("/api/v1/admin/media/uploads/presign", "POST", {
+          targetType,
+          targetId,
+          contentType: file.type,
+          sizeBytes: file.size,
+        });
+      } catch (nextError) {
+        throw new Error(`업로드 URL 발급 실패: ${requestErrorMessage(nextError)}`);
+      }
+
+      let uploadResponse: Response;
+      try {
+        uploadResponse = await fetch(presign.uploadUrl, {
+          method: "PUT",
+          headers: presign.requiredHeaders,
+          body: file,
+        });
+      } catch {
+        throw new Error("R2 이미지 전송에 실패했습니다. 네트워크 상태와 R2 CORS 설정을 확인해주세요.");
+      }
+      if (!uploadResponse.ok) {
+        throw new Error(`R2 이미지 전송에 실패했습니다. (${uploadResponse.status})`);
+      }
+
+      let completed: AdminMediaResponse;
+      try {
+        completed = await adminJson<AdminMediaResponse>("/api/v1/admin/media/uploads/complete", "POST", {
+          targetType,
+          targetId,
+          objectKey: presign.objectKey,
+        });
+      } catch (nextError) {
+        throw new Error(`업로드 완료 확인 실패: ${requestErrorMessage(nextError)}`);
+      }
+
+      applyAdminMediaResponse(completed);
+      clearApiMemoryCache();
+      setMessage("관리자 이미지를 적용했습니다.");
+      await reloadAuditLogs();
+    });
+  }
+
+  async function restoreAdminMedia(targetType: AdminMediaTargetType, targetId: number) {
+    await runSave(`media:${targetType}:${targetId}`, async () => {
+      const restored = await adminJson<AdminMediaResponse>(
+        `/api/v1/admin/media/${targetType}/${targetId}`,
+        "DELETE",
+      );
+      applyAdminMediaResponse(restored);
+      clearApiMemoryCache();
+      setMessage("관리자 이미지를 제거하고 원본 이미지로 복원했습니다.");
+      await reloadAuditLogs();
+    });
+  }
+
+  function applyAdminMediaResponse(response: AdminMediaResponse) {
+    if (response.targetType === "PLAYER_PHOTO") {
+      setPlayerSelection((current) => current.status === "ready" && current.playerId === response.targetId && current.detail
+        ? {
+            ...current,
+            detail: { ...current.detail, photoDisplayUrl: response.publicUrl, adminPhoto: response.adminImage },
+          }
+        : current);
+      return;
+    }
+
+    setTeamSelection((current) => {
+      if (current.status !== "ready" || !current.detail) {
+        return current;
+      }
+      const matchesTarget = response.targetType === "TEAM_LOGO"
+        ? current.teamId === response.targetId
+        : current.detail.venueId === response.targetId;
+      if (!matchesTarget) {
+        return current;
+      }
+      return {
+        ...current,
+        detail: response.targetType === "TEAM_LOGO"
+          ? { ...current.detail, logoDisplayUrl: response.publicUrl, adminLogo: response.adminImage }
+          : { ...current.detail, venueImageDisplayUrl: response.publicUrl, adminVenueImage: response.adminImage },
+      };
+    });
+  }
+
   async function saveFixture(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!selectedFixture) {
@@ -929,15 +1048,40 @@ export function AdminPage({ authState }: AdminPageProps) {
           />
           {loadingTeamId !== null ? <p className="muted admin-sync-message">팀 정보를 불러오는 중입니다.</p> : null}
           {selectedTeam ? (
-            <AdminForm
-              title={selectedTeam.name ?? "Team"}
-              fields={teamFields}
-              value={selectedTeam}
-              overrides={selectedTeam.manualOverrides}
-              submitLabel="Save Team"
-              onSubmit={saveTeam}
-              disabled={savingKey !== null}
-            />
+            <>
+              <div className="admin-media-grid">
+                <AdminMediaUpload
+                  label="팀 로고"
+                  imageUrl={selectedTeam.logoDisplayUrl}
+                  adminImage={selectedTeam.adminLogo}
+                  targetType="TEAM_LOGO"
+                  targetId={selectedTeam.teamId}
+                  disabled={savingKey !== null}
+                  onUpload={uploadAdminMedia}
+                  onRestore={restoreAdminMedia}
+                />
+                <AdminMediaUpload
+                  label="경기장 이미지"
+                  imageUrl={selectedTeam.venueImageDisplayUrl}
+                  adminImage={selectedTeam.adminVenueImage}
+                  targetType="VENUE_IMAGE"
+                  targetId={selectedTeam.venueId}
+                  disabled={savingKey !== null}
+                  unavailableMessage="경기장 정보를 먼저 저장해주세요."
+                  onUpload={uploadAdminMedia}
+                  onRestore={restoreAdminMedia}
+                />
+              </div>
+              <AdminForm
+                title={selectedTeam.name ?? "Team"}
+                fields={teamFields}
+                value={selectedTeam}
+                overrides={selectedTeam.manualOverrides}
+                submitLabel="Save Team"
+                onSubmit={saveTeam}
+                disabled={savingKey !== null}
+              />
+            </>
           ) : null}
         </EditorPanel>
       ) : null}
@@ -987,15 +1131,29 @@ export function AdminPage({ authState }: AdminPageProps) {
           />
           {loadingPlayerId !== null ? <p className="muted admin-sync-message">선수 정보를 불러오는 중입니다.</p> : null}
           {selectedPlayer ? (
-            <AdminForm
-              title={selectedPlayer.name ?? "Player"}
-              fields={playerFields}
-              value={selectedPlayer}
-              overrides={selectedPlayer.manualOverrides}
-              submitLabel="Save Player"
-              onSubmit={savePlayer}
-              disabled={savingKey !== null}
-            />
+            <>
+              <div className="admin-media-grid single">
+                <AdminMediaUpload
+                  label="선수 프로필 이미지"
+                  imageUrl={selectedPlayer.photoDisplayUrl}
+                  adminImage={selectedPlayer.adminPhoto}
+                  targetType="PLAYER_PHOTO"
+                  targetId={selectedPlayer.playerId}
+                  disabled={savingKey !== null}
+                  onUpload={uploadAdminMedia}
+                  onRestore={restoreAdminMedia}
+                />
+              </div>
+              <AdminForm
+                title={selectedPlayer.name ?? "Player"}
+                fields={playerFields}
+                value={selectedPlayer}
+                overrides={selectedPlayer.manualOverrides}
+                submitLabel="Save Player"
+                onSubmit={savePlayer}
+                disabled={savingKey !== null}
+              />
+            </>
           ) : null}
         </EditorPanel>
       ) : null}
@@ -1228,6 +1386,90 @@ function ResultList<T>({
         </button>
       ))}
     </div>
+  );
+}
+
+function AdminMediaUpload({
+  label,
+  imageUrl,
+  adminImage,
+  targetType,
+  targetId,
+  disabled,
+  unavailableMessage,
+  onUpload,
+  onRestore,
+}: {
+  label: string;
+  imageUrl: string | null;
+  adminImage: boolean;
+  targetType: AdminMediaTargetType;
+  targetId: number | null;
+  disabled?: boolean;
+  unavailableMessage?: string;
+  onUpload: (targetType: AdminMediaTargetType, targetId: number, file: File) => Promise<void>;
+  onRestore: (targetType: AdminMediaTargetType, targetId: number) => Promise<void>;
+}) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [imageFailed, setImageFailed] = useState(false);
+  const available = targetId !== null && Number.isFinite(targetId) && targetId > 0;
+
+  useEffect(() => {
+    setImageFailed(false);
+  }, [imageUrl]);
+
+  async function selectFile(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.currentTarget.files?.[0];
+    event.currentTarget.value = "";
+    if (!file || !available || targetId === null) {
+      return;
+    }
+    await onUpload(targetType, targetId, file);
+  }
+
+  async function restore() {
+    if (!available || targetId === null || !adminImage) {
+      return;
+    }
+    if (!window.confirm(`${label}를 원본 이미지로 복원할까요?`)) {
+      return;
+    }
+    await onRestore(targetType, targetId);
+  }
+
+  return (
+    <section className="admin-media-card">
+      <div className="admin-media-heading">
+        <strong>{label}</strong>
+        <span className={adminImage ? "status-pill" : "muted"}>{adminImage ? "관리자 이미지" : "원본 이미지"}</span>
+      </div>
+      <div className="admin-media-preview">
+        {imageUrl && !imageFailed ? (
+          <img src={imageUrl} alt={`${label} 미리보기`} onError={() => setImageFailed(true)} />
+        ) : (
+          <span>이미지 없음</span>
+        )}
+      </div>
+      {!available && unavailableMessage ? <p className="admin-media-help">{unavailableMessage}</p> : null}
+      <div className="admin-media-actions">
+        <input
+          ref={inputRef}
+          type="file"
+          accept="image/png,image/jpeg,image/webp"
+          onChange={selectFile}
+          disabled={disabled || !available}
+          hidden
+        />
+        <button type="button" onClick={() => inputRef.current?.click()} disabled={disabled || !available}>
+          {disabled ? <LoaderCircle className="admin-loading-icon" aria-hidden="true" /> : null}
+          이미지 업로드
+        </button>
+        <button type="button" onClick={restore} disabled={disabled || !available || !adminImage}>
+          원본으로 복원
+        </button>
+      </div>
+      <small>PNG, JPEG, WebP · 최대 2MB</small>
+    </section>
   );
 }
 
@@ -1886,6 +2128,10 @@ async function errorMessage(response: Response, fallback: string) {
   } catch {
     return fallback;
   }
+}
+
+function requestErrorMessage(error: unknown) {
+  return error instanceof Error ? error.message : "요청을 처리하지 못했습니다.";
 }
 
 function formatDateTime(value: string | null) {
