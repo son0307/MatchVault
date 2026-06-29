@@ -1,8 +1,11 @@
 package com.son.soccerStreaming.admin.controller;
 
 import com.son.soccerStreaming.admin.dto.AdminDto;
+import com.son.soccerStreaming.admin.dto.AdminMediaDto;
+import com.son.soccerStreaming.admin.entity.AdminMediaTargetType;
 import com.son.soccerStreaming.auth.security.AuthUserDetails;
 import com.son.soccerStreaming.admin.service.AdminService;
+import com.son.soccerStreaming.admin.service.AdminMediaService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -24,6 +27,31 @@ import java.util.List;
 public class AdminController {
 
     private final AdminService adminService;
+    private final AdminMediaService adminMediaService;
+
+    @PostMapping("/media/uploads/presign")
+    public ResponseEntity<AdminMediaDto.PresignResponse> presignMediaUpload(
+            @RequestBody AdminMediaDto.PresignRequest request
+    ) {
+        return ResponseEntity.ok(adminMediaService.presign(request));
+    }
+
+    @PostMapping("/media/uploads/complete")
+    public ResponseEntity<AdminMediaDto.MediaResponse> completeMediaUpload(
+            @AuthenticationPrincipal AuthUserDetails userDetails,
+            @RequestBody AdminMediaDto.CompleteRequest request
+    ) {
+        return ResponseEntity.ok(adminMediaService.complete(userDetails.getId(), request));
+    }
+
+    @DeleteMapping("/media/{targetType}/{targetId}")
+    public ResponseEntity<AdminMediaDto.MediaResponse> restoreMedia(
+            @AuthenticationPrincipal AuthUserDetails userDetails,
+            @PathVariable AdminMediaTargetType targetType,
+            @PathVariable Long targetId
+    ) {
+        return ResponseEntity.ok(adminMediaService.restore(userDetails.getId(), targetType, targetId));
+    }
 
     @GetMapping("/teams")
     public List<AdminDto.TeamAdminResponse> searchTeams(@RequestParam(defaultValue = "") String keyword) {

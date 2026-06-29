@@ -23,6 +23,7 @@ import com.son.soccerStreaming.fixture.repository.PlayerFixtureStatRepository;
 import com.son.soccerStreaming.fixture.service.FixtureRedisService;
 import com.son.soccerStreaming.league.entity.LeagueSeasonCoverage;
 import com.son.soccerStreaming.league.repository.LeagueSeasonCoverageRepository;
+import com.son.soccerStreaming.media.service.MediaUrlService;
 import com.son.soccerStreaming.player.entity.Player;
 import com.son.soccerStreaming.team.entity.Team;
 import com.son.soccerStreaming.admin.repository.AdminAuditLogRepository;
@@ -94,6 +95,8 @@ class AdminServiceTest {
     private LeagueSeasonCoverageSyncService leagueSeasonCoverageSyncService;
     @Mock
     private AdminSyncTaskRunner adminSyncTaskRunner;
+    @Mock
+    private MediaUrlService mediaUrlService;
 
     @InjectMocks
     private AdminService adminService;

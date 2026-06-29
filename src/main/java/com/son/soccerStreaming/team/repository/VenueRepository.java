@@ -23,4 +23,7 @@ public interface VenueRepository extends JpaRepository<Venue, Long> {
             order by v.venueName asc
             """)
     List<Long> findImageCacheCandidateIds(LocalDateTime retryBefore, Pageable pageable);
+
+    @Query("select v.adminVenueImageObjectKey from Venue v where v.adminVenueImageObjectKey is not null")
+    List<String> findAllAdminVenueImageObjectKeys();
 }

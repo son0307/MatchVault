@@ -33,4 +33,7 @@ public interface PlayerRepository extends JpaRepository<Player, Long> {
             order by p.name asc
             """)
     List<Long> findPhotoCacheCandidateIds(LocalDateTime retryBefore, Pageable pageable);
+
+    @Query("select p.adminPhotoObjectKey from Player p where p.adminPhotoObjectKey is not null")
+    List<String> findAllAdminPhotoObjectKeys();
 }

@@ -45,6 +45,7 @@ public class Player {
     // 이미지 정보
     private String photoUrl;
     private String photoObjectKey;
+    private String adminPhotoObjectKey;
     private LocalDateTime photoCachedAt;
     private LocalDateTime photoCacheFailedAt;
     private String photoCacheFailureReason;
@@ -94,6 +95,14 @@ public class Player {
         this.photoCachedAt = cachedAt;
         this.photoCacheFailedAt = null;
         this.photoCacheFailureReason = null;
+    }
+
+    public void updateAdminPhotoObjectKey(String objectKey) {
+        this.adminPhotoObjectKey = objectKey;
+    }
+
+    public void clearAdminPhotoObjectKey() {
+        this.adminPhotoObjectKey = null;
     }
 
     public void markPhotoCacheFailed(LocalDateTime failedAt, String failureReason) {

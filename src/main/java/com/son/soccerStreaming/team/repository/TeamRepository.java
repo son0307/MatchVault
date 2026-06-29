@@ -50,4 +50,7 @@ public interface TeamRepository extends JpaRepository<Team, Long> {
             order by t.name asc
             """)
     List<Long> findLogoCacheCandidateIds(LocalDateTime retryBefore, Pageable pageable);
+
+    @Query("select t.adminLogoObjectKey from Team t where t.adminLogoObjectKey is not null")
+    List<String> findAllAdminLogoObjectKeys();
 }

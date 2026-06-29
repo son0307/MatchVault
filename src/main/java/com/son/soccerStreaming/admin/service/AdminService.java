@@ -31,6 +31,7 @@ import com.son.soccerStreaming.team.entity.Venue;
 import com.son.soccerStreaming.global.exception.CustomException;
 import com.son.soccerStreaming.global.exception.ErrorCode;
 import com.son.soccerStreaming.global.config.RedisCacheConfig;
+import com.son.soccerStreaming.media.service.MediaUrlService;
 import com.son.soccerStreaming.admin.repository.AdminAuditLogRepository;
 import com.son.soccerStreaming.apifootball.repository.ApiFootballSyncStatusRepository;
 import com.son.soccerStreaming.auth.repository.AppUserRepository;
@@ -137,6 +138,7 @@ public class AdminService {
     private final ApiFootballInjurySyncService apiFootballInjurySyncService;
     private final LeagueSeasonCoverageSyncService leagueSeasonCoverageSyncService;
     private final AdminSyncTaskRunner adminSyncTaskRunner;
+    private final MediaUrlService mediaUrlService;
     private final ConcurrentMap<String, ManualSyncState> manualSyncStates = new ConcurrentHashMap<>();
 
     @Transactional(readOnly = true)
@@ -979,6 +981,8 @@ public class AdminService {
                 .country(team.getCountry())
                 .founded(team.getFounded())
                 .logoUrl(team.getLogoUrl())
+                .logoDisplayUrl(mediaUrlService.teamLogoUrl(team))
+                .adminLogo(hasText(team.getAdminLogoObjectKey()))
                 .venueId(venue != null ? venue.getVenueId() : null)
                 .venueName(venue != null ? venue.getVenueName() : null)
                 .venueAddress(venue != null ? venue.getVenueAddress() : null)
@@ -986,6 +990,8 @@ public class AdminService {
                 .capacity(venue != null ? venue.getCapacity() : null)
                 .surface(venue != null ? venue.getSurface() : null)
                 .venueImageUrl(venue != null ? venue.getVenueImageUrl() : null)
+                .venueImageDisplayUrl(mediaUrlService.venueImageUrl(venue))
+                .adminVenueImage(venue != null && hasText(venue.getAdminVenueImageObjectKey()))
                 .manualOverrides(toOverrideResponses(AdminOverrideTargetType.TEAM, team.getTeamId()))
                 .build();
     }
@@ -1007,8 +1013,14 @@ public class AdminService {
                 .position(player.getPosition())
                 .number(player.getNumber())
                 .photoUrl(player.getPhotoUrl())
+                .photoDisplayUrl(mediaUrlService.playerPhotoUrl(player))
+                .adminPhoto(hasText(player.getAdminPhotoObjectKey()))
                 .manualOverrides(toOverrideResponses(AdminOverrideTargetType.PLAYER, player.getPlayerId()))
                 .build();
+    }
+
+    private boolean hasText(String value) {
+        return value != null && !value.isBlank();
     }
 
     private AdminDto.FixtureAdminSummaryResponse toFixtureSummaryResponse(Fixture fixture) {

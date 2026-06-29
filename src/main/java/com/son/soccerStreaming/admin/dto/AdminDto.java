@@ -195,6 +195,8 @@ public class AdminDto {
         private String country;
         private Integer founded;
         private String logoUrl;
+        private String logoDisplayUrl;
+        private boolean adminLogo;
         private Long venueId;
         private String venueName;
         private String venueAddress;
@@ -202,6 +204,8 @@ public class AdminDto {
         private Integer capacity;
         private String surface;
         private String venueImageUrl;
+        private String venueImageDisplayUrl;
+        private boolean adminVenueImage;
         private List<ManualOverrideResponse> manualOverrides;
     }
 
@@ -223,6 +227,8 @@ public class AdminDto {
         private String position;
         private Integer number;
         private String photoUrl;
+        private String photoDisplayUrl;
+        private boolean adminPhoto;
         private List<ManualOverrideResponse> manualOverrides;
     }
 

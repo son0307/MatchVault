@@ -3997,6 +3997,7 @@ h2 {
 .admin-fixture-sync-form button,
 .admin-pagination button,
 .admin-add-button,
+.admin-media-actions button,
 .admin-result-list button {
   display: inline-flex;
   align-items: center;
@@ -4018,6 +4019,7 @@ h2 {
 .admin-fixture-sync-form button:hover,
 .admin-pagination button:hover,
 .admin-add-button:hover,
+.admin-media-actions button:hover,
 .admin-result-list button:hover {
   border-color: #77a878;
   background: #edf6ed;
@@ -4029,6 +4031,7 @@ h2 {
 .admin-fixture-sync-form button:disabled,
 .admin-pagination button:disabled,
 .admin-add-button:disabled,
+.admin-media-actions button:disabled,
 .admin-result-list button:disabled {
   cursor: wait;
   opacity: 0.65;
@@ -4145,6 +4148,101 @@ h2 {
 .admin-edit-form {
   border-top: 1px solid #edf1eb;
   padding-inline: 0;
+}
+
+.admin-media-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.admin-media-grid.single {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.admin-media-card {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+  border: 1px solid #dbe5da;
+  border-radius: 8px;
+  padding: 12px;
+  background: #fbfdfb;
+}
+
+.admin-media-heading,
+.admin-media-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.admin-media-heading > span {
+  font-size: 0.72rem;
+}
+
+.admin-media-preview {
+  display: grid;
+  min-height: 124px;
+  place-items: center;
+  overflow: hidden;
+  border-radius: 7px;
+  background: #f0f4ef;
+}
+
+.admin-media-preview img {
+  width: 100%;
+  height: 124px;
+  object-fit: contain;
+}
+
+.admin-media-preview span,
+.admin-media-help,
+.admin-media-card small {
+  margin: 0;
+  color: #69766c;
+  font-size: 0.76rem;
+  font-weight: 800;
+}
+
+.admin-media-actions {
+  justify-content: flex-start;
+  flex-wrap: wrap;
+}
+
+.admin-media-actions button {
+  min-height: 36px;
+}
+
+.admin-media-upload-error {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  border: 1px solid #efb7b1;
+  border-radius: 7px;
+  padding: 9px 10px;
+  background: #fff1ef;
+  color: #8a2d26;
+}
+
+.admin-media-upload-error > div {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.admin-media-upload-error strong,
+.admin-media-upload-error span {
+  overflow-wrap: anywhere;
+  font-size: 0.76rem;
+}
+
+.admin-media-upload-error button {
+  flex: 0 0 auto;
+  min-height: 34px;
 }
 
 .admin-edit-form h3 {
@@ -4575,6 +4673,7 @@ h2 {
   .admin-page-heading,
   .admin-search-row,
   .admin-form-grid,
+  .admin-media-grid,
   .admin-fixture-sync-form,
   .admin-log-item {
     grid-template-columns: 1fr;
