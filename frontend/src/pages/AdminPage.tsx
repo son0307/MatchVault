@@ -724,13 +724,18 @@ export function AdminPage({ authState }: AdminPageProps) {
     });
   }
 
-  async function uploadAdminMedia(targetType: AdminMediaTargetType, targetId: number, file: File) {
+  async function uploadAdminMedia(
+    targetType: AdminMediaTargetType,
+    targetId: number,
+    file: File,
+  ): Promise<string | null> {
     if (!ADMIN_IMAGE_CONTENT_TYPES.has(file.type) || file.size <= 0 || file.size > ADMIN_IMAGE_MAX_BYTES) {
-      setError("PNG, JPEG, WebP 형식의 2MB 이하 이미지만 업로드할 수 있습니다.");
-      return;
+      const validationError = "PNG, JPEG, WebP 형식의 2MB 이하 이미지만 업로드할 수 있습니다.";
+      setError(validationError);
+      return validationError;
     }
 
-    await runSave(`media:${targetType}:${targetId}`, async () => {
+    return runSave(`media:${targetType}:${targetId}`, async () => {
       let presign: AdminMediaPresignResponse;
       try {
         presign = await adminJson<AdminMediaPresignResponse>("/api/v1/admin/media/uploads/presign", "POST", {
@@ -857,13 +862,13 @@ export function AdminPage({ authState }: AdminPageProps) {
       && fixtureSelection.detail?.fixture.fixtureId === fixtureId;
   }
 
-  async function runSave(key: string, action: () => Promise<void>) {
+  async function runSave(key: string, action: () => Promise<void>): Promise<string | null> {
     if (savingKey !== null) {
-      return;
+      return "다른 관리자 요청을 처리하고 있습니다. 잠시 후 다시 시도해주세요.";
     }
     setSavingKey(key);
     try {
-      await runRequest(action);
+      return await runRequest(action);
     } finally {
       setSavingKey(null);
     }
@@ -970,13 +975,16 @@ export function AdminPage({ authState }: AdminPageProps) {
   const selectedCoverage = seasonCoverages.find((coverage) => coverage.seasonYear === authState.season) ?? null;
   const fixtureDetailCooldownSeconds = syncFixtureId.trim() ? syncCooldownSeconds(fixtureDetailCooldownKey(syncFixtureId.trim())) : 0;
 
-  async function runRequest(action: () => Promise<void>) {
+  async function runRequest(action: () => Promise<void>): Promise<string | null> {
     setError("");
     setMessage("");
     try {
       await action();
+      return null;
     } catch (nextError) {
-      setError(nextError instanceof Error ? nextError.message : "요청을 처리하지 못했습니다.");
+      const requestError = nextError instanceof Error ? nextError.message : "요청을 처리하지 못했습니다.";
+      setError(requestError);
+      return requestError;
     }
   }
 
@@ -1407,16 +1415,32 @@ function AdminMediaUpload({
   targetId: number | null;
   disabled?: boolean;
   unavailableMessage?: string;
-  onUpload: (targetType: AdminMediaTargetType, targetId: number, file: File) => Promise<void>;
+  onUpload: (targetType: AdminMediaTargetType, targetId: number, file: File) => Promise<string | null>;
   onRestore: (targetType: AdminMediaTargetType, targetId: number) => Promise<void>;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [imageFailed, setImageFailed] = useState(false);
+  const [failedUpload, setFailedUpload] = useState<{ file: File; message: string } | null>(null);
   const available = targetId !== null && Number.isFinite(targetId) && targetId > 0;
 
   useEffect(() => {
     setImageFailed(false);
   }, [imageUrl]);
+
+  useEffect(() => {
+    setFailedUpload(null);
+  }, [targetType, targetId]);
+
+  async function tryUpload(file: File) {
+    if (!available || targetId === null) {
+      return;
+    }
+    setFailedUpload(null);
+    const failureMessage = await onUpload(targetType, targetId, file);
+    if (failureMessage) {
+      setFailedUpload({ file, message: failureMessage });
+    }
+  }
 
   async function selectFile(event: React.ChangeEvent<HTMLInputElement>) {
     const file = event.currentTarget.files?.[0];
@@ -1424,7 +1448,7 @@ function AdminMediaUpload({
     if (!file || !available || targetId === null) {
       return;
     }
-    await onUpload(targetType, targetId, file);
+    await tryUpload(file);
   }
 
   async function restore() {
@@ -1451,6 +1475,17 @@ function AdminMediaUpload({
         )}
       </div>
       {!available && unavailableMessage ? <p className="admin-media-help">{unavailableMessage}</p> : null}
+      {failedUpload ? (
+        <div className="admin-media-upload-error" role="alert">
+          <div>
+            <strong>{failedUpload.file.name}</strong>
+            <span>{failedUpload.message}</span>
+          </div>
+          <button type="button" onClick={() => void tryUpload(failedUpload.file)} disabled={disabled || !available}>
+            다시 시도
+          </button>
+        </div>
+      ) : null}
       <div className="admin-media-actions">
         <input
           ref={inputRef}

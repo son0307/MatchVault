@@ -4216,6 +4216,35 @@ h2 {
   min-height: 36px;
 }
 
+.admin-media-upload-error {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  border: 1px solid #efb7b1;
+  border-radius: 7px;
+  padding: 9px 10px;
+  background: #fff1ef;
+  color: #8a2d26;
+}
+
+.admin-media-upload-error > div {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.admin-media-upload-error strong,
+.admin-media-upload-error span {
+  overflow-wrap: anywhere;
+  font-size: 0.76rem;
+}
+
+.admin-media-upload-error button {
+  flex: 0 0 auto;
+  min-height: 34px;
+}
+
 .admin-edit-form h3 {
   margin: 0;
   color: #213826;
