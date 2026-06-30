@@ -1,5 +1,5 @@
 import { FormEvent, useEffect, useRef, useState } from "react";
-import { LoaderCircle } from "lucide-react";
+import { LoaderCircle, X } from "lucide-react";
 import { Navigate, useSearchParams } from "react-router-dom";
 import {
   clearApiMemoryCache,
@@ -17,6 +17,10 @@ type AdminPageProps = {
 
 type AdminTab = "team" | "player" | "fixture";
 type AdminMediaTargetType = "PLAYER_PHOTO" | "TEAM_LOGO" | "VENUE_IMAGE";
+type AdminMediaToast = {
+  message: string;
+  type: "success" | "error";
+};
 
 type AdminMediaPresignResponse = {
   objectKey: string;
@@ -398,6 +402,7 @@ export function AdminPage({ authState }: AdminPageProps) {
   const [auditTotalElements, setAuditTotalElements] = useState(0);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const [mediaToast, setMediaToast] = useState<AdminMediaToast | null>(null);
   const teamRequestIdRef = useRef(0);
   const playerRequestIdRef = useRef(0);
   const teamPlayerRequestIdRef = useRef(0);
@@ -429,6 +434,14 @@ export function AdminPage({ authState }: AdminPageProps) {
     const timerId = window.setInterval(() => setSyncClock(Date.now()), 1000);
     return () => window.clearInterval(timerId);
   }, [syncCooldownUntil, syncClock]);
+
+  useEffect(() => {
+    if (!mediaToast) {
+      return;
+    }
+    const timerId = window.setTimeout(() => setMediaToast(null), 4000);
+    return () => window.clearTimeout(timerId);
+  }, [mediaToast]);
 
   useEffect(() => {
     if (
@@ -731,11 +744,11 @@ export function AdminPage({ authState }: AdminPageProps) {
   ): Promise<string | null> {
     if (!ADMIN_IMAGE_CONTENT_TYPES.has(file.type) || file.size <= 0 || file.size > ADMIN_IMAGE_MAX_BYTES) {
       const validationError = "PNG, JPEG, WebP 형식의 2MB 이하 이미지만 업로드할 수 있습니다.";
-      setError(validationError);
+      setMediaToast({ message: validationError, type: "error" });
       return validationError;
     }
 
-    return runSave(`media:${targetType}:${targetId}`, async () => {
+    return runMediaSave(`media:${targetType}:${targetId}`, async () => {
       let presign: AdminMediaPresignResponse;
       try {
         presign = await adminJson<AdminMediaPresignResponse>("/api/v1/admin/media/uploads/presign", "POST", {
@@ -775,22 +788,20 @@ export function AdminPage({ authState }: AdminPageProps) {
 
       applyAdminMediaResponse(completed);
       clearApiMemoryCache();
-      setMessage("관리자 이미지를 적용했습니다.");
       await reloadAuditLogs();
-    });
+    }, "관리자 이미지를 적용했습니다.");
   }
 
   async function restoreAdminMedia(targetType: AdminMediaTargetType, targetId: number) {
-    await runSave(`media:${targetType}:${targetId}`, async () => {
+    await runMediaSave(`media:${targetType}:${targetId}`, async () => {
       const restored = await adminJson<AdminMediaResponse>(
         `/api/v1/admin/media/${targetType}/${targetId}`,
         "DELETE",
       );
       applyAdminMediaResponse(restored);
       clearApiMemoryCache();
-      setMessage("관리자 이미지를 제거하고 원본 이미지로 복원했습니다.");
       await reloadAuditLogs();
-    });
+    }, "관리자 이미지를 제거하고 원본 이미지로 복원했습니다.");
   }
 
   function applyAdminMediaResponse(response: AdminMediaResponse) {
@@ -869,6 +880,26 @@ export function AdminPage({ authState }: AdminPageProps) {
     setSavingKey(key);
     try {
       return await runRequest(action);
+    } finally {
+      setSavingKey(null);
+    }
+  }
+
+  async function runMediaSave(key: string, action: () => Promise<void>, successMessage: string): Promise<string | null> {
+    if (savingKey !== null) {
+      const busyMessage = "다른 관리자 요청을 처리하고 있습니다. 잠시 후 다시 시도해주세요.";
+      setMediaToast({ message: busyMessage, type: "error" });
+      return busyMessage;
+    }
+    setSavingKey(key);
+    try {
+      await action();
+      setMediaToast({ message: successMessage, type: "success" });
+      return null;
+    } catch (nextError) {
+      const requestError = nextError instanceof Error ? nextError.message : "이미지 요청을 처리하지 못했습니다.";
+      setMediaToast({ message: requestError, type: "error" });
+      return requestError;
     } finally {
       setSavingKey(null);
     }
@@ -990,6 +1021,18 @@ export function AdminPage({ authState }: AdminPageProps) {
 
   return (
     <section className="admin-page">
+      {mediaToast ? (
+        <div
+          className={`admin-media-toast ${mediaToast.type}`}
+          role={mediaToast.type === "error" ? "alert" : "status"}
+          aria-live={mediaToast.type === "error" ? "assertive" : "polite"}
+        >
+          <span>{mediaToast.message}</span>
+          <button type="button" aria-label="알림 닫기" onClick={() => setMediaToast(null)}>
+            <X size={18} aria-hidden="true" />
+          </button>
+        </div>
+      ) : null}
       <div className="admin-page-heading">
         <div>
           <p className="eyebrow">Admin</p>

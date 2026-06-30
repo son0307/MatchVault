@@ -374,15 +374,18 @@ export function TeamDetailPage({ authStatus, currentUser, season }: { authStatus
 
   return (
     <section className="league-content team-detail-page">
-      <TeamHero
-        canUseFavorite={authStatus === "authenticated"}
-        favoriteError={favoriteError}
-        isFavorite={isFavorite}
-        isFavoriteLoading={isFavoriteLoading}
-        onToggleFavorite={toggleFavorite}
-        team={teamState.data}
-        isAdmin={currentUser?.role === "ADMIN"}
-      />
+      <div className="team-overview-grid">
+        <TeamHero
+          canUseFavorite={authStatus === "authenticated"}
+          favoriteError={favoriteError}
+          isFavorite={isFavorite}
+          isFavoriteLoading={isFavoriteLoading}
+          onToggleFavorite={toggleFavorite}
+          team={teamState.data}
+          isAdmin={currentUser?.role === "ADMIN"}
+        />
+        <TeamVenueCard venue={teamState.data.venue} />
+      </div>
       <TeamFixturePanel
         fixturePage={fixturePage}
         fixturesState={fixturesState}
@@ -392,6 +395,93 @@ export function TeamDetailPage({ authStatus, currentUser, season }: { authStatus
       <TeamPlayersPanel onRetry={retryPlayers} playersState={playersState} />
       <TeamPlayerRanksPanel onRetry={retryRankings} rankState={rankState} />
     </section>
+  );
+}
+
+function TeamVenueCard({ venue }: { venue: TeamDetails["venue"] }) {
+  const [imageFailed, setImageFailed] = useState(false);
+
+  useEffect(() => {
+    setImageFailed(false);
+  }, [venue?.venueImageUrl]);
+
+  if (!venue) {
+    return (
+      <article className="panel team-venue-card empty">
+        <p className="eyebrow">Stadium</p>
+        <h3>경기장 정보가 없습니다.</h3>
+      </article>
+    );
+  }
+
+  const fullAddress = [venue.venueCity, venue.venueAddress].filter(Boolean).join(" · ");
+  const addressPopoverId = `team-venue-address-${venue.venueId ?? "current"}`;
+
+  return (
+    <article className="panel team-venue-card">
+      <div className="team-venue-image">
+        {venue.venueImageUrl && !imageFailed ? (
+          <img
+            src={venue.venueImageUrl}
+            alt={venue.venueName ? `${venue.venueName} 경기장` : "팀 경기장"}
+            onError={() => setImageFailed(true)}
+          />
+        ) : (
+          <span>경기장 이미지가 없습니다.</span>
+        )}
+      </div>
+      <div className="team-venue-info">
+        <p className="eyebrow">Stadium</p>
+        <h3>{venue.venueName ?? "경기장 이름 정보 없음"}</h3>
+        <dl>
+          {fullAddress ? (
+            <div className="team-venue-location">
+              <dt>위치</dt>
+              <dd>
+                {venue.venueCity && venue.venueAddress ? (
+                  <>
+                    <button
+                      type="button"
+                      className="team-venue-address-button"
+                      popoverTarget={addressPopoverId}
+                      aria-haspopup="dialog"
+                      aria-label={`${venue.venueCity} 전체 주소 보기`}
+                      title={venue.venueCity}
+                    >
+                      {venue.venueCity}
+                    </button>
+                    <div
+                      id={addressPopoverId}
+                      className="team-venue-address-popover"
+                      popover="auto"
+                      role="dialog"
+                      aria-label="경기장 전체 주소"
+                    >
+                      <strong>{venue.venueName ?? "경기장 주소"}</strong>
+                      <span>{fullAddress}</span>
+                    </div>
+                  </>
+                ) : (
+                  venue.venueCity ?? venue.venueAddress
+                )}
+              </dd>
+            </div>
+          ) : null}
+          {venue.capacity ? (
+            <div>
+              <dt>수용 인원</dt>
+              <dd>{new Intl.NumberFormat("ko-KR").format(venue.capacity)}명</dd>
+            </div>
+          ) : null}
+          {venue.surface ? (
+            <div>
+              <dt>경기장 표면</dt>
+              <dd>{venue.surface}</dd>
+            </div>
+          ) : null}
+        </dl>
+      </div>
+    </article>
   );
 }
 
@@ -437,7 +527,6 @@ function TeamHero({
         <div className="team-detail-meta">
           <span>{team.country ?? "국가 정보 없음"}</span>
           <span>{team.founded ? `${team.founded} 창단` : "창단 정보 없음"}</span>
-          <span>{team.venue?.venueName ?? "경기장 정보 없음"}</span>
         </div>
       </div>
     </article>

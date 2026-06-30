@@ -1443,7 +1443,7 @@ h2 {
   flex: 0 0 38px;
   border-radius: 50%;
   object-fit: cover;
-  background: #e4ebe2;
+  background: #ffffff;
 }
 
 .player-ranking-player div {
@@ -3226,7 +3226,7 @@ h2 {
 
 .player-hero {
   display: grid;
-  grid-template-columns: 104px minmax(0, 1fr) minmax(220px, 0.42fr);
+  grid-template-columns: 128px minmax(0, 1fr) minmax(220px, 0.42fr);
   align-items: center;
   gap: 18px;
   padding: 20px;
@@ -3238,11 +3238,10 @@ h2 {
 }
 
 .player-photo {
-  width: 92px;
-  height: 92px;
+  width: 120px;
+  height: 120px;
   border-radius: 8px;
-  object-fit: cover;
-  background: #dde6dc;
+  object-fit: contain;
 }
 
 .player-photo.placeholder {
@@ -3692,6 +3691,16 @@ h2 {
   gap: 16px;
 }
 
+.team-overview-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 0.8fr);
+  gap: 16px;
+}
+
+.team-overview-grid > * {
+  min-width: 0;
+}
+
 .team-detail-hero {
   display: grid;
   grid-template-columns: 96px minmax(0, 1fr);
@@ -3732,6 +3741,162 @@ h2 {
   color: #53665a;
   font-size: 0.84rem;
   font-weight: 800;
+}
+
+.team-venue-card {
+  display: grid;
+  grid-template-columns: minmax(180px, 220px) minmax(0, 1fr);
+  overflow: hidden;
+}
+
+.team-venue-card.empty {
+  display: block;
+  padding: 20px;
+}
+
+.team-venue-card.empty h3 {
+  margin: 4px 0 0;
+  color: #53665a;
+}
+
+.team-venue-image {
+  display: grid;
+  min-height: 160px;
+  place-items: center;
+  overflow: hidden;
+  background: #eef4ec;
+}
+
+.team-venue-image img {
+  width: 100%;
+  height: 100%;
+  min-height: 160px;
+  object-fit: cover;
+}
+
+.team-venue-image span {
+  padding: 20px;
+  color: #69766c;
+  font-size: 0.84rem;
+  font-weight: 800;
+  text-align: center;
+}
+
+.team-venue-info {
+  min-width: 0;
+  padding: 24px;
+}
+
+.team-venue-info h3 {
+  margin: 4px 0 18px;
+  overflow-wrap: anywhere;
+  color: #213826;
+  font-size: clamp(0.5rem, 2vw, 1rem);
+}
+
+.team-venue-info dl {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+}
+
+.team-venue-info dl > div {
+  display: grid;
+  grid-template-columns: 88px minmax(0, 1fr);
+  gap: 12px;
+}
+
+.team-venue-info dt {
+  color: #69766c;
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+.team-venue-info dd {
+  min-width: 0;
+  margin: 0;
+  overflow-wrap: anywhere;
+  color: #253a2a;
+  font-weight: 800;
+}
+
+.team-venue-address-button {
+  anchor-name: --team-venue-address-trigger;
+  display: block;
+  width: max-content;
+  max-width: 100%;
+  min-width: 0;
+  min-height: 0;
+  border: 0;
+  padding: 0;
+  overflow: hidden;
+  background: transparent;
+  color: #1b5e20;
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+  text-overflow: ellipsis;
+  text-decoration: underline;
+  text-decoration-style: dotted;
+  text-underline-offset: 3px;
+  white-space: nowrap;
+}
+
+.team-venue-address-button:hover {
+  background: transparent;
+  color: #0f4815;
+}
+
+.team-venue-address-popover {
+  position: fixed;
+  position-anchor: --team-venue-address-trigger;
+  top: anchor(top);
+  left: anchor(right);
+  width: min(280px, calc(100vw - 24px));
+  margin: 0;
+  border: 1px solid #cdd9cc;
+  border-radius: 8px;
+  padding: 13px 14px;
+  background: #ffffff;
+  color: #253a2a;
+  box-shadow: 0 10px 28px rgba(28, 54, 34, 0.2);
+  translate: 8px calc(-100% - 8px);
+}
+
+.team-venue-address-popover::backdrop {
+  background: transparent;
+}
+
+.team-venue-address-popover strong,
+.team-venue-address-popover span {
+  display: block;
+}
+
+.team-venue-address-popover strong {
+  margin-bottom: 8px;
+  color: #1b5e20;
+  font-size: 1rem;
+}
+
+.team-venue-address-popover span {
+  overflow-wrap: break-word;
+  color: #53665a;
+  font-size: 0.9rem;
+  line-height: 1.55;
+}
+
+@media (max-width: 760px) {
+  .team-venue-address-popover {
+    right: 12px;
+    left: auto;
+    width: min(280px, calc(100vw - 24px));
+    translate: 0 calc(-100% - 8px);
+  }
+}
+
+.team-venue-location dd {
+  overflow-wrap: normal;
+  word-break: normal;
 }
 
 .team-fixtures-panel,
@@ -4243,6 +4408,54 @@ h2 {
 .admin-media-upload-error button {
   flex: 0 0 auto;
   min-height: 34px;
+}
+
+.admin-media-toast {
+  position: fixed;
+  top: 18px;
+  right: 18px;
+  z-index: 1200;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  width: min(420px, calc(100vw - 36px));
+  border: 1px solid #9bc59d;
+  border-radius: 8px;
+  padding: 13px 14px;
+  background: #edf8ee;
+  color: #1b5e20;
+  box-shadow: 0 12px 32px rgba(28, 54, 34, 0.2);
+  font-weight: 800;
+}
+
+.admin-media-toast.error {
+  border-color: #ef9a9a;
+  background: #fff3f3;
+  color: #b71c1c;
+}
+
+.admin-media-toast span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.admin-media-toast button {
+  display: inline-grid;
+  flex: 0 0 auto;
+  width: 32px;
+  min-height: 32px;
+  place-items: center;
+  border: 0;
+  border-radius: 6px;
+  padding: 0;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+
+.admin-media-toast button:hover {
+  background: rgba(0, 0, 0, 0.06);
 }
 
 .admin-edit-form h3 {
@@ -4765,10 +4978,26 @@ h2 {
   .lineup-detail-grid,
   .player-stat-team-grid,
   .player-hero,
+  .team-overview-grid,
   .team-detail-hero,
+  .team-venue-card,
   .team-player-grid,
   .team-rank-grid {
     grid-template-columns: 1fr;
+  }
+
+  .team-venue-image,
+  .team-venue-image img {
+    min-height: 140px;
+    max-height: 160px;
+  }
+
+  .team-venue-info {
+    padding: 20px;
+  }
+
+  .team-venue-info h3 {
+    font-size: 1rem;
   }
 
   .player-team-card {
