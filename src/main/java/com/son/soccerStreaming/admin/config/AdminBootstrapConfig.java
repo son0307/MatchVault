@@ -1,8 +1,8 @@
 package com.son.soccerStreaming.admin.config;
 
+import com.son.soccerStreaming.auth.entity.AppUser;
 import com.son.soccerStreaming.auth.repository.AppUserRepository;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
@@ -11,7 +11,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Arrays;
 
-@Slf4j
 @Component
 @RequiredArgsConstructor
 public class AdminBootstrapConfig {
@@ -32,9 +31,6 @@ public class AdminBootstrapConfig {
                 .map(String::trim)
                 .filter(email -> !email.isBlank())
                 .map(String::toLowerCase)
-                .forEach(email -> appUserRepository.findByEmail(email).ifPresent(user -> {
-                    user.promoteToAdmin();
-                    log.info("Admin user promoted by ADMIN_EMAILS. email={}", email);
-                }));
+                .forEach(email -> appUserRepository.findByEmail(email).ifPresent(AppUser::promoteToAdmin));
     }
 }

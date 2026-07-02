@@ -65,7 +65,7 @@ api-football:
 
 logging:
   file:
-    name: ${LOG_FILE_NAME:logs/application.json}
+    name: ${LOG_FILE_NAME}
   structured:
     format:
       console: ecs
@@ -75,7 +75,7 @@ logging:
         environment: production
   logback:
     rollingpolicy:
-      file-name-pattern: ${LOG_ARCHIVE_PATTERN:logs/application.%d{yyyy-MM-dd}.%i.json.gz}
+      file-name-pattern: ${LOG_ARCHIVE_PATTERN}
       clean-history-on-start: false
       max-file-size: ${LOG_MAX_FILE_SIZE:100MB}
       max-history: ${LOG_MAX_HISTORY:30}

@@ -28,7 +28,10 @@ services:
       - ./logstash/config/logstash.yml:/usr/share/logstash/config/logstash.yml:ro
       - ./logstash/config/pipelines.yml:/usr/share/logstash/config/pipelines.yml:ro
       - ./logstash/pipeline:/usr/share/logstash/pipeline:ro
-      - ../../logs:/var/log/match-vault:ro
+      - type: bind
+        source: ${LOG_HOST_PATH:?LOG_HOST_PATH must be set}
+        target: /var/log/match-vault
+        read_only: true
       - logstash-data:/usr/share/logstash/data
     depends_on:
       elasticsearch:

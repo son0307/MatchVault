@@ -42,9 +42,9 @@ class StructuredLoggingTest {
         assertThat(property(prod, "logging.structured.format.file")).isEqualTo("ecs");
         assertThat(property(prod, "logging.structured.ecs.service.environment")).isEqualTo("production");
         assertThat(property(prod, "logging.file.name"))
-                .isEqualTo("${LOG_FILE_NAME:logs/application.json}");
+                .isEqualTo("${LOG_FILE_NAME}");
         assertThat(property(prod, "logging.logback.rollingpolicy.file-name-pattern"))
-                .isEqualTo("${LOG_ARCHIVE_PATTERN:logs/application.%d{yyyy-MM-dd}.%i.json.gz}");
+                .isEqualTo("${LOG_ARCHIVE_PATTERN}");
         assertThat(property(prod, "logging.logback.rollingpolicy.max-file-size"))
                 .isEqualTo("${LOG_MAX_FILE_SIZE:100MB}");
         assertThat(property(prod, "logging.logback.rollingpolicy.max-history"))
