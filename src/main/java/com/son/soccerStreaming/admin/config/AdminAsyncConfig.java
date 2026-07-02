@@ -1,5 +1,6 @@
 package com.son.soccerStreaming.admin.config;
 
+import com.son.soccerStreaming.global.logging.MdcTaskDecorator;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.scheduling.annotation.EnableAsync;
@@ -18,6 +19,7 @@ public class AdminAsyncConfig {
         executor.setMaxPoolSize(2);
         executor.setQueueCapacity(20);
         executor.setThreadNamePrefix("admin-sync-");
+        executor.setTaskDecorator(new MdcTaskDecorator());
         executor.initialize();
         return executor;
     }

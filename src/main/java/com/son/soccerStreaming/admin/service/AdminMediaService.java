@@ -89,7 +89,7 @@ public class AdminMediaService {
                     .putObjectRequest(putObjectRequest)
                     .build());
         } catch (SdkException e) {
-            throw new CustomException(ErrorCode.ADMIN_MEDIA_STORAGE_UNAVAILABLE);
+            throw new CustomException(ErrorCode.ADMIN_MEDIA_STORAGE_UNAVAILABLE, e);
         }
 
         Instant expiresAt = Instant.now().plus(PRESIGN_DURATION);
@@ -211,9 +211,9 @@ public class AdminMediaService {
             if (e.statusCode() == 404) {
                 throw new CustomException(ErrorCode.ADMIN_MEDIA_OBJECT_NOT_FOUND);
             }
-            throw new CustomException(ErrorCode.ADMIN_MEDIA_STORAGE_UNAVAILABLE);
+            throw new CustomException(ErrorCode.ADMIN_MEDIA_STORAGE_UNAVAILABLE, e);
         } catch (SdkException e) {
-            throw new CustomException(ErrorCode.ADMIN_MEDIA_STORAGE_UNAVAILABLE);
+            throw new CustomException(ErrorCode.ADMIN_MEDIA_STORAGE_UNAVAILABLE, e);
         }
     }
 

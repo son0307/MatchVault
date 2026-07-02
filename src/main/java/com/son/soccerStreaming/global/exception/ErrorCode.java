@@ -34,6 +34,9 @@ public enum ErrorCode {
     // 503 SERVICE_UNAVAILABLE
     ADMIN_MEDIA_STORAGE_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "이미지 저장소를 사용할 수 없습니다."),
 
+    // 500 INTERNAL_SERVER_ERROR
+    INTERNAL_SERVER_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "예기치 못한 서버 오류가 발생했습니다."),
+
     // 409 CONFLICT
     EMAIL_ALREADY_EXISTS(HttpStatus.CONFLICT, "이미 가입된 이메일입니다.");
 

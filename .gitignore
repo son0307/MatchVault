@@ -41,6 +41,8 @@ out/
 
 # QueryDSL Auto Generated
 src/main/generated
+
 /AGENTS.md
 /src/main/test/
 /docs/
+/logs
