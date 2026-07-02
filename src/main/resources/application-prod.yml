@@ -62,3 +62,21 @@ api-football:
       league: ${API_FOOTBALL_INJURIES_LEAGUE:39}
       season: ${API_FOOTBALL_INJURIES_SEASON:2025}
       daily-cron: ${API_FOOTBALL_INJURIES_DAILY_CRON:0 0 5 * * *}
+
+logging:
+  file:
+    name: ${LOG_FILE_NAME}
+  structured:
+    format:
+      console: ecs
+      file: ecs
+    ecs:
+      service:
+        environment: production
+  logback:
+    rollingpolicy:
+      file-name-pattern: ${LOG_ARCHIVE_PATTERN}
+      clean-history-on-start: false
+      max-file-size: ${LOG_MAX_FILE_SIZE:100MB}
+      max-history: ${LOG_MAX_HISTORY:30}
+      total-size-cap: ${LOG_TOTAL_SIZE_CAP:5GB}

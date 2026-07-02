@@ -19,6 +19,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.ObjectProvider;
+import software.amazon.awssdk.core.exception.SdkClientException;
 import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
 import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
 import software.amazon.awssdk.regions.Region;
@@ -145,6 +146,20 @@ class AdminMediaServiceTest {
                 new AdminMediaDto.CompleteRequest(AdminMediaTargetType.PLAYER_PHOTO, 7L, objectKey)))
                 .isInstanceOfSatisfying(CustomException.class,
                         exception -> assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.INVALID_ADMIN_MEDIA_OBJECT));
+    }
+
+    @Test
+    void completePreservesStorageFailureCause() {
+        String objectKey = "admin/player-photos/7/123e4567-e89b-12d3-a456-426614174000.png";
+        SdkClientException cause = SdkClientException.create("storage unavailable");
+        when(s3Client.headObject(any(HeadObjectRequest.class))).thenThrow(cause);
+
+        assertThatThrownBy(() -> service.complete(1L,
+                new AdminMediaDto.CompleteRequest(AdminMediaTargetType.PLAYER_PHOTO, 7L, objectKey)))
+                .isInstanceOfSatisfying(CustomException.class, exception -> {
+                    assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.ADMIN_MEDIA_STORAGE_UNAVAILABLE);
+                    assertThat(exception.getCause()).isSameAs(cause);
+                });
     }
 
     @Test
