@@ -4,6 +4,7 @@ import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
+import jakarta.servlet.AsyncContext;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.http.HttpServletRequest;
 import org.junit.jupiter.api.AfterEach;
@@ -47,7 +48,7 @@ class RequestLoggingFilterTest {
     }
 
     @Test
-    void reusesSafeRequestIdAndClearsMdcAfterCompletion() throws Exception {
+    void generatesServerRequestIdAndClearsMdcAfterCompletion() throws Exception {
         MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/v1/fixtures/100");
         request.addHeader(RequestLoggingFilter.REQUEST_ID_HEADER, "client-request_123");
         MockHttpServletResponse response = new MockHttpServletResponse();
@@ -63,10 +64,12 @@ class RequestLoggingFilterTest {
 
         filter.doFilter(request, response, chain);
 
-        assertThat(requestIdSeenByApplication).hasValue("client-request_123");
+        assertThat(requestIdSeenByApplication.get()).isNotEqualTo("client-request_123");
+        assertThat(UUID.fromString(requestIdSeenByApplication.get())).isNotNull();
         assertThat(methodSeenByApplication).hasValue("GET");
         assertThat(uriSeenByApplication).hasValue("/api/v1/fixtures/100");
-        assertThat(response.getHeader(RequestLoggingFilter.REQUEST_ID_HEADER)).isEqualTo("client-request_123");
+        assertThat(response.getHeader(RequestLoggingFilter.REQUEST_ID_HEADER))
+                .isEqualTo(requestIdSeenByApplication.get());
         assertThat(response.getStatus()).isEqualTo(204);
         assertThat(MDC.get(RequestLoggingFilter.REQUEST_ID_MDC_KEY)).isNull();
         assertThat(MDC.get(RequestLoggingFilter.REQUEST_METHOD_MDC_KEY)).isNull();
@@ -74,16 +77,16 @@ class RequestLoggingFilterTest {
     }
 
     @Test
-    void replacesUnsafeRequestId() throws Exception {
+    void ignoresClientRequestIdRegardlessOfFormat() throws Exception {
         MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/v1/search");
-        request.addHeader(RequestLoggingFilter.REQUEST_ID_HEADER, "unsafe request id");
+        request.addHeader(RequestLoggingFilter.REQUEST_ID_HEADER, "safe-client-id");
         MockHttpServletResponse response = new MockHttpServletResponse();
 
         filter.doFilter(request, response, (servletRequest, servletResponse) -> {
         });
 
         String generatedRequestId = response.getHeader(RequestLoggingFilter.REQUEST_ID_HEADER);
-        assertThat(generatedRequestId).isNotEqualTo("unsafe request id");
+        assertThat(generatedRequestId).isNotEqualTo("safe-client-id");
         assertThat(UUID.fromString(generatedRequestId)).isNotNull();
     }
 
@@ -105,6 +108,32 @@ class RequestLoggingFilterTest {
 
         request.getAsyncContext().complete();
 
+        assertThat(MDC.get(RequestLoggingFilter.REQUEST_ID_MDC_KEY)).isNull();
+        assertThat(logAppender.list).hasSize(2);
+        ILoggingEvent completed = logAppender.list.get(1);
+        assertThat(keyValue(completed, "event.action")).isEqualTo("http-request-completed");
+        assertThat(completed.getMDCPropertyMap())
+                .containsEntry(RequestLoggingFilter.REQUEST_ID_MDC_KEY, requestIdSeenByApplication.get())
+                .containsEntry(RequestLoggingFilter.REQUEST_METHOD_MDC_KEY, "GET")
+                .containsEntry(RequestLoggingFilter.REQUEST_URI_MDC_KEY, "/api/v1/live/stream/fixtures/100");
+    }
+
+    @Test
+    void logsAsyncCompletionOnceWhenRequestCompletesBeforeListenerRegistration() throws Exception {
+        MockHttpServletRequest request = new CompletedAsyncRequest("GET", "/api/v1/live/stream/fixtures/100");
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        response.setStatus(204);
+
+        filter.doFilter(request, response, (servletRequest, servletResponse) -> {
+        });
+
+        assertThat(logAppender.list).hasSize(2);
+        ILoggingEvent completed = logAppender.list.get(1);
+        assertThat(keyValue(completed, "event.action")).isEqualTo("http-request-completed");
+        assertThat(keyValue(completed, "http.response.status_code")).isEqualTo(204);
+        assertThat(completed.getMDCPropertyMap())
+                .containsEntry(RequestLoggingFilter.REQUEST_METHOD_MDC_KEY, "GET")
+                .containsEntry(RequestLoggingFilter.REQUEST_URI_MDC_KEY, "/api/v1/live/stream/fixtures/100");
         assertThat(MDC.get(RequestLoggingFilter.REQUEST_ID_MDC_KEY)).isNull();
     }
 
@@ -136,5 +165,22 @@ class RequestLoggingFilterTest {
                 .map(pair -> pair.value)
                 .findFirst()
                 .orElse(null);
+    }
+
+    private static class CompletedAsyncRequest extends MockHttpServletRequest {
+
+        private CompletedAsyncRequest(String method, String requestUri) {
+            super(method, requestUri);
+        }
+
+        @Override
+        public boolean isAsyncStarted() {
+            return true;
+        }
+
+        @Override
+        public AsyncContext getAsyncContext() {
+            throw new IllegalStateException("Async request already completed");
+        }
     }
 }

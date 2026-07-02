@@ -17,7 +17,6 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.regex.Pattern;
 
 @Slf4j
 @Order(Ordered.HIGHEST_PRECEDENCE)
@@ -28,9 +27,7 @@ public class RequestLoggingFilter extends OncePerRequestFilter {
     static final String REQUEST_METHOD_MDC_KEY = "http.request.method";
     static final String REQUEST_URI_MDC_KEY = "url.path";
 
-    private static final int MAX_REQUEST_ID_LENGTH = 64;
     private static final int MAX_URI_LENGTH = 2_048;
-    private static final Pattern SAFE_REQUEST_ID = Pattern.compile("[A-Za-z0-9._-]{1," + MAX_REQUEST_ID_LENGTH + "}");
 
     @Override
     protected void doFilterInternal(
@@ -38,7 +35,7 @@ public class RequestLoggingFilter extends OncePerRequestFilter {
             HttpServletResponse response,
             FilterChain filterChain
     ) throws ServletException, IOException {
-        String requestId = requestId(request.getHeader(REQUEST_ID_HEADER));
+        String requestId = UUID.randomUUID().toString();
         String method = request.getMethod();
         String uri = safeUri(request.getRequestURI());
         long startedAtNanos = System.nanoTime();
@@ -87,13 +84,6 @@ public class RequestLoggingFilter extends OncePerRequestFilter {
             // The async request completed between the state check and listener registration.
             listener.complete();
         }
-    }
-
-    private String requestId(String candidate) {
-        if (candidate != null && SAFE_REQUEST_ID.matcher(candidate).matches()) {
-            return candidate;
-        }
-        return UUID.randomUUID().toString();
     }
 
     private String safeUri(String uri) {

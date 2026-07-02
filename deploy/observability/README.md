@@ -8,11 +8,31 @@ Logback -> logs/application.json -> Logstash -> Elasticsearch -> Kibana
 
 Elasticsearch 보안 기능을 비활성화했으므로 운영 환경에서 그대로 사용하면 안 된다.
 호스트 포트는 외부에 노출되지 않도록 `127.0.0.1`에만 바인딩한다.
+같은 호스트의 다른 프로세스는 인증 없이 로그 데이터에 접근할 수 있으므로 민감한
+운영 로그를 저장하거나 외부에 포트를 공개하지 않는다.
 
 ## 1. 애플리케이션 로그 생성
 
 프로젝트 루트에서 운영 프로필로 실행한다. 기본 로그 경로가
 `logs/application.json`이므로 별도의 로그 경로 환경 변수는 필요하지 않다.
+
+애플리케이션 실행 전에 로그 디렉터리를 만들고 애플리케이션과 Logstash가 각각
+쓰기와 읽기를 할 수 있는지 확인한다.
+
+```powershell
+New-Item -ItemType Directory -Force logs
+```
+
+Linux 서버에서 `/opt/match-vault/logs`를 공유한다면 다음처럼 준비한다.
+
+```bash
+sudo install -d -o match-vault -g match-vault -m 755 /opt/match-vault/logs
+chmod 755 deploy/observability/logstash \
+  deploy/observability/logstash/config \
+  deploy/observability/logstash/pipeline
+chmod 644 deploy/observability/logstash/config/*.yml \
+  deploy/observability/logstash/pipeline/*.conf
+```
 
 ```powershell
 $env:SPRING_PROFILES_ACTIVE="prod"
@@ -28,6 +48,13 @@ $env:SPRING_PROFILES_ACTIVE="prod"
 ```powershell
 docker compose -f deploy/observability/compose.yml up -d
 docker compose -f deploy/observability/compose.yml ps
+```
+
+Logstash 컨테이너가 로그 파일을 읽을 수 있는지 확인한다.
+
+```powershell
+docker compose -f deploy/observability/compose.yml exec logstash `
+  test -r /var/log/match-vault/application.json
 ```
 
 Logstash는 첫 실행 시 `application.json`을 처음부터 읽는다. 이후 읽은 위치는
