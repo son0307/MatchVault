@@ -4666,6 +4666,150 @@ h2 {
   padding: 0 14px 14px;
 }
 
+.admin-sync-jobs {
+  display: grid;
+  gap: 10px;
+  margin: 0 14px 14px;
+  padding-top: 14px;
+  border-top: 1px solid #edf1eb;
+}
+
+.admin-sync-jobs-heading,
+.admin-sync-job-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.admin-sync-jobs-heading .section-retry-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.admin-sync-job {
+  display: grid;
+  gap: 8px;
+  border: 1px solid #dce7dd;
+  border-radius: 8px;
+  padding: 11px;
+  background: #fbfdfb;
+}
+
+.admin-sync-job-section {
+  display: grid;
+  gap: 8px;
+}
+
+.admin-sync-job-section + .admin-sync-job-section {
+  margin-top: 6px;
+  padding-top: 12px;
+  border-top: 1px dashed #dce7dd;
+}
+
+.admin-sync-job-section h4 {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin: 0;
+  color: #263a2a;
+  font-size: 0.86rem;
+}
+
+.admin-sync-job-section h4 span {
+  display: inline-grid;
+  place-items: center;
+  min-width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  background: #e8efe9;
+  font-size: 0.72rem;
+}
+
+.admin-sync-job-empty {
+  margin: 0;
+  padding: 8px 0;
+  font-size: 0.78rem;
+}
+
+.admin-sync-job.partial_failed,
+.admin-sync-job.failed {
+  border-color: #e3c8bb;
+  background: #fffaf7;
+}
+
+.admin-sync-job-heading > div {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.admin-sync-job-heading span,
+.admin-sync-job p,
+.admin-sync-errors li {
+  overflow-wrap: anywhere;
+}
+
+.admin-sync-progress,
+.admin-sync-indeterminate {
+  height: 7px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #e4ebe5;
+}
+
+.admin-sync-progress > span,
+.admin-sync-indeterminate > span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: #3c7950;
+}
+
+.admin-sync-indeterminate > span {
+  width: 35%;
+  animation: admin-sync-indeterminate 1.2s ease-in-out infinite;
+}
+
+@keyframes admin-sync-indeterminate {
+  from { transform: translateX(-110%); }
+  to { transform: translateX(300%); }
+}
+
+.admin-sync-job-counts {
+  font-weight: 800;
+}
+
+.admin-sync-phase {
+  color: #355f41;
+  font-weight: 900;
+}
+
+.admin-sync-errors summary {
+  cursor: pointer;
+  color: #9a4f2b;
+  font-weight: 900;
+}
+
+.admin-sync-errors ul {
+  display: grid;
+  gap: 6px;
+  margin: 8px 0 0;
+  padding-left: 18px;
+}
+
+.admin-sync-errors li {
+  display: grid;
+  gap: 2px;
+}
+
+.admin-inline-error {
+  margin: 0 14px 14px;
+  color: #a13f31;
+  font-weight: 800;
+}
+
 .admin-log-list {
   display: grid;
   gap: 8px;

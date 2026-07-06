@@ -13,6 +13,7 @@ import com.son.soccerStreaming.fixture.repository.FixtureLineupRepository;
 import com.son.soccerStreaming.player.repository.PlayerRepository;
 import com.son.soccerStreaming.player.repository.PlayerTeamSeasonStatRepository;
 import com.son.soccerStreaming.team.repository.TeamRepository;
+import com.son.soccerStreaming.team.repository.TeamStandingRepository;
 import com.son.soccerStreaming.admin.service.AdminOverrideService;
 import jakarta.persistence.EntityManager;
 import lombok.RequiredArgsConstructor;
@@ -31,6 +32,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+import java.util.Comparator;
 
 @Slf4j
 @Service
@@ -42,6 +44,7 @@ public class ApiFootballPlayerSyncService {
     private final PlayerRepository playerRepository;
     private final PlayerTeamSeasonStatRepository playerTeamSeasonStatRepository;
     private final TeamRepository teamRepository;
+    private final TeamStandingRepository teamStandingRepository;
     private final AdminOverrideService adminOverrideService;
     private final TransactionTemplate transactionTemplate;
     private final EntityManager entityManager;
@@ -70,30 +73,67 @@ public class ApiFootballPlayerSyncService {
             )
     })
     public int syncRegisteredPlayers(Integer league, Integer season, Long delayMs) {
+        return syncRegisteredPlayers(league, season, delayMs, SyncProgressReporter.NO_OP);
+    }
+
+    @Caching(evict = {
+            @CacheEvict(
+                    cacheManager = RedisCacheConfig.RANKINGS_CACHE_MANAGER,
+                    cacheNames = RedisCacheConfig.TEAM_PLAYER_RANKINGS_CACHE,
+                    allEntries = true
+            ),
+            @CacheEvict(cacheNames = RedisCacheConfig.FAVORITE_PLAYER_CARD_CACHE, allEntries = true),
+            @CacheEvict(
+                    cacheManager = RedisCacheConfig.RANKINGS_CACHE_MANAGER,
+                    cacheNames = RedisCacheConfig.LEAGUE_PLAYER_RANKINGS_CACHE,
+                    allEntries = true
+            )
+    })
+    public int syncRegisteredPlayers(Integer league, Integer season, Long delayMs,
+                                     SyncProgressReporter progressReporter) {
         int syncedCount = 0;
         List<Long> failedTeamIds = new java.util.ArrayList<>();
         Set<Long> syncedPlayerIds = new LinkedHashSet<>();
-        for (Team team : teamRepository.findAllByOrderByNameAsc()) {
+        List<Team> teams = seasonTeams(league, season);
+        int processedTeams = 0;
+        int successfulTeams = 0;
+        progressReporter.beginPhase("SYNCING_PLAYERS", teams.size(), "teams", 0);
+        for (Team team : teams) {
+            progressReporter.checkCancelled();
             try {
-                RegisteredPlayerSyncResult result = syncRegisteredPlayersByTeamInternal(team, league, season, delayMs);
+                RegisteredPlayerSyncResult result = syncRegisteredPlayersByTeamInternal(
+                        team, league, season, delayMs, progressReporter);
                 syncedCount += result.syncedCount();
                 syncedPlayerIds.addAll(result.playerIds());
+                successfulTeams++;
+            } catch (SyncCancelledException exception) {
+                throw exception;
             } catch (Exception e) {
                 failedTeamIds.add(team.getTeamId());
+                progressReporter.error("TEAM", String.valueOf(team.getTeamId()), e.getMessage());
                 log.error("API-Football registered players team sync failed. teamId={}, season={}",
                         team.getTeamId(), season, e);
             }
+            processedTeams++;
+            progressReporter.update(processedTeams, successfulTeams, failedTeamIds.size(), syncedCount);
         }
 
         if (!failedTeamIds.isEmpty()) {
             throw new ApiFootballRegisteredPlayerSyncException(failedTeamIds);
         }
 
+        progressReporter.checkCancelled();
+        progressReporter.beginPhase("CACHING_IMAGES", syncedPlayerIds.size(), "images", syncedCount);
+        imageCacheService.cachePlayerPhotos(syncedPlayerIds, progressReporter, syncedCount);
+        progressReporter.checkCancelled();
+        progressReporter.beginPhase("REBUILDING_SEASON_STATS", 0, "season", syncedCount);
+        playerTeamSeasonStatAggregationService.rebuildSeason(league, season);
+        progressReporter.beginPhase("REBUILDING_SEASON_STATS", 1, "season", syncedCount);
+        progressReporter.update(1, 1, 0, syncedCount);
+        progressReporter.checkCancelled();
         log.info("API-Football registered players sync completed. league={}, season={}, count={}",
                 league, season, syncedCount);
         apiFootballSyncStatusService.recordSuccess("players", "Players", season);
-        imageCacheService.cachePlayerPhotos(syncedPlayerIds);
-        playerTeamSeasonStatAggregationService.rebuildSeason(league, season);
         return syncedCount;
     }
 
@@ -117,18 +157,21 @@ public class ApiFootballPlayerSyncService {
             )
     })
     public int syncRegisteredPlayersByTeam(Team team, Integer league, Integer season, Long delayMs) {
-        RegisteredPlayerSyncResult result = syncRegisteredPlayersByTeamInternal(team, league, season, delayMs);
+        RegisteredPlayerSyncResult result = syncRegisteredPlayersByTeamInternal(
+                team, league, season, delayMs, SyncProgressReporter.NO_OP);
         imageCacheService.cachePlayerPhotos(result.playerIds());
         return result.syncedCount();
     }
 
-    private RegisteredPlayerSyncResult syncRegisteredPlayersByTeamInternal(Team team, Integer league, Integer season, Long delayMs) {
+    private RegisteredPlayerSyncResult syncRegisteredPlayersByTeamInternal(
+            Team team, Integer league, Integer season, Long delayMs, SyncProgressReporter progressReporter) {
         int page = 1;
         int totalPages = 1;
         int syncedCount = 0;
         Set<Long> syncedPlayerIds = new LinkedHashSet<>();
 
         do {
+            progressReporter.checkCancelled();
             ApiFootballPlayerDto.ApiResponse<ApiFootballPlayerDto.RegisteredPlayerResponse> response =
                     apiFootballClient.getRegisteredPlayersByTeam(team.getTeamId(), league, season, page == 1 ? null : page);
 
@@ -151,6 +194,18 @@ public class ApiFootballPlayerSyncService {
         log.info("API-Football registered players team sync completed. teamId={}, season={}, count={}",
                 team.getTeamId(), season, syncedCount);
         return new RegisteredPlayerSyncResult(syncedCount, syncedPlayerIds);
+    }
+
+    private List<Team> seasonTeams(Integer league, Integer season) {
+        List<Team> standingTeams = teamStandingRepository.findAllByLeagueIdAndSeason(league, season).stream()
+                .map(standing -> standing.getTeam())
+                .distinct()
+                .sorted(Comparator.comparing(Team::getName, Comparator.nullsLast(String.CASE_INSENSITIVE_ORDER)))
+                .toList();
+        if (!standingTeams.isEmpty()) {
+            return standingTeams;
+        }
+        return teamRepository.findAllWithFixtureInSeasonOrderByNameAsc(season);
     }
 
     private RegisteredPlayerPageSyncResult syncRegisteredPlayerPage(List<ApiFootballPlayerDto.RegisteredPlayerResponse> players,

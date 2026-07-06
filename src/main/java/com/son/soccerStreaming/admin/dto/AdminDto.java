@@ -436,10 +436,60 @@ public class AdminDto {
     @Getter
     @Builder
     public static class SyncResponse {
+        private Long jobId;
         private String task;
         private boolean success;
         private boolean queued;
         private int count;
+        private String message;
+    }
+
+    @Getter
+    @Builder
+    public static class SyncJobErrorResponse {
+        private String unitType;
+        private String unitId;
+        private String message;
+        private LocalDateTime createdAt;
+    }
+
+    @Getter
+    @Builder
+    public static class SyncJobResponse {
+        private Long id;
+        private String task;
+        private String adminEmail;
+        private String targetType;
+        private Long targetId;
+        private Integer season;
+        private String details;
+        private String status;
+        private boolean active;
+        private int totalUnits;
+        private int processedUnits;
+        private int successfulUnits;
+        private int failedUnits;
+        private int savedCount;
+        private String phase;
+        private String unitLabel;
+        private String message;
+        private LocalDateTime createdAt;
+        private LocalDateTime startedAt;
+        private LocalDateTime completedAt;
+        private List<SyncJobErrorResponse> errors;
+    }
+
+    @Getter
+    @Builder
+    public static class SyncJobListResponse {
+        private List<SyncJobResponse> jobs;
+    }
+
+    @Getter
+    @Builder
+    public static class SyncCancelResponse {
+        private Long jobId;
+        private String status;
         private String message;
     }
 

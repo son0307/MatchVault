@@ -11,6 +11,8 @@ import com.son.soccerStreaming.admin.dto.AdminDto;
 import com.son.soccerStreaming.admin.entity.AdminAuditLog;
 import com.son.soccerStreaming.admin.entity.AdminAuditType;
 import com.son.soccerStreaming.admin.entity.AdminOverrideTargetType;
+import com.son.soccerStreaming.admin.entity.AdminSyncJob;
+import com.son.soccerStreaming.admin.entity.AdminSyncJobStatus;
 import com.son.soccerStreaming.apifootball.repository.ApiFootballSyncStatusRepository;
 import com.son.soccerStreaming.auth.entity.AppUser;
 import com.son.soccerStreaming.global.exception.CustomException;
@@ -95,6 +97,8 @@ class AdminServiceTest {
     private LeagueSeasonCoverageSyncService leagueSeasonCoverageSyncService;
     @Mock
     private AdminSyncTaskRunner adminSyncTaskRunner;
+    @Mock
+    private AdminSyncJobService adminSyncJobService;
     @Mock
     private MediaUrlService mediaUrlService;
 
@@ -185,6 +189,9 @@ class AdminServiceTest {
                 .build();
 
         when(appUserRepository.findById(1L)).thenReturn(Optional.of(admin));
+        when(adminSyncJobService.create(
+                1L, "players", "PLAYER", null, 2025, "league=39; season=2025"
+        )).thenReturn(AdminSyncJob.builder().id(99L).build());
         when(leagueSeasonCoverageRepository.findByLeagueIdAndSeasonYear(39, 2025)).thenReturn(Optional.of(
                 LeagueSeasonCoverage.builder()
                         .leagueId(39)
@@ -198,7 +205,9 @@ class AdminServiceTest {
 
         assertThat(response.isSuccess()).isTrue();
         assertThat(response.isQueued()).isTrue();
+        assertThat(response.getJobId()).isEqualTo(99L);
         verify(adminSyncTaskRunner).run(
+                eq(99L),
                 eq(1L),
                 eq("players"),
                 eq("PLAYER"),
@@ -207,6 +216,21 @@ class AdminServiceTest {
                 any(AdminSyncTaskRunner.SyncTask.class),
                 any(Runnable.class)
         );
+    }
+
+    @Test
+    void cancelQueuedSyncJobReturnsCancelledStatusAndWritesAuditLog() {
+        AppUser admin = adminUser();
+        when(appUserRepository.findById(1L)).thenReturn(Optional.of(admin));
+        when(adminSyncJobService.requestCancel(99L)).thenReturn(new AdminSyncJobService.CancelResult(
+                99L, "players", "league=39; season=2025", AdminSyncJobStatus.CANCELLED, true));
+
+        AdminDto.SyncCancelResponse response = adminService.cancelSyncJob(1L, 99L);
+
+        assertThat(response.getStatus()).isEqualTo("CANCELLED");
+        ArgumentCaptor<AdminAuditLog> logCaptor = ArgumentCaptor.forClass(AdminAuditLog.class);
+        verify(adminAuditLogRepository).save(logCaptor.capture());
+        assertThat(logCaptor.getValue().getMessage()).contains("cancelled before start");
     }
 
     @Test
