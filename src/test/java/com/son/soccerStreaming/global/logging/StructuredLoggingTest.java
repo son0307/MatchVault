@@ -41,6 +41,12 @@ class StructuredLoggingTest {
         assertThat(property(prod, "logging.structured.format.console")).isEqualTo("ecs");
         assertThat(property(prod, "logging.structured.format.file")).isEqualTo("ecs");
         assertThat(property(prod, "logging.structured.ecs.service.environment")).isEqualTo("production");
+        assertThat(property(prod, "logging.level.sync-detail"))
+                .isEqualTo("${LOGGING_LEVEL_SYNC_DETAIL:INFO}");
+        assertThat(property(prod, "logging.group.sync-detail[0]"))
+                .isEqualTo("com.son.soccerStreaming.apifootball.service.ApiFootballFixtureDetailSyncService");
+        assertThat(property(prod, "logging.group.sync-detail[5]"))
+                .isEqualTo("com.son.soccerStreaming.media.service.ImageCacheService");
         assertThat(property(prod, "logging.file.name"))
                 .isEqualTo("${LOG_FILE_NAME}");
         assertThat(property(prod, "logging.logback.rollingpolicy.file-name-pattern"))

@@ -64,6 +64,16 @@ api-football:
       daily-cron: ${API_FOOTBALL_INJURIES_DAILY_CRON:0 0 5 * * *}
 
 logging:
+  group:
+    sync-detail:
+      - com.son.soccerStreaming.apifootball.service.ApiFootballFixtureDetailSyncService
+      - com.son.soccerStreaming.apifootball.service.ApiFootballPlayerSyncService
+      - com.son.soccerStreaming.apifootball.service.ApiFootballInjurySyncService
+      - com.son.soccerStreaming.apifootball.service.ApiFootballStandingLocalUpdateService
+      - com.son.soccerStreaming.live.service.LiveFixturePollingScheduler
+      - com.son.soccerStreaming.media.service.ImageCacheService
+  level:
+    sync-detail: ${LOGGING_LEVEL_SYNC_DETAIL:INFO}
   file:
     name: ${LOG_FILE_NAME}
   structured:

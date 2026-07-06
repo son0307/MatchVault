@@ -2,6 +2,7 @@ package com.son.soccerStreaming.apifootball.scheduler;
 
 import com.son.soccerStreaming.apifootball.service.ApiFootballFixtureDetailSyncException;
 import com.son.soccerStreaming.apifootball.service.ApiFootballFixtureDetailSyncService;
+import com.son.soccerStreaming.fixture.entity.Fixture;
 import com.son.soccerStreaming.live.service.LiveFixtureBroadcastService;
 import com.son.soccerStreaming.fixture.repository.FixtureRepository;
 import lombok.RequiredArgsConstructor;
@@ -10,6 +11,8 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
+
+import java.util.List;
 
 @Slf4j
 @Component
@@ -46,8 +49,13 @@ public class ApiFootballFixtureDetailSyncScheduler {
     }
 
     private void syncLiveFixtureDetailsNow() {
+        List<Fixture> liveFixtures = fixtureRepository.findAllByFixtureStatus("LIVE");
+        if (liveFixtures.isEmpty()) {
+            return;
+        }
+
         apiFootballFixtureDetailSyncService.syncFixtureDetailsWithResults(
-                fixtureRepository.findAllByFixtureStatus("LIVE"),
+                liveFixtures,
                 true
         ).forEach(result -> liveFixtureBroadcastService.broadcastFixture(result.fixtureId(), result.latestEvent()));
     }
