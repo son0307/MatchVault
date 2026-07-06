@@ -177,13 +177,13 @@ public class ImageCacheService {
         }
 
         try {
-            log.info("Image cache started. type={}, externalId={}, objectKeyPrefix={}",
+            log.debug("Image cache started. type={}, externalId={}, objectKeyPrefix={}",
                     type, externalId, objectKeyPrefix);
             ImageDownloadResult image = imageDownloader.download(sourceUrl);
             String objectKey = objectKeyPrefix + "." + image.extension();
             storageService.upload(objectKey, image.content(), image.contentType());
             successHandler.handle(objectKey, now());
-            log.info("Image cache completed. type={}, externalId={}, objectKey={}, contentType={}, bytes={}",
+            log.debug("Image cache completed. type={}, externalId={}, objectKey={}, contentType={}, bytes={}",
                     type, externalId, objectKey, image.contentType(), image.content().length);
         } catch (RuntimeException e) {
             failureHandler.handle(failureReason(e));

@@ -98,7 +98,7 @@ public class ApiFootballFixtureDetailSyncService {
             ));
         }
 
-        log.info("API-Football fixture detail processed. fixtureId={}, totalMs={}, {}",
+        log.debug("API-Football fixture detail processed. fixtureId={}, totalMs={}, {}",
                 fixture.get().getFixtureId(),
                 stopWatch.getTotalTimeMillis(),
                 shortSummary(stopWatch));
@@ -136,6 +136,7 @@ public class ApiFootballFixtureDetailSyncService {
             boolean applyLiveStandingImpact,
             boolean rebuildAffectedSeasonStats
     ) {
+        long startedAtNanos = System.nanoTime();
         List<FixtureDetailSyncResult> results = new ArrayList<>();
         List<List<Long>> chunks = chunks(fixtureIds);
         List<List<Long>> failedChunks = new ArrayList<>();
@@ -143,7 +144,7 @@ public class ApiFootballFixtureDetailSyncService {
             List<Long> chunk = chunks.get(i);
             StopWatch chunkWatch = new StopWatch("fixture-detail-chunk-" + (i + 1));
             try {
-                log.info("API-Football fixture detail chunk started. chunk={}/{}, size={}, fixtureIds={}",
+                log.debug("API-Football fixture detail chunk started. chunk={}/{}, size={}, fixtureIds={}",
                         i + 1, chunks.size(), chunk.size(), chunk);
 
                 chunkWatch.start("api");
@@ -191,6 +192,10 @@ public class ApiFootballFixtureDetailSyncService {
         if (!failedChunks.isEmpty()) {
             throw new ApiFootballFixtureDetailSyncException(failedChunks, chunks.size());
         }
+        long totalMs = (System.nanoTime() - startedAtNanos) / 1_000_000;
+        log.info("API-Football fixture detail sync completed. requestedCount={}, processedCount={}, "
+                        + "chunkCount={}, failedChunkCount=0, totalMs={}",
+                fixtureIds.size(), results.size(), chunks.size(), totalMs);
         return results;
     }
 

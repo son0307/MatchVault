@@ -143,7 +143,7 @@ public class ApiFootballPlayerSyncService {
                     ? response.getPaging().getTotal()
                     : page;
 
-            log.info("API-Football registered players page synced. teamId={}, season={}, page={}/{}, count={}",
+            log.debug("API-Football registered players page synced. teamId={}, season={}, page={}/{}, count={}",
                     team.getTeamId(), season, page, totalPages, players.size());
             page++;
         } while (page <= totalPages);

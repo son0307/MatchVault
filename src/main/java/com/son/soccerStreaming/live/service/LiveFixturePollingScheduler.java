@@ -110,7 +110,7 @@ public class LiveFixturePollingScheduler {
             return false;
         }
 
-        log.warn("Live fixture sync skipped during cooldown. fixtureId={}, failureCount={}, cooldownUntilEpochMs={}",
+        log.debug("Live fixture sync skipped during cooldown. fixtureId={}, failureCount={}, cooldownUntilEpochMs={}",
                 fixtureId, failureState.failureCount(), failureState.cooldownUntilEpochMs());
         return true;
     }

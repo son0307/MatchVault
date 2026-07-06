@@ -64,7 +64,7 @@ public class ApiFootballStandingLocalUpdateService {
                 LocalDateTime.now()
         ));
 
-        log.info("Standing live impact cached. fixtureId={}, season={}, status={}, score={}-{}",
+        log.debug("Standing live impact cached. fixtureId={}, season={}, status={}, score={}-{}",
                 fixture.getFixtureId(), season, fixture.getStatusShort(), fixture.getHomeScore(), fixture.getAwayScore());
     }
 

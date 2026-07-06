@@ -45,7 +45,7 @@ public class ApiFootballInjurySyncService {
         List<List<ApiFootballInjuryDto.InjuryResponse>> chunks = chunks(injuries);
         for (int i = 0; i < chunks.size(); i++) {
             List<ApiFootballInjuryDto.InjuryResponse> chunk = chunks.get(i);
-            log.info("API-Football injury chunk started. chunk={}/{}, size={}", i + 1, chunks.size(), chunk.size());
+            log.debug("API-Football injury chunk started. chunk={}/{}, size={}", i + 1, chunks.size(), chunk.size());
             syncedCount += syncInjuryChunk(chunk);
             log.info("API-Football injury chunk completed. chunk={}/{}, size={}", i + 1, chunks.size(), chunk.size());
         }
