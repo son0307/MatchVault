@@ -117,6 +117,34 @@ class AdminSyncJobServiceTest {
     }
 
     @Test
+    void terminalJobStatusIsNotOverwrittenByLateFailureOrCancellation() {
+        AdminSyncJob job = AdminSyncJob.queued(AppUser.builder().email("admin@example.com").build(),
+                "players", "PLAYER", null, 2025, "season=2025");
+        job.markRunning();
+        job.markSucceeded(10, false);
+        LocalDateTime completedAt = job.getCompletedAt();
+
+        job.markFailed("late audit failure");
+        job.markCancelled();
+        job.requestCancel();
+
+        assertThat(job.getStatus()).isEqualTo(AdminSyncJobStatus.SUCCEEDED);
+        assertThat(job.getCompletedAt()).isEqualTo(completedAt);
+    }
+
+    @Test
+    void cancellationRequestedJobCanOnlyFinishAsCancelled() {
+        AdminSyncJob job = AdminSyncJob.queued(AppUser.builder().email("admin@example.com").build(),
+                "fixture-details", "FIXTURE", null, 2025, "season=2025");
+        job.markRunning();
+        job.requestCancel();
+
+        job.markSucceeded(10, false);
+
+        assertThat(job.getStatus()).isEqualTo(AdminSyncJobStatus.CANCELLED);
+    }
+
+    @Test
     void missingJobUsesNotFoundErrorInsteadOfInternalServerError() {
         when(jobRepository.findByIdForUpdate(404L)).thenReturn(Optional.empty());
 

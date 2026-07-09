@@ -124,6 +124,9 @@ public class AdminSyncJob {
             markCancelled();
             return;
         }
+        if (status != AdminSyncJobStatus.RUNNING) {
+            return;
+        }
         status = hasErrors ? AdminSyncJobStatus.PARTIAL_FAILED : AdminSyncJobStatus.SUCCEEDED;
         savedCount = Math.max(savedCount, count);
         if (totalUnits > 0 && processedUnits < totalUnits) {
@@ -136,6 +139,13 @@ public class AdminSyncJob {
     }
 
     public void markFailed(String failureMessage) {
+        if (status == AdminSyncJobStatus.CANCEL_REQUESTED) {
+            markCancelled();
+            return;
+        }
+        if (isTerminal()) {
+            return;
+        }
         status = savedCount > 0 || successfulUnits > 0
                 ? AdminSyncJobStatus.PARTIAL_FAILED
                 : AdminSyncJobStatus.FAILED;
@@ -162,8 +172,15 @@ public class AdminSyncJob {
     }
 
     public void markCancelled() {
+        if (isTerminal()) {
+            return;
+        }
         status = AdminSyncJobStatus.CANCELLED;
         message = task + " sync was cancelled.";
         completedAt = LocalDateTime.now();
+    }
+
+    private boolean isTerminal() {
+        return !status.isActive();
     }
 }
