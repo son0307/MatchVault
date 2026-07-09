@@ -32,6 +32,7 @@ import com.son.soccerStreaming.admin.repository.AdminAuditLogRepository;
 import com.son.soccerStreaming.auth.repository.AppUserRepository;
 import com.son.soccerStreaming.player.repository.PlayerRepository;
 import com.son.soccerStreaming.team.repository.TeamRepository;
+import com.son.soccerStreaming.team.repository.TeamStandingRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -59,6 +60,8 @@ class AdminServiceTest {
     private AppUserRepository appUserRepository;
     @Mock
     private TeamRepository teamRepository;
+    @Mock
+    private TeamStandingRepository teamStandingRepository;
     @Mock
     private PlayerRepository playerRepository;
     @Mock
@@ -200,6 +203,7 @@ class AdminServiceTest {
                         .players(true)
                         .build()
         ));
+        when(teamStandingRepository.existsByLeagueIdAndSeason(39, 2025)).thenReturn(true);
 
         AdminDto.SyncResponse response = adminService.syncPlayers(1L, 39, 2025, 7000L);
 
@@ -216,6 +220,24 @@ class AdminServiceTest {
                 any(AdminSyncTaskRunner.SyncTask.class),
                 any(Runnable.class)
         );
+    }
+
+    @Test
+    void syncPlayersRequiresStandingsBeforeCreatingJob() {
+        when(leagueSeasonCoverageRepository.findByLeagueIdAndSeasonYear(39, 2025)).thenReturn(Optional.of(
+                LeagueSeasonCoverage.builder()
+                        .leagueId(39)
+                        .seasonYear(2025)
+                        .players(true)
+                        .build()
+        ));
+        when(teamStandingRepository.existsByLeagueIdAndSeason(39, 2025)).thenReturn(false);
+
+        assertThatThrownBy(() -> adminService.syncPlayers(1L, 39, 2025, 7000L))
+                .isInstanceOf(CustomException.class)
+                .hasMessage("선수 동기화 전에 해당 시즌의 팀과 순위를 먼저 동기화해 주세요.");
+
+        verify(adminSyncJobService, org.mockito.Mockito.never()).create(any(), any(), any(), any(), any(), any());
     }
 
     @Test

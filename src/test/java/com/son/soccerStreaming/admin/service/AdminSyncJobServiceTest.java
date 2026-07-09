@@ -6,6 +6,8 @@ import com.son.soccerStreaming.admin.repository.AdminSyncJobErrorRepository;
 import com.son.soccerStreaming.admin.repository.AdminSyncJobRepository;
 import com.son.soccerStreaming.auth.entity.AppUser;
 import com.son.soccerStreaming.auth.repository.AppUserRepository;
+import com.son.soccerStreaming.global.exception.CustomException;
+import com.son.soccerStreaming.global.exception.ErrorCode;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -18,6 +20,7 @@ import org.springframework.data.domain.PageRequest;
 import java.time.LocalDateTime;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.verify;
 
@@ -111,6 +114,15 @@ class AdminSyncJobServiceTest {
         assertThat(running.requestCancel()).isFalse();
         assertThat(running.getStatus()).isEqualTo(AdminSyncJobStatus.CANCEL_REQUESTED);
         assertThat(running.isCancellationRequested()).isTrue();
+    }
+
+    @Test
+    void missingJobUsesNotFoundErrorInsteadOfInternalServerError() {
+        when(jobRepository.findByIdForUpdate(404L)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.requestCancel(404L))
+                .isInstanceOfSatisfying(CustomException.class,
+                        exception -> assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.ADMIN_SYNC_JOB_NOT_FOUND));
     }
 
     @Test

@@ -30,11 +30,10 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 class SyncProgressReportingTest {
 
     @Test
-    void playerSyncInitializesTeamProgressAndKeepsExistingReturnContract() {
+    void playerSyncFailsWhenStandingsHaveNotBeenSynchronized() {
         TeamRepository teamRepository = mock(TeamRepository.class);
         TeamStandingRepository standingRepository = mock(TeamStandingRepository.class);
         when(standingRepository.findAllByLeagueIdAndSeason(39, 2025)).thenReturn(List.of());
-        when(teamRepository.findAllWithFixtureInSeasonOrderByNameAsc(2025)).thenReturn(List.of());
         SyncProgressReporter reporter = mock(SyncProgressReporter.class);
         ApiFootballPlayerSyncService service = new ApiFootballPlayerSyncService(
                 mock(ApiFootballClient.class), mock(FixtureLineupRepository.class), mock(PlayerRepository.class),
@@ -44,13 +43,11 @@ class SyncProgressReportingTest {
                 mock(ImageCacheService.class), mock(PlayerTeamSeasonStatAggregationService.class)
         );
 
-        int count = service.syncRegisteredPlayers(39, 2025, 0L, reporter);
+        assertThatThrownBy(() -> service.syncRegisteredPlayers(39, 2025, 0L, reporter))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("Team standings must be synchronized before player sync");
 
-        assertThat(count).isZero();
-        verify(reporter).beginPhase("SYNCING_PLAYERS", 0, "teams", 0);
-        verify(reporter).beginPhase("CACHING_IMAGES", 0, "images", 0);
-        verify(reporter).beginPhase("REBUILDING_SEASON_STATS", 0, "season", 0);
-        verify(teamRepository).findAllWithFixtureInSeasonOrderByNameAsc(2025);
+        verify(teamRepository, never()).findAllWithFixtureInSeasonOrderByNameAsc(any());
     }
 
     @Test

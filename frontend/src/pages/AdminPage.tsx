@@ -232,6 +232,7 @@ type AuditLogPage = {
 
 const AUDIT_LOG_PAGE_SIZE = 20;
 const SYNC_JOB_POLL_INTERVAL_MS = 2_000;
+const SYNC_JOB_RETRY_INTERVAL_MS = 5_000;
 const ADMIN_SEARCH_KEYWORD_MAX_LENGTH = 80;
 const MANUAL_SYNC_COOLDOWN_MS = 30_000;
 const ADMIN_IMAGE_MAX_BYTES = 2 * 1024 * 1024;
@@ -480,6 +481,17 @@ export function AdminPage({ authState }: AdminPageProps) {
     const timerId = window.setInterval(() => void reloadSyncJobs(true), SYNC_JOB_POLL_INTERVAL_MS);
     return () => window.clearInterval(timerId);
   }, [hasActiveSyncJobs, authState.season]);
+
+  useEffect(() => {
+    if (syncJobsStatus !== "error" || hasActiveSyncJobs) {
+      return;
+    }
+    const timerId = window.setTimeout(
+      () => void reloadSyncJobs(false),
+      SYNC_JOB_RETRY_INTERVAL_MS,
+    );
+    return () => window.clearTimeout(timerId);
+  }, [syncJobsStatus, hasActiveSyncJobs, authState.season]);
 
   useEffect(() => {
     if (!Object.values(syncCooldownUntil).some((until) => until > syncClock)) {
@@ -1425,6 +1437,9 @@ export function AdminPage({ authState }: AdminPageProps) {
             <strong>Manual Sync</strong>
           </span>
         </summary>
+        <p className="muted admin-sync-message">
+          새로운 시즌은 Teams → Standings 순서로 동기화한 뒤 나머지 동기화를 진행해 주세요.
+        </p>
         <div className="admin-sync-actions">
           {syncTasks.map((item) => {
             const status = syncStatusByTask.get(item.task);

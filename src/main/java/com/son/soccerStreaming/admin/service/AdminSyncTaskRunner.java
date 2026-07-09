@@ -34,6 +34,7 @@ public class AdminSyncTaskRunner {
                 return;
             }
             SyncProgressReporter progressReporter = new AdminSyncJobProgressReporter(jobId, adminSyncJobService);
+            progressReporter.checkCancelled();
             adminAuditLogRepository.save(AdminAuditLog.of(
                     admin,
                     AdminAuditType.SYNC,

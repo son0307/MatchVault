@@ -12,6 +12,7 @@ import java.util.Optional;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -72,6 +73,29 @@ class AdminSyncTaskRunnerTest {
                 progress -> { throw new SyncCancelledException(); }, null);
 
         verify(jobService).markCancelled(12L);
+        verify(jobService, never()).markFailed(any(), any());
+    }
+
+    @Test
+    void stopsBeforeAuditAndSyncWhenCancelledImmediatelyAfterMarkRunning() {
+        AppUserRepository userRepository = mock(AppUserRepository.class);
+        AdminAuditLogRepository auditRepository = mock(AdminAuditLogRepository.class);
+        AdminSyncJobService jobService = mock(AdminSyncJobService.class);
+        when(userRepository.findById(1L)).thenReturn(Optional.of(AppUser.builder().email("admin@example.com").build()));
+        when(jobService.markRunning(13L)).thenReturn(true);
+        when(jobService.isCancellationRequested(13L)).thenReturn(true);
+        AdminSyncTaskRunner runner = new AdminSyncTaskRunner(userRepository, auditRepository, jobService);
+        AtomicBoolean syncStarted = new AtomicBoolean();
+
+        runner.run(13L, 1L, "players", "PLAYER", null, "season=2025",
+                progress -> {
+                    syncStarted.set(true);
+                    return 0;
+                }, null);
+
+        assertThat(syncStarted.get()).isFalse();
+        verify(jobService).markCancelled(13L);
+        verify(jobService, never()).markSucceeded(any(), anyInt());
         verify(jobService, never()).markFailed(any(), any());
     }
 }

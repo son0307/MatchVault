@@ -37,6 +37,7 @@ import com.son.soccerStreaming.apifootball.repository.ApiFootballSyncStatusRepos
 import com.son.soccerStreaming.auth.repository.AppUserRepository;
 import com.son.soccerStreaming.player.repository.PlayerRepository;
 import com.son.soccerStreaming.team.repository.TeamRepository;
+import com.son.soccerStreaming.team.repository.TeamStandingRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -119,6 +120,7 @@ public class AdminService {
 
     private final AppUserRepository appUserRepository;
     private final TeamRepository teamRepository;
+    private final TeamStandingRepository teamStandingRepository;
     private final PlayerRepository playerRepository;
     private final FixtureRepository fixtureRepository;
     private final FixtureEventRepository fixtureEventRepository;
@@ -579,6 +581,9 @@ public class AdminService {
 
     public AdminDto.SyncResponse syncPlayers(Long adminUserId, Integer league, Integer season, Long delayMs) {
         validateSeasonCoverage(league, season, coverage -> Boolean.TRUE.equals(coverage.getPlayers()));
+        if (!teamStandingRepository.existsByLeagueIdAndSeason(league, season)) {
+            throw new CustomException(ErrorCode.ADMIN_SYNC_STANDINGS_REQUIRED);
+        }
         return queueSync(adminUserId, "players", "PLAYER", null, syncDetails(league, season),
                 season, progress -> apiFootballPlayerSyncService.syncRegisteredPlayers(league, season, delayMs, progress));
     }

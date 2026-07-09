@@ -202,10 +202,11 @@ public class ApiFootballPlayerSyncService {
                 .distinct()
                 .sorted(Comparator.comparing(Team::getName, Comparator.nullsLast(String.CASE_INSENSITIVE_ORDER)))
                 .toList();
-        if (!standingTeams.isEmpty()) {
-            return standingTeams;
+        if (standingTeams.isEmpty()) {
+            throw new IllegalStateException(
+                    "Team standings must be synchronized before player sync. league=" + league + "; season=" + season);
         }
-        return teamRepository.findAllWithFixtureInSeasonOrderByNameAsc(season);
+        return standingTeams;
     }
 
     private RegisteredPlayerPageSyncResult syncRegisteredPlayerPage(List<ApiFootballPlayerDto.RegisteredPlayerResponse> players,

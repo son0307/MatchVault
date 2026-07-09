@@ -129,7 +129,7 @@ public class AdminSyncJobService {
 
     private AdminSyncJob job(Long jobId) {
         return jobRepository.findByIdForUpdate(jobId)
-                .orElseThrow(() -> new IllegalArgumentException("Admin sync job not found. jobId=" + jobId));
+                .orElseThrow(() -> new CustomException(ErrorCode.ADMIN_SYNC_JOB_NOT_FOUND));
     }
 
     private AdminDto.SyncJobResponse toResponse(AdminSyncJob job, List<AdminSyncJobError> errors) {
