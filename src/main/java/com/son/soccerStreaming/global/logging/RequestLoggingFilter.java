@@ -38,12 +38,14 @@ public class RequestLoggingFilter extends OncePerRequestFilter {
         String requestId = UUID.randomUUID().toString();
         String method = request.getMethod();
         String uri = safeUri(request.getRequestURI());
+        boolean quietPollingRequest = "GET".equals(method) && "/api/v1/admin/sync/jobs".equals(uri);
         long startedAtNanos = System.nanoTime();
         boolean completedNormally = false;
 
         response.setHeader(REQUEST_ID_HEADER, requestId);
         putRequestContext(requestId, method, uri);
-        log.atInfo()
+        var startLog = quietPollingRequest ? log.atDebug() : log.atInfo();
+        startLog
                 .addKeyValue("event.action", "http-request-started")
                 .log("HTTP request started. method={}, uri={}", method, uri);
 
@@ -52,12 +54,12 @@ public class RequestLoggingFilter extends OncePerRequestFilter {
             completedNormally = true;
         } finally {
             if (request.isAsyncStarted()) {
-                registerAsyncCompletion(request, response, requestId, method, uri, startedAtNanos);
+                registerAsyncCompletion(request, response, requestId, method, uri, startedAtNanos, quietPollingRequest);
             } else {
                 int status = completedNormally || response.getStatus() >= 500
                         ? response.getStatus()
                         : HttpServletResponse.SC_INTERNAL_SERVER_ERROR;
-                logCompleted(method, uri, status, startedAtNanos);
+                logCompleted(method, uri, status, startedAtNanos, quietPollingRequest);
             }
             clearRequestContext();
         }
@@ -69,14 +71,16 @@ public class RequestLoggingFilter extends OncePerRequestFilter {
             String requestId,
             String method,
             String uri,
-            long startedAtNanos
+            long startedAtNanos,
+            boolean quietPollingRequest
     ) {
         AsyncCompletionListener listener = new AsyncCompletionListener(
                 requestId,
                 method,
                 uri,
                 response,
-                startedAtNanos
+                startedAtNanos,
+                quietPollingRequest
         );
         try {
             request.getAsyncContext().addListener(listener);
@@ -94,10 +98,12 @@ public class RequestLoggingFilter extends OncePerRequestFilter {
         return sanitized.length() <= MAX_URI_LENGTH ? sanitized : sanitized.substring(0, MAX_URI_LENGTH);
     }
 
-    private void logCompleted(String method, String uri, int status, long startedAtNanos) {
+    private void logCompleted(String method, String uri, int status, long startedAtNanos,
+                              boolean quietPollingRequest) {
         long elapsedNanos = System.nanoTime() - startedAtNanos;
         long elapsedMs = TimeUnit.NANOSECONDS.toMillis(elapsedNanos);
-        log.atInfo()
+        var completionLog = quietPollingRequest ? log.atDebug() : log.atInfo();
+        completionLog
                 .addKeyValue("event.action", "http-request-completed")
                 .addKeyValue("event.outcome", status < 400 ? "success" : "failure")
                 .addKeyValue("event.duration", elapsedNanos)
@@ -133,6 +139,7 @@ public class RequestLoggingFilter extends OncePerRequestFilter {
         private final String uri;
         private final HttpServletResponse response;
         private final long startedAtNanos;
+        private final boolean quietPollingRequest;
         private final AtomicBoolean completed = new AtomicBoolean();
 
         private AsyncCompletionListener(
@@ -140,13 +147,15 @@ public class RequestLoggingFilter extends OncePerRequestFilter {
                 String method,
                 String uri,
                 HttpServletResponse response,
-                long startedAtNanos
+                long startedAtNanos,
+                boolean quietPollingRequest
         ) {
             this.requestId = requestId;
             this.method = method;
             this.uri = uri;
             this.response = response;
             this.startedAtNanos = startedAtNanos;
+            this.quietPollingRequest = quietPollingRequest;
         }
 
         @Override
@@ -177,7 +186,7 @@ public class RequestLoggingFilter extends OncePerRequestFilter {
             Map<String, String> previousContext = MDC.getCopyOfContextMap();
             try {
                 putRequestContext(requestId, method, uri);
-                logCompleted(method, uri, response.getStatus(), startedAtNanos);
+                logCompleted(method, uri, response.getStatus(), startedAtNanos, quietPollingRequest);
             } finally {
                 restoreContext(previousContext);
             }

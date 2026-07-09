@@ -120,7 +120,7 @@ public class ApiFootballFixtureDetailSyncService {
         List<Long> fixtureIds = fixtures.stream()
                 .map(Fixture::getFixtureId)
                 .toList();
-        return syncFixtureDetailsByIdsWithResults(fixtureIds, applyLiveStandingImpact, true);
+        return syncFixtureDetailsByIdsWithResults(fixtureIds, applyLiveStandingImpact, true, SyncProgressReporter.NO_OP);
     }
 
     public int syncFixtureDetailsByIds(List<Long> fixtureIds, boolean applyLiveStandingImpact) {
@@ -128,19 +128,25 @@ public class ApiFootballFixtureDetailSyncService {
     }
 
     public List<FixtureDetailSyncResult> syncFixtureDetailsByIdsWithResults(List<Long> fixtureIds, boolean applyLiveStandingImpact) {
-        return syncFixtureDetailsByIdsWithResults(fixtureIds, applyLiveStandingImpact, true);
+        return syncFixtureDetailsByIdsWithResults(fixtureIds, applyLiveStandingImpact, true, SyncProgressReporter.NO_OP);
     }
 
     private List<FixtureDetailSyncResult> syncFixtureDetailsByIdsWithResults(
             List<Long> fixtureIds,
             boolean applyLiveStandingImpact,
-            boolean rebuildAffectedSeasonStats
+            boolean rebuildAffectedSeasonStats,
+            SyncProgressReporter progressReporter
     ) {
         long startedAtNanos = System.nanoTime();
         List<FixtureDetailSyncResult> results = new ArrayList<>();
         List<List<Long>> chunks = chunks(fixtureIds);
         List<List<Long>> failedChunks = new ArrayList<>();
+        int processedUnits = 0;
+        int successfulUnits = 0;
+        int failedUnits = 0;
+        progressReporter.beginPhase("SYNCING_FIXTURES", fixtureIds.size(), "fixtures", 0);
         for (int i = 0; i < chunks.size(); i++) {
+            progressReporter.checkCancelled();
             List<Long> chunk = chunks.get(i);
             StopWatch chunkWatch = new StopWatch("fixture-detail-chunk-" + (i + 1));
             try {
@@ -166,6 +172,15 @@ public class ApiFootballFixtureDetailSyncService {
                     return processed;
                 });
                 results.addAll(chunkResults);
+                processedUnits += chunk.size();
+                successfulUnits += chunkResults.size();
+                int missingCount = Math.max(0, chunk.size() - chunkResults.size());
+                failedUnits += missingCount;
+                if (missingCount > 0) {
+                    progressReporter.error("FIXTURE_CHUNK", chunk.toString(),
+                            "Some requested fixtures were missing from the API response. missingCount=" + missingCount);
+                }
+                progressReporter.update(processedUnits, successfulUnits, failedUnits, results.size());
                 chunkWatch.stop();
 
                 if (rebuildAffectedSeasonStats) {
@@ -181,11 +196,17 @@ public class ApiFootballFixtureDetailSyncService {
 
                 log.info("API-Football fixture detail chunk completed. chunk={}/{}, responseCount={}, totalMs={}, {}",
                         i + 1, chunks.size(), responses.size(), chunkWatch.getTotalTimeMillis(), shortSummary(chunkWatch));
+            } catch (SyncCancelledException exception) {
+                throw exception;
             } catch (Exception e) {
                 if (chunkWatch.isRunning()) {
                     chunkWatch.stop();
                 }
                 failedChunks.add(List.copyOf(chunk));
+                processedUnits += chunk.size();
+                failedUnits += chunk.size();
+                progressReporter.error("FIXTURE_CHUNK", chunk.toString(), e.getMessage());
+                progressReporter.update(processedUnits, successfulUnits, failedUnits, results.size());
                 log.error("API-Football fixture detail chunk sync failed. fixtureIds={}", chunk, e);
             }
         }
@@ -200,11 +221,22 @@ public class ApiFootballFixtureDetailSyncService {
     }
 
     public int syncSeasonFixtureDetails(Integer season, boolean applyLiveStandingImpact) {
+        return syncSeasonFixtureDetails(season, applyLiveStandingImpact, SyncProgressReporter.NO_OP);
+    }
+
+    public int syncSeasonFixtureDetails(Integer season, boolean applyLiveStandingImpact,
+                                        SyncProgressReporter progressReporter) {
         List<Long> fixtureIds = fixtureRepository.findAllBySeasonOrderByFixtureDateAsc(season).stream()
                 .map(Fixture::getFixtureId)
                 .toList();
-        int syncedCount = syncFixtureDetailsByIdsWithResults(fixtureIds, applyLiveStandingImpact, false).size();
+        int syncedCount = syncFixtureDetailsByIdsWithResults(
+                fixtureIds, applyLiveStandingImpact, false, progressReporter).size();
+        progressReporter.checkCancelled();
+        progressReporter.beginPhase("REBUILDING_SEASON_STATS", 0, "season", syncedCount);
         playerTeamSeasonStatAggregationService.rebuildSeason(39, season);
+        progressReporter.beginPhase("REBUILDING_SEASON_STATS", 1, "season", syncedCount);
+        progressReporter.update(1, 1, 0, syncedCount);
+        progressReporter.checkCancelled();
         apiFootballSyncStatusService.recordSuccess("fixture-details", "Season Details", season);
         return syncedCount;
     }

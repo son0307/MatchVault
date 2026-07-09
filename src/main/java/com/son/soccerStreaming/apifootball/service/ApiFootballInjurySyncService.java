@@ -38,18 +38,49 @@ public class ApiFootballInjurySyncService {
     private final ApiFootballSyncStatusService apiFootballSyncStatusService;
 
     public int syncInjuries(Integer league, Integer season) {
+        return syncInjuries(league, season, SyncProgressReporter.NO_OP);
+    }
+
+    public int syncInjuries(Integer league, Integer season, SyncProgressReporter progressReporter) {
+        progressReporter.beginPhase("FETCHING_INJURIES", 0, "request", 0);
+        progressReporter.checkCancelled();
         List<ApiFootballInjuryDto.InjuryResponse> injuries = Optional.ofNullable(apiFootballClient.getInjuries(league, season))
                 .orElse(List.of());
         int syncedCount = 0;
 
         List<List<ApiFootballInjuryDto.InjuryResponse>> chunks = chunks(injuries);
+        int processedUnits = 0;
+        int failedUnits = 0;
+        progressReporter.beginPhase("SYNCING_INJURIES", injuries.size(), "injuries", 0);
         for (int i = 0; i < chunks.size(); i++) {
+            progressReporter.checkCancelled();
             List<ApiFootballInjuryDto.InjuryResponse> chunk = chunks.get(i);
             log.debug("API-Football injury chunk started. chunk={}/{}, size={}", i + 1, chunks.size(), chunk.size());
-            syncedCount += syncInjuryChunk(chunk);
+            try {
+                int chunkSyncedCount = syncInjuryChunk(chunk);
+                syncedCount += chunkSyncedCount;
+                processedUnits += chunk.size();
+                int skippedCount = Math.max(0, chunk.size() - chunkSyncedCount);
+                failedUnits += skippedCount;
+                if (skippedCount > 0) {
+                    progressReporter.error("INJURY_CHUNK", String.valueOf(i + 1),
+                            "Some injuries were skipped because required fixture, team, or player data was missing. skippedCount="
+                                    + skippedCount);
+                }
+                progressReporter.update(processedUnits, processedUnits - failedUnits, failedUnits, syncedCount);
+            } catch (SyncCancelledException exception) {
+                throw exception;
+            } catch (RuntimeException exception) {
+                processedUnits += chunk.size();
+                failedUnits += chunk.size();
+                progressReporter.error("INJURY_CHUNK", String.valueOf(i + 1), exception.getMessage());
+                progressReporter.update(processedUnits, processedUnits - failedUnits, failedUnits, syncedCount);
+                throw exception;
+            }
             log.info("API-Football injury chunk completed. chunk={}/{}, size={}", i + 1, chunks.size(), chunk.size());
         }
 
+        progressReporter.checkCancelled();
         log.info("API-Football injury sync completed. league={}, season={}, count={}", league, season, syncedCount);
         apiFootballSyncStatusService.recordSuccess("injuries", "Injuries", season);
         return syncedCount;

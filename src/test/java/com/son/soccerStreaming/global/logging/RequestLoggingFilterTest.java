@@ -25,10 +25,13 @@ class RequestLoggingFilterTest {
     private final RequestLoggingFilter filter = new RequestLoggingFilter();
     private Logger filterLogger;
     private ListAppender<ILoggingEvent> logAppender;
+    private Level originalLevel;
 
     @BeforeEach
     void attachLogAppender() {
         filterLogger = (Logger) LoggerFactory.getLogger(RequestLoggingFilter.class);
+        originalLevel = filterLogger.getLevel();
+        filterLogger.setLevel(Level.DEBUG);
         logAppender = new ListAppender<>() {
             @Override
             protected void append(ILoggingEvent event) {
@@ -43,6 +46,7 @@ class RequestLoggingFilterTest {
     @AfterEach
     void cleanUp() {
         filterLogger.detachAppender(logAppender);
+        filterLogger.setLevel(originalLevel);
         logAppender.stop();
         MDC.clear();
     }
@@ -157,6 +161,20 @@ class RequestLoggingFilterTest {
         assertThat(completed.getMDCPropertyMap())
                 .containsEntry(RequestLoggingFilter.REQUEST_METHOD_MDC_KEY, "GET")
                 .containsEntry(RequestLoggingFilter.REQUEST_URI_MDC_KEY, "/api/v1/test");
+    }
+
+    @Test
+    void logsAdminSyncJobPollingAtDebug() throws Exception {
+        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/v1/admin/sync/jobs");
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        filter.doFilter(request, response, (servletRequest, servletResponse) -> {
+        });
+
+        assertThat(logAppender.list).hasSize(2);
+        assertThat(logAppender.list).allSatisfy(event -> assertThat(event.getLevel()).isEqualTo(Level.DEBUG));
+        assertThat(logAppender.list.get(1).getMDCPropertyMap())
+                .containsEntry(RequestLoggingFilter.REQUEST_URI_MDC_KEY, "/api/v1/admin/sync/jobs");
     }
 
     private Object keyValue(ILoggingEvent event, String key) {

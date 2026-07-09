@@ -11,6 +11,8 @@ import com.son.soccerStreaming.admin.dto.AdminDto;
 import com.son.soccerStreaming.admin.entity.AdminAuditLog;
 import com.son.soccerStreaming.admin.entity.AdminAuditType;
 import com.son.soccerStreaming.admin.entity.AdminOverrideTargetType;
+import com.son.soccerStreaming.admin.entity.AdminSyncJob;
+import com.son.soccerStreaming.admin.entity.AdminSyncJobStatus;
 import com.son.soccerStreaming.apifootball.repository.ApiFootballSyncStatusRepository;
 import com.son.soccerStreaming.auth.entity.AppUser;
 import com.son.soccerStreaming.global.exception.CustomException;
@@ -30,6 +32,7 @@ import com.son.soccerStreaming.admin.repository.AdminAuditLogRepository;
 import com.son.soccerStreaming.auth.repository.AppUserRepository;
 import com.son.soccerStreaming.player.repository.PlayerRepository;
 import com.son.soccerStreaming.team.repository.TeamRepository;
+import com.son.soccerStreaming.team.repository.TeamStandingRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -57,6 +60,8 @@ class AdminServiceTest {
     private AppUserRepository appUserRepository;
     @Mock
     private TeamRepository teamRepository;
+    @Mock
+    private TeamStandingRepository teamStandingRepository;
     @Mock
     private PlayerRepository playerRepository;
     @Mock
@@ -95,6 +100,8 @@ class AdminServiceTest {
     private LeagueSeasonCoverageSyncService leagueSeasonCoverageSyncService;
     @Mock
     private AdminSyncTaskRunner adminSyncTaskRunner;
+    @Mock
+    private AdminSyncJobService adminSyncJobService;
     @Mock
     private MediaUrlService mediaUrlService;
 
@@ -185,6 +192,9 @@ class AdminServiceTest {
                 .build();
 
         when(appUserRepository.findById(1L)).thenReturn(Optional.of(admin));
+        when(adminSyncJobService.create(
+                1L, "players", "PLAYER", null, 2025, "league=39; season=2025"
+        )).thenReturn(AdminSyncJob.builder().id(99L).build());
         when(leagueSeasonCoverageRepository.findByLeagueIdAndSeasonYear(39, 2025)).thenReturn(Optional.of(
                 LeagueSeasonCoverage.builder()
                         .leagueId(39)
@@ -193,12 +203,15 @@ class AdminServiceTest {
                         .players(true)
                         .build()
         ));
+        when(teamStandingRepository.existsByLeagueIdAndSeason(39, 2025)).thenReturn(true);
 
         AdminDto.SyncResponse response = adminService.syncPlayers(1L, 39, 2025, 7000L);
 
         assertThat(response.isSuccess()).isTrue();
         assertThat(response.isQueued()).isTrue();
+        assertThat(response.getJobId()).isEqualTo(99L);
         verify(adminSyncTaskRunner).run(
+                eq(99L),
                 eq(1L),
                 eq("players"),
                 eq("PLAYER"),
@@ -207,6 +220,39 @@ class AdminServiceTest {
                 any(AdminSyncTaskRunner.SyncTask.class),
                 any(Runnable.class)
         );
+    }
+
+    @Test
+    void syncPlayersRequiresStandingsBeforeCreatingJob() {
+        when(leagueSeasonCoverageRepository.findByLeagueIdAndSeasonYear(39, 2025)).thenReturn(Optional.of(
+                LeagueSeasonCoverage.builder()
+                        .leagueId(39)
+                        .seasonYear(2025)
+                        .players(true)
+                        .build()
+        ));
+        when(teamStandingRepository.existsByLeagueIdAndSeason(39, 2025)).thenReturn(false);
+
+        assertThatThrownBy(() -> adminService.syncPlayers(1L, 39, 2025, 7000L))
+                .isInstanceOf(CustomException.class)
+                .hasMessage("선수 동기화 전에 해당 시즌의 팀과 순위를 먼저 동기화해 주세요.");
+
+        verify(adminSyncJobService, org.mockito.Mockito.never()).create(any(), any(), any(), any(), any(), any());
+    }
+
+    @Test
+    void cancelQueuedSyncJobReturnsCancelledStatusAndWritesAuditLog() {
+        AppUser admin = adminUser();
+        when(appUserRepository.findById(1L)).thenReturn(Optional.of(admin));
+        when(adminSyncJobService.requestCancel(99L)).thenReturn(new AdminSyncJobService.CancelResult(
+                99L, "players", "league=39; season=2025", AdminSyncJobStatus.CANCELLED, true));
+
+        AdminDto.SyncCancelResponse response = adminService.cancelSyncJob(1L, 99L);
+
+        assertThat(response.getStatus()).isEqualTo("CANCELLED");
+        ArgumentCaptor<AdminAuditLog> logCaptor = ArgumentCaptor.forClass(AdminAuditLog.class);
+        verify(adminAuditLogRepository).save(logCaptor.capture());
+        assertThat(logCaptor.getValue().getMessage()).contains("cancelled before start");
     }
 
     @Test

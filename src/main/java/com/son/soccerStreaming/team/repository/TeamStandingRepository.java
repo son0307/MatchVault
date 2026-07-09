@@ -12,5 +12,7 @@ public interface TeamStandingRepository extends JpaRepository<TeamStanding, Long
     @EntityGraph(attributePaths = "team")
     List<TeamStanding> findAllByLeagueIdAndSeason(Integer leagueId, Integer season);
 
+    boolean existsByLeagueIdAndSeason(Integer leagueId, Integer season);
+
     Optional<TeamStanding> findByTeamTeamIdAndLeagueIdAndSeason(Long teamId, Integer leagueId, Integer season);
 }

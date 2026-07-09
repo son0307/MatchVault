@@ -37,6 +37,7 @@ import com.son.soccerStreaming.apifootball.repository.ApiFootballSyncStatusRepos
 import com.son.soccerStreaming.auth.repository.AppUserRepository;
 import com.son.soccerStreaming.player.repository.PlayerRepository;
 import com.son.soccerStreaming.team.repository.TeamRepository;
+import com.son.soccerStreaming.team.repository.TeamStandingRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -119,6 +120,7 @@ public class AdminService {
 
     private final AppUserRepository appUserRepository;
     private final TeamRepository teamRepository;
+    private final TeamStandingRepository teamStandingRepository;
     private final PlayerRepository playerRepository;
     private final FixtureRepository fixtureRepository;
     private final FixtureEventRepository fixtureEventRepository;
@@ -138,6 +140,7 @@ public class AdminService {
     private final ApiFootballInjurySyncService apiFootballInjurySyncService;
     private final LeagueSeasonCoverageSyncService leagueSeasonCoverageSyncService;
     private final AdminSyncTaskRunner adminSyncTaskRunner;
+    private final AdminSyncJobService adminSyncJobService;
     private final MediaUrlService mediaUrlService;
     private final ConcurrentMap<String, ManualSyncState> manualSyncStates = new ConcurrentHashMap<>();
 
@@ -567,7 +570,7 @@ public class AdminService {
     public AdminDto.SyncResponse syncSeasonFixtureDetails(Long adminUserId, Integer season) {
         validateSeasonCoverage(39, season, this::supportsFixtureDetails);
         return queueSync(adminUserId, "fixture-details", "FIXTURE", null, syncDetails(null, season),
-                () -> apiFootballFixtureDetailSyncService.syncSeasonFixtureDetails(season, false));
+                season, progress -> apiFootballFixtureDetailSyncService.syncSeasonFixtureDetails(season, false, progress));
     }
 
     public AdminDto.SyncResponse syncFixtureDetail(Long adminUserId, Long fixtureId) {
@@ -578,13 +581,17 @@ public class AdminService {
 
     public AdminDto.SyncResponse syncPlayers(Long adminUserId, Integer league, Integer season, Long delayMs) {
         validateSeasonCoverage(league, season, coverage -> Boolean.TRUE.equals(coverage.getPlayers()));
+        if (!teamStandingRepository.existsByLeagueIdAndSeason(league, season)) {
+            throw new CustomException(ErrorCode.ADMIN_SYNC_STANDINGS_REQUIRED);
+        }
         return queueSync(adminUserId, "players", "PLAYER", null, syncDetails(league, season),
-                () -> apiFootballPlayerSyncService.syncRegisteredPlayers(league, season, delayMs));
+                season, progress -> apiFootballPlayerSyncService.syncRegisteredPlayers(league, season, delayMs, progress));
     }
 
     public AdminDto.SyncResponse syncInjuries(Long adminUserId, Integer league, Integer season) {
         validateSeasonCoverage(league, season, coverage -> Boolean.TRUE.equals(coverage.getInjuries()));
-        return queueSync(adminUserId, "injuries", "INJURY", null, syncDetails(league, season), () -> apiFootballInjurySyncService.syncInjuries(league, season));
+        return queueSync(adminUserId, "injuries", "INJURY", null, syncDetails(league, season),
+                season, progress -> apiFootballInjurySyncService.syncInjuries(league, season, progress));
     }
 
     @Transactional(readOnly = true)
@@ -640,14 +647,47 @@ public class AdminService {
         }
     }
 
+    public AdminDto.SyncJobListResponse getSyncJobs(Integer limit) {
+        return adminSyncJobService.recentJobs(limit);
+    }
+
+    public AdminDto.SyncCancelResponse cancelSyncJob(Long adminUserId, Long jobId) {
+        AppUser admin = findUser(adminUserId);
+        AdminSyncJobService.CancelResult result = adminSyncJobService.requestCancel(jobId);
+        if (result.cancelledBeforeStart()) {
+            releaseManualSync(manualSyncKey(result.task(), result.details()));
+        }
+        String message = result.cancelledBeforeStart()
+                ? result.task() + " sync cancelled before start."
+                : result.status() == com.son.soccerStreaming.admin.entity.AdminSyncJobStatus.CANCEL_REQUESTED
+                ? result.task() + " sync cancellation requested."
+                : result.task() + " sync is already finished.";
+        adminAuditLogRepository.save(AdminAuditLog.of(
+                admin, AdminAuditType.SYNC, "SYNC_JOB", jobId, message, result.details(), true));
+        return AdminDto.SyncCancelResponse.builder()
+                .jobId(jobId)
+                .status(result.status().name())
+                .message(message)
+                .build();
+    }
+
     private AdminDto.SyncResponse queueSync(Long adminUserId, String task, String targetType, Long targetId,
-                                            String details, AdminSyncTaskRunner.SyncTask syncTask) {
+                                            String details, Integer season, AdminSyncTaskRunner.SyncTask syncTask) {
         // Keep the admin request short; the runner writes start/completion audit logs from a worker thread.
         findUser(adminUserId);
         String syncKey = manualSyncKey(task, details);
         acquireManualSync(syncKey);
-        adminSyncTaskRunner.run(adminUserId, task, targetType, targetId, details, syncTask, () -> releaseManualSync(syncKey));
+        var job = adminSyncJobService.create(adminUserId, task, targetType, targetId, season, details);
+        try {
+            adminSyncTaskRunner.run(job.getId(), adminUserId, task, targetType, targetId, details,
+                    syncTask, () -> releaseManualSync(syncKey));
+        } catch (RuntimeException exception) {
+            adminSyncJobService.markFailed(job.getId(), task + " sync could not be queued: " + exception.getMessage());
+            releaseManualSync(syncKey);
+            throw exception;
+        }
         return AdminDto.SyncResponse.builder()
+                .jobId(job.getId())
                 .task(task)
                 .success(true)
                 .queued(true)
@@ -1242,11 +1282,40 @@ public class AdminService {
                 .type(log.getType().name())
                 .targetType(log.getTargetType())
                 .targetId(log.getTargetId())
-                .message(log.getMessage())
-                .details(log.getDetails())
+                .message(publicAuditMessage(log))
+                .details(null)
                 .success(log.isSuccess())
                 .createdAt(log.getCreatedAt())
                 .build();
+    }
+
+    private String publicAuditMessage(AdminAuditLog log) {
+        return switch (log.getType()) {
+            case TEAM_UPDATE -> "팀 정보가 수정되었습니다.";
+            case PLAYER_UPDATE -> "선수 정보가 수정되었습니다.";
+            case FIXTURE_UPDATE -> "경기 정보가 수정되었습니다.";
+            case MEDIA_UPLOAD -> "관리자 이미지가 적용되었습니다.";
+            case MEDIA_RESTORE -> "관리자 이미지가 원본으로 복원되었습니다.";
+            case OVERRIDE_CLEAR -> "수동 수정 설정이 해제되었습니다.";
+            case SYNC -> publicSyncAuditMessage(log);
+        };
+    }
+
+    private String publicSyncAuditMessage(AdminAuditLog log) {
+        String message = log.getMessage() == null ? "" : log.getMessage().toLowerCase();
+        if (message.contains("cancel")) {
+            return "관리자 요청으로 동기화가 취소되었습니다.";
+        }
+        if (message.contains("started")) {
+            return "동기화 작업을 시작했습니다.";
+        }
+        if (message.contains("partial")) {
+            return "일부 데이터는 동기화하지 못했습니다.";
+        }
+        if (!log.isSuccess() || message.contains("failed")) {
+            return "동기화에 실패했습니다.";
+        }
+        return "성공적으로 동기화되었습니다.";
     }
 
     private AdminDto.SyncStatusItem toSyncStatusItem(SyncStatusDefinition definition, Integer season) {

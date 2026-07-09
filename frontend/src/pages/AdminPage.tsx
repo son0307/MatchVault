@@ -188,6 +188,39 @@ type SyncStatus = {
 };
 
 type CoverageStatus = "loading" | "ready" | "error";
+type LoadStatus = "idle" | "loading" | "ready" | "error";
+type SyncJobStatus = "QUEUED" | "RUNNING" | "CANCEL_REQUESTED" | "CANCELLED" | "SUCCEEDED" | "PARTIAL_FAILED" | "FAILED";
+
+type SyncJobError = {
+  unitType: string;
+  unitId: string | null;
+  message: string;
+  createdAt: string | null;
+};
+
+type SyncJob = {
+  id: number;
+  task: string;
+  adminEmail: string | null;
+  targetType: string | null;
+  targetId: number | null;
+  season: number | null;
+  details: string | null;
+  status: SyncJobStatus;
+  active: boolean;
+  totalUnits: number;
+  processedUnits: number;
+  successfulUnits: number;
+  failedUnits: number;
+  savedCount: number;
+  phase: string | null;
+  unitLabel: string | null;
+  message: string;
+  createdAt: string | null;
+  startedAt: string | null;
+  completedAt: string | null;
+  errors: SyncJobError[];
+};
 
 type AuditLogPage = {
   logs: AuditLog[];
@@ -198,6 +231,8 @@ type AuditLogPage = {
 };
 
 const AUDIT_LOG_PAGE_SIZE = 20;
+const SYNC_JOB_POLL_INTERVAL_MS = 2_000;
+const SYNC_JOB_RETRY_INTERVAL_MS = 5_000;
 const ADMIN_SEARCH_KEYWORD_MAX_LENGTH = 80;
 const MANUAL_SYNC_COOLDOWN_MS = 30_000;
 const ADMIN_IMAGE_MAX_BYTES = 2 * 1024 * 1024;
@@ -396,7 +431,12 @@ export function AdminPage({ authState }: AdminPageProps) {
   const [syncStatuses, setSyncStatuses] = useState<SyncStatus[]>([]);
   const [seasonCoverages, setSeasonCoverages] = useState<LeagueSeasonCoverage[]>([]);
   const [coverageStatus, setCoverageStatus] = useState<CoverageStatus>("loading");
+  const [syncJobs, setSyncJobs] = useState<SyncJob[]>([]);
+  const [syncJobsStatus, setSyncJobsStatus] = useState<LoadStatus>("idle");
+  const [cancellingJobId, setCancellingJobId] = useState<number | null>(null);
   const [logs, setLogs] = useState<AuditLog[]>([]);
+  const [auditStatus, setAuditStatus] = useState<LoadStatus>("idle");
+  const [auditError, setAuditError] = useState("");
   const [auditPage, setAuditPage] = useState(0);
   const [auditTotalPages, setAuditTotalPages] = useState(0);
   const [auditTotalElements, setAuditTotalElements] = useState(0);
@@ -409,6 +449,10 @@ export function AdminPage({ authState }: AdminPageProps) {
   const fixtureTeamRequestIdRef = useRef(0);
   const fixtureListRequestIdRef = useRef(0);
   const fixtureRequestIdRef = useRef(0);
+  const auditRequestIdRef = useRef(0);
+  const syncJobsRequestIdRef = useRef(0);
+  const syncJobsInitializedRef = useRef(false);
+  const seenTerminalJobIdsRef = useRef<Set<number>>(new Set());
   const appliedAdminTargetRef = useRef("");
   const pendingAdminTargetRef = useRef<{ tab: AdminTab; id: number } | null>(null);
   const fixtureEditorRef = useRef<HTMLDivElement>(null);
@@ -421,11 +465,33 @@ export function AdminPage({ authState }: AdminPageProps) {
 
   useEffect(() => {
     if (authState.authStatus === "authenticated" && authState.currentUser?.role === "ADMIN") {
-      void loadAuditLogs(0, setLogs, setAuditPage, setAuditTotalPages, setAuditTotalElements);
+      void reloadAuditLogs(0);
+      void reloadSyncJobs(false);
       void loadSyncStatuses(authState.season, setSyncStatuses);
       void loadSeasonCoverages(setSeasonCoverages, setCoverageStatus);
     }
   }, [authState.authStatus, authState.currentUser?.role, authState.season]);
+
+  const hasActiveSyncJobs = syncJobs.some((job) => job.active);
+
+  useEffect(() => {
+    if (!hasActiveSyncJobs) {
+      return;
+    }
+    const timerId = window.setInterval(() => void reloadSyncJobs(true), SYNC_JOB_POLL_INTERVAL_MS);
+    return () => window.clearInterval(timerId);
+  }, [hasActiveSyncJobs, authState.season]);
+
+  useEffect(() => {
+    if (syncJobsStatus !== "error" || hasActiveSyncJobs) {
+      return;
+    }
+    const timerId = window.setTimeout(
+      () => void reloadSyncJobs(false),
+      SYNC_JOB_RETRY_INTERVAL_MS,
+    );
+    return () => window.clearTimeout(timerId);
+  }, [syncJobsStatus, hasActiveSyncJobs, authState.season]);
 
   useEffect(() => {
     if (!Object.values(syncCooldownUntil).some((until) => until > syncClock)) {
@@ -702,7 +768,93 @@ export function AdminPage({ authState }: AdminPageProps) {
   }
 
   async function reloadAuditLogs(page = auditPage) {
-    await loadAuditLogs(page, setLogs, setAuditPage, setAuditTotalPages, setAuditTotalElements);
+    const requestId = auditRequestIdRef.current + 1;
+    auditRequestIdRef.current = requestId;
+    setAuditStatus("loading");
+    setAuditError("");
+    try {
+      const response = await adminGet<AuditLogPage>(`/api/v1/admin/audit-logs?page=${page}&size=${AUDIT_LOG_PAGE_SIZE}`);
+      if (auditRequestIdRef.current !== requestId) {
+        return;
+      }
+      setLogs(response.logs ?? []);
+      setAuditPage(response.page ?? page);
+      setAuditTotalPages(response.totalPages ?? 0);
+      setAuditTotalElements(response.totalElements ?? 0);
+      setAuditStatus("ready");
+    } catch (nextError) {
+      if (auditRequestIdRef.current !== requestId) {
+        return;
+      }
+      setAuditStatus("error");
+      setAuditError(nextError instanceof Error ? nextError.message : "관리자 로그를 불러오지 못했습니다.");
+    }
+  }
+
+  async function reloadSyncJobs(notify: boolean) {
+    const requestId = syncJobsRequestIdRef.current + 1;
+    syncJobsRequestIdRef.current = requestId;
+    if (!syncJobsInitializedRef.current) {
+      setSyncJobsStatus("loading");
+    }
+    try {
+      const response = await adminGet<{ jobs: SyncJob[] }>("/api/v1/admin/sync/jobs?limit=10");
+      if (syncJobsRequestIdRef.current !== requestId) {
+        return;
+      }
+      const jobs = response.jobs ?? [];
+      const terminalJobs = jobs.filter((job) => !job.active);
+      if (!syncJobsInitializedRef.current) {
+        terminalJobs.forEach((job) => seenTerminalJobIdsRef.current.add(job.id));
+        syncJobsInitializedRef.current = true;
+      } else if (notify) {
+        const newlyCompleted = terminalJobs.filter((job) => !seenTerminalJobIdsRef.current.has(job.id));
+        newlyCompleted.forEach((job) => {
+          seenTerminalJobIdsRef.current.add(job.id);
+          setMediaToast({
+            type: job.status === "SUCCEEDED" ? "success" : "error",
+            message: syncJobCompletionMessage(job),
+          });
+        });
+        if (newlyCompleted.length > 0) {
+          await Promise.all([
+            reloadAuditLogs(0),
+            loadSyncStatuses(authState.season, setSyncStatuses),
+          ]);
+        }
+      }
+      setSyncJobs(jobs);
+      setSyncJobsStatus("ready");
+    } catch {
+      if (syncJobsRequestIdRef.current === requestId) {
+        setSyncJobsStatus("error");
+      }
+    }
+  }
+
+  async function cancelSyncJob(job: SyncJob) {
+    if (job.status !== "QUEUED" && job.status !== "RUNNING") {
+      return;
+    }
+    if (!window.confirm(`${syncTaskLabel(job.task)} 작업을 취소할까요? 현재 처리 중인 단위는 안전하게 마친 뒤 중단됩니다.`)) {
+      return;
+    }
+    setCancellingJobId(job.id);
+    try {
+      const response = await adminJson<{ message: string }>(
+        `/api/v1/admin/sync/jobs/${job.id}/cancel`,
+        "POST",
+      );
+      setMediaToast({ type: "success", message: response.message });
+      await Promise.all([reloadSyncJobs(false), reloadAuditLogs(0)]);
+    } catch (nextError) {
+      setMediaToast({
+        type: "error",
+        message: nextError instanceof Error ? nextError.message : "작업 취소 요청에 실패했습니다.",
+      });
+    } finally {
+      setCancellingJobId(null);
+    }
   }
 
   async function saveTeam(event: FormEvent<HTMLFormElement>) {
@@ -961,7 +1113,7 @@ export function AdminPage({ authState }: AdminPageProps) {
     setSyncingTask(task);
     try {
       await runRequest(async () => {
-        const result = await adminJson<{ message: string }>(url, "POST");
+        const result = await adminJson<{ jobId?: number; message: string }>(url, "POST");
         clearApiMemoryCache();
         setSyncMessage(result.message);
         if (task === "seasons") {
@@ -969,6 +1121,9 @@ export function AdminPage({ authState }: AdminPageProps) {
         }
         await loadSyncStatuses(authState.season, setSyncStatuses);
         await reloadAuditLogs();
+        if (result.jobId) {
+          await reloadSyncJobs(true);
+        }
       });
     } finally {
       setSyncingTask(null);
@@ -1003,6 +1158,10 @@ export function AdminPage({ authState }: AdminPageProps) {
   }
 
   const syncStatusByTask = new Map(syncStatuses.map((status) => [status.task, status]));
+  const activeSyncTasks = new Set(syncJobs.filter((job) => job.active).map((job) => job.task));
+  const runningSyncJobs = syncJobs.filter((job) => job.status === "RUNNING" || job.status === "CANCEL_REQUESTED");
+  const queuedSyncJobs = syncJobs.filter((job) => job.status === "QUEUED");
+  const completedSyncJobs = syncJobs.filter((job) => !job.active);
   const selectedCoverage = seasonCoverages.find((coverage) => coverage.seasonYear === authState.season) ?? null;
   const fixtureDetailCooldownSeconds = syncFixtureId.trim() ? syncCooldownSeconds(fixtureDetailCooldownKey(syncFixtureId.trim())) : 0;
 
@@ -1278,6 +1437,9 @@ export function AdminPage({ authState }: AdminPageProps) {
             <strong>Manual Sync</strong>
           </span>
         </summary>
+        <p className="muted admin-sync-message">
+          새로운 시즌은 Teams → Standings 순서로 동기화한 뒤 나머지 동기화를 진행해 주세요.
+        </p>
         <div className="admin-sync-actions">
           {syncTasks.map((item) => {
             const status = syncStatusByTask.get(item.task);
@@ -1286,7 +1448,7 @@ export function AdminPage({ authState }: AdminPageProps) {
             const cooldownSeconds = syncCooldownSeconds(manualSyncCooldownKey(item.task));
             return (
               <div className="admin-sync-action" key={item.task}>
-                <button type="button" onClick={() => void runSync(item.task)} disabled={syncingTask !== null || cooldownSeconds > 0 || !availability.enabled}>
+                <button type="button" onClick={() => void runSync(item.task)} disabled={syncingTask !== null || activeSyncTasks.has(item.task) || cooldownSeconds > 0 || !availability.enabled}>
                   {isSyncing ? <LoaderCircle className="admin-loading-icon" aria-hidden="true" /> : null}
                   {item.label}
                 </button>
@@ -1296,6 +1458,39 @@ export function AdminPage({ authState }: AdminPageProps) {
               </div>
             );
           })}
+        </div>
+        <div className="admin-sync-jobs" aria-live="polite">
+          <div className="admin-sync-jobs-heading">
+            <strong>Background Sync Jobs</strong>
+            <button type="button" className="section-retry-button" disabled={syncJobsStatus === "loading"} onClick={() => void reloadSyncJobs(false)}>
+              {syncJobsStatus === "loading" ? <LoaderCircle className="admin-loading-icon" aria-hidden="true" /> : null}
+              Refresh
+            </button>
+          </div>
+          {syncJobsStatus === "loading" && syncJobs.length === 0 ? <p className="muted admin-sync-message">작업 내역을 불러오는 중입니다.</p> : null}
+          {syncJobsStatus === "error" ? <p className="admin-inline-error">작업 내역을 불러오지 못했습니다.</p> : null}
+          {syncJobsStatus === "ready" && syncJobs.length === 0 ? <p className="muted admin-sync-message">최근 비동기 작업이 없습니다.</p> : null}
+          <SyncJobSection
+            title="현재 진행 중인 작업"
+            jobs={runningSyncJobs}
+            emptyMessage="현재 실행 중인 작업이 없습니다."
+            cancellingJobId={cancellingJobId}
+            onCancel={cancelSyncJob}
+          />
+          <SyncJobSection
+            title="대기 중인 작업"
+            jobs={queuedSyncJobs}
+            emptyMessage="대기 중인 작업이 없습니다."
+            cancellingJobId={cancellingJobId}
+            onCancel={cancelSyncJob}
+          />
+          <SyncJobSection
+            title="최근 완료된 작업"
+            jobs={completedSyncJobs}
+            emptyMessage="최근 완료된 작업이 없습니다."
+            cancellingJobId={cancellingJobId}
+            onCancel={cancelSyncJob}
+          />
         </div>
         {coverageStatus === "error" ? (
           <p className="muted admin-sync-message">시즌 지원 범위를 불러오지 못해 수동 싱크 요청을 잠시 막았습니다.</p>
@@ -1330,10 +1525,14 @@ export function AdminPage({ authState }: AdminPageProps) {
             <span className="eyebrow">Audit</span>
             <strong>Recent Admin Logs</strong>
           </span>
-          <button type="button" className="section-retry-button" onClick={() => void reloadAuditLogs()}>
-            Refresh
+          <button type="button" className="section-retry-button" disabled={auditStatus === "loading"} onClick={() => void reloadAuditLogs()}>
+            {auditStatus === "loading" ? <LoaderCircle className="admin-loading-icon" aria-hidden="true" /> : null}
+            {auditStatus === "loading" ? "Refreshing" : "Refresh"}
           </button>
         </summary>
+        {auditStatus === "loading" && logs.length === 0 ? <p className="muted admin-sync-message">관리자 로그를 불러오는 중입니다.</p> : null}
+        {auditStatus === "loading" && logs.length > 0 ? <p className="muted admin-sync-message" role="status">기존 로그를 표시한 채 새 내역을 확인하고 있습니다.</p> : null}
+        {auditStatus === "error" ? <p className="admin-inline-error" role="alert">{auditError}</p> : null}
         <div className="admin-log-list">
           {logs.map((log) => (
             <article className="admin-log-item" key={log.id}>
@@ -1350,18 +1549,111 @@ export function AdminPage({ authState }: AdminPageProps) {
           ))}
         </div>
         <div className="admin-pagination">
-          <button type="button" disabled={auditPage <= 0} onClick={() => void reloadAuditLogs(auditPage - 1)}>
+          <button type="button" disabled={auditStatus === "loading" || auditPage <= 0} onClick={() => void reloadAuditLogs(auditPage - 1)}>
             Previous
           </button>
           <span>
             Page {auditTotalPages === 0 ? 0 : auditPage + 1} / {auditTotalPages} · {auditTotalElements} logs
           </span>
-          <button type="button" disabled={auditPage + 1 >= auditTotalPages} onClick={() => void reloadAuditLogs(auditPage + 1)}>
+          <button type="button" disabled={auditStatus === "loading" || auditPage + 1 >= auditTotalPages} onClick={() => void reloadAuditLogs(auditPage + 1)}>
             Next
           </button>
         </div>
       </details>
     </section>
+  );
+}
+
+function SyncJobSection({
+  title,
+  jobs,
+  emptyMessage,
+  cancellingJobId,
+  onCancel,
+}: {
+  title: string;
+  jobs: SyncJob[];
+  emptyMessage: string;
+  cancellingJobId: number | null;
+  onCancel: (job: SyncJob) => Promise<void>;
+}) {
+  return (
+    <section className="admin-sync-job-section">
+      <h4>{title} <span>{jobs.length}</span></h4>
+      {jobs.length === 0 ? <p className="muted admin-sync-job-empty">{emptyMessage}</p> : null}
+      {jobs.map((job) => (
+        <SyncJobCard
+          key={job.id}
+          job={job}
+          cancelling={cancellingJobId === job.id}
+          onCancel={onCancel}
+        />
+      ))}
+    </section>
+  );
+}
+
+function SyncJobCard({
+  job,
+  cancelling,
+  onCancel,
+}: {
+  job: SyncJob;
+  cancelling: boolean;
+  onCancel: (job: SyncJob) => Promise<void>;
+}) {
+  const percent = job.totalUnits > 0
+    ? Math.min(100, Math.round((job.processedUnits / job.totalUnits) * 100))
+    : null;
+  const cancellable = job.status === "QUEUED" || job.status === "RUNNING";
+  return (
+    <article className={`admin-sync-job ${job.status.toLowerCase()}`}>
+      <div className="admin-sync-job-heading">
+        <div>
+          <strong>{syncTaskLabel(job.task)}</strong>
+          <span>{job.details ?? `Job #${job.id}`}</span>
+        </div>
+        <span className="status-pill">{syncJobStatusLabel(job.status)}</span>
+      </div>
+      {job.active ? (
+        percent === null ? (
+          <div className="admin-sync-indeterminate"><span /></div>
+        ) : (
+          <div className="admin-sync-progress" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={percent}>
+            <span style={{ width: `${percent}%` }} />
+          </div>
+        )
+      ) : null}
+      <p className="admin-sync-phase">{syncJobPhaseLabel(job.phase, job.status)}</p>
+      <p className="muted admin-sync-job-counts">
+        처리 {job.processedUnits}/{job.totalUnits || "?"} {job.unitLabel ?? "units"} · 성공 {job.successfulUnits} · 실패 {job.failedUnits} · 저장 {job.savedCount}
+      </p>
+      <p className="muted">{job.adminEmail ?? "-"} · 요청 {formatDateTime(job.createdAt)}{job.startedAt ? ` · 시작 ${formatDateTime(job.startedAt)}` : ""}{job.completedAt ? ` · 완료 ${formatDateTime(job.completedAt)}` : ""}</p>
+      {cancellable || job.status === "CANCEL_REQUESTED" ? (
+        <button
+          type="button"
+          className="section-retry-button"
+          disabled={!cancellable || cancelling}
+          onClick={() => void onCancel(job)}
+        >
+          {cancelling ? <LoaderCircle className="admin-loading-icon" aria-hidden="true" /> : null}
+          {job.status === "CANCEL_REQUESTED" ? "현재 처리 단위 완료 후 취소 중" : "작업 취소"}
+        </button>
+      ) : null}
+      {job.errors.length > 0 ? (
+        <details className="admin-sync-errors">
+          <summary>오류 내역 {job.errors.length}건</summary>
+          <ul>
+            {job.errors.map((jobError, index) => (
+              <li key={`${jobError.unitType}:${jobError.unitId ?? index}`}>
+                <strong>{jobError.unitType}{jobError.unitId ? ` ${jobError.unitId}` : ""}</strong>
+                <span>{jobError.message}</span>
+              </li>
+            ))}
+          </ul>
+        </details>
+      ) : null}
+    </article>
   );
 }
 
@@ -2097,23 +2389,58 @@ function colorInputValue(value: string) {
   return /^[0-9A-F]{6}$/i.test(value) ? `#${value}` : "";
 }
 
-async function loadAuditLogs(
-  page: number,
-  setLogs: (logs: AuditLog[]) => void,
-  setPage: (page: number) => void,
-  setTotalPages: (totalPages: number) => void,
-  setTotalElements: (totalElements: number) => void,
-) {
-  const response = await adminGet<AuditLogPage>(`/api/v1/admin/audit-logs?page=${page}&size=${AUDIT_LOG_PAGE_SIZE}`);
-  setLogs(response.logs ?? []);
-  setPage(response.page ?? page);
-  setTotalPages(response.totalPages ?? 0);
-  setTotalElements(response.totalElements ?? 0);
-}
-
 async function loadSyncStatuses(season: number, setSyncStatuses: (statuses: SyncStatus[]) => void) {
   const response = await adminGet<{ statuses: SyncStatus[] }>(`/api/v1/admin/sync/statuses?season=${season}`);
   setSyncStatuses(response.statuses ?? []);
+}
+
+function syncTaskLabel(task: string) {
+  return syncTasks.find((item) => item.task === task)?.label ?? task;
+}
+
+function syncJobStatusLabel(status: SyncJobStatus) {
+  const labels: Record<SyncJobStatus, string> = {
+    QUEUED: "대기 중",
+    RUNNING: "진행 중",
+    CANCEL_REQUESTED: "취소 요청됨",
+    CANCELLED: "취소됨",
+    SUCCEEDED: "성공",
+    PARTIAL_FAILED: "부분 실패",
+    FAILED: "실패",
+  };
+  return labels[status];
+}
+
+function syncJobPhaseLabel(phase: string | null, status: SyncJobStatus) {
+  if (status === "SUCCEEDED") return "성공적으로 동기화되었습니다.";
+  if (status === "PARTIAL_FAILED") return "일부 데이터는 동기화하지 못했습니다.";
+  if (status === "FAILED") return "동기화에 실패했습니다.";
+  if (status === "QUEUED") return "실행 순서를 기다리고 있습니다.";
+  if (status === "CANCEL_REQUESTED") return "현재 처리 단위를 마친 뒤 취소합니다.";
+  if (status === "CANCELLED") return "관리자 요청으로 취소되었습니다.";
+  const labels: Record<string, string> = {
+    SYNCING_FIXTURES: "경기 상세 정보를 동기화하고 있습니다.",
+    REBUILDING_SEASON_STATS: "선수 팀별 시즌 스탯을 재계산하고 있습니다.",
+    SYNCING_PLAYERS: "시즌 참가 팀의 선수 정보를 동기화하고 있습니다.",
+    CACHING_IMAGES: "선수 이미지를 캐싱하고 있습니다.",
+    FETCHING_INJURIES: "API-Football에서 부상 정보를 가져오고 있습니다.",
+    SYNCING_INJURIES: "부상 정보를 저장하고 있습니다.",
+  };
+  return phase ? labels[phase] ?? phase : "작업 상태를 준비하고 있습니다.";
+}
+
+function syncJobCompletionMessage(job: SyncJob) {
+  const label = syncTaskLabel(job.task);
+  if (job.status === "SUCCEEDED") {
+    return `${label} 동기화가 완료되었습니다. 저장 ${job.savedCount}건`;
+  }
+  if (job.status === "PARTIAL_FAILED") {
+    return `${label} 동기화가 일부 실패했습니다. 오류 ${job.failedUnits}건을 확인해 주세요.`;
+  }
+  if (job.status === "CANCELLED") {
+    return `${label} 동기화가 취소되었습니다.`;
+  }
+  return `${label} 동기화에 실패했습니다. 오류 내역을 확인해 주세요.`;
 }
 
 async function loadSeasonCoverages(

@@ -25,6 +25,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.function.Supplier;
+import com.son.soccerStreaming.apifootball.service.SyncProgressReporter;
 
 @Slf4j
 @Service
@@ -84,11 +85,21 @@ public class ImageCacheService {
     }
 
     public void cachePlayerPhotos(Collection<Long> playerIds) {
+        cachePlayerPhotos(playerIds, SyncProgressReporter.NO_OP, 0);
+    }
+
+    public void cachePlayerPhotos(Collection<Long> playerIds, SyncProgressReporter progressReporter, int savedCount) {
         if (playerIds == null || playerIds.isEmpty()) {
             return;
         }
         log.info("Player photo cache batch started. players={}", playerIds.size());
-        playerIds.forEach(this::cachePlayerPhoto);
+        int processed = 0;
+        for (Long playerId : playerIds) {
+            progressReporter.checkCancelled();
+            cachePlayerPhoto(playerId);
+            processed++;
+            progressReporter.update(processed, processed, 0, savedCount);
+        }
         log.info("Player photo cache batch completed. players={}", playerIds.size());
     }
 

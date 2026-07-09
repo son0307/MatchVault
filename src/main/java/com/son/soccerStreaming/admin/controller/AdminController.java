@@ -289,4 +289,19 @@ public class AdminController {
         return ResponseEntity.ok(adminService.getSyncStatuses(season));
     }
 
+    @GetMapping("/sync/jobs")
+    public ResponseEntity<AdminDto.SyncJobListResponse> getSyncJobs(
+            @RequestParam(defaultValue = "10") Integer limit
+    ) {
+        return ResponseEntity.ok(adminService.getSyncJobs(limit));
+    }
+
+    @PostMapping("/sync/jobs/{jobId}/cancel")
+    public ResponseEntity<AdminDto.SyncCancelResponse> cancelSyncJob(
+            @AuthenticationPrincipal AuthUserDetails userDetails,
+            @PathVariable Long jobId
+    ) {
+        return ResponseEntity.ok(adminService.cancelSyncJob(userDetails.getId(), jobId));
+    }
+
 }
