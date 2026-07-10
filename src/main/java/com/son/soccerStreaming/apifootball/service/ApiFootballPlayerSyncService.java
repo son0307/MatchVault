@@ -91,6 +91,7 @@ public class ApiFootballPlayerSyncService {
     })
     public int syncRegisteredPlayers(Integer league, Integer season, Long delayMs,
                                      SyncProgressReporter progressReporter) {
+        apiFootballSyncStatusService.recordAttempt("players", "Players", season);
         int syncedCount = 0;
         List<Long> failedTeamIds = new java.util.ArrayList<>();
         Set<Long> syncedPlayerIds = new LinkedHashSet<>();

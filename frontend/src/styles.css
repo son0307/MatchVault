@@ -842,6 +842,51 @@ h2 {
   font-weight: 800;
 }
 
+.sync-status-failed {
+  background: #fde7e3;
+  color: #9b2418;
+}
+
+.sync-status-retry_pending,
+.sync-status-stale {
+  background: #fff2cc;
+  color: #7a4b00;
+}
+
+.sync-status-never_synced {
+  background: #eef1f4;
+  color: #52606d;
+}
+
+.data-freshness {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin: 0 0 12px;
+  color: #66736b;
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.data-freshness.stale {
+  color: #8a5a11;
+}
+
+.data-freshness button {
+  border: 1px solid #d9e2d8;
+  border-radius: 6px;
+  padding: 6px 10px;
+  background: #ffffff;
+  color: #1f3d2a;
+  font-weight: 800;
+}
+
+.data-freshness button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
 .standing-row {
   grid-template-columns: 28px 34px minmax(0, 1fr) 64px 48px;
 }

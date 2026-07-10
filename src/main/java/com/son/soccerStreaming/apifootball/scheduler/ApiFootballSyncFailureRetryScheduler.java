@@ -3,6 +3,7 @@ package com.son.soccerStreaming.apifootball.scheduler;
 import jakarta.annotation.PreDestroy;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import com.son.soccerStreaming.apifootball.service.ApiFootballSyncStatusService;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
@@ -17,6 +18,7 @@ import java.util.concurrent.TimeUnit;
 @RequiredArgsConstructor
 public class ApiFootballSyncFailureRetryScheduler {
 
+    private final ApiFootballSyncStatusService syncStatusService;
     private final ScheduledExecutorService retryExecutor = Executors.newSingleThreadScheduledExecutor(runnable -> {
         Thread thread = new Thread(runnable, "api-football-sync-failure-retry");
         thread.setDaemon(true);
@@ -55,6 +57,9 @@ public class ApiFootballSyncFailureRetryScheduler {
             return;
         }
 
+        syncStatusOfRetryKey(key).ifPresent(status ->
+                syncStatusService.recordRetryPendingByKey(status.syncKey(), status.displayName(),
+                        "Retry scheduled. " + description));
         scheduleNext(key, newState);
     }
 
@@ -89,6 +94,8 @@ public class ApiFootballSyncFailureRetryScheduler {
         } catch (Exception e) {
             if (attempt >= state.maxAttempts()) {
                 retryStates.remove(key);
+                syncStatusOfRetryKey(key).ifPresent(status ->
+                        syncStatusService.recordFailureByKey(status.syncKey(), status.displayName(), e));
                 log.error("API-Football sync failure retry exhausted. alert=api-football-sync-retry-exhausted, key={}, description={}, attempts={}",
                         key, state.description(), attempt, e);
                 return;
@@ -96,8 +103,57 @@ public class ApiFootballSyncFailureRetryScheduler {
 
             log.error("API-Football sync failure retry failed. key={}, description={}, attempt={}/{}",
                     key, state.description(), attempt, state.maxAttempts(), e);
+            syncStatusOfRetryKey(key).ifPresent(status ->
+                    syncStatusService.recordRetryPendingByKey(status.syncKey(), status.displayName(),
+                            "Retry failed and was rescheduled. " + state.description()));
             scheduleNext(key, state);
         }
+    }
+
+    private java.util.Optional<SyncStatusTarget> syncStatusOfRetryKey(String key) {
+        String[] parts = key.split(":");
+        if (parts.length == 0) {
+            return java.util.Optional.empty();
+        }
+        return switch (parts[0]) {
+            case "teams" -> seasonTarget("teams", "Teams", parts, 2);
+            case "standings" -> seasonTarget("standings", "Standings", parts, parts.length - 1);
+            case "fixtures" -> seasonTarget("fixtures", "Fixtures", parts, parts.length - 1);
+            case "fixture-details" -> seasonTarget("fixture-details", "Season Details", parts, 1);
+            case "registered-players" -> seasonTarget("players", "Players", parts, 2);
+            case "injuries" -> seasonTarget("injuries", "Injuries", parts, 2);
+            case "league-seasons" -> parts.length > 1
+                    ? java.util.Optional.of(new SyncStatusTarget("league-seasons:" + parts[1], "League Seasons"))
+                    : java.util.Optional.empty();
+            case "startup" -> startupTarget(parts);
+            default -> java.util.Optional.empty();
+        };
+    }
+
+    private java.util.Optional<SyncStatusTarget> startupTarget(String[] parts) {
+        if (parts.length < 3) {
+            return java.util.Optional.empty();
+        }
+        return switch (parts[1]) {
+            case "fixture-details" -> seasonTarget("fixture-details", "Season Details", parts, 2);
+            case "registered-players" -> seasonTarget("players", "Players", parts, 3);
+            default -> java.util.Optional.empty();
+        };
+    }
+
+    private java.util.Optional<SyncStatusTarget> seasonTarget(String task, String displayName, String[] parts, int seasonIndex) {
+        if (seasonIndex < 0 || seasonIndex >= parts.length) {
+            return java.util.Optional.empty();
+        }
+        try {
+            int season = Integer.parseInt(parts[seasonIndex]);
+            return java.util.Optional.of(new SyncStatusTarget("%s:%d".formatted(task, season), "%s %d".formatted(displayName, season)));
+        } catch (NumberFormatException exception) {
+            return java.util.Optional.empty();
+        }
+    }
+
+    private record SyncStatusTarget(String syncKey, String displayName) {
     }
 
     private static class RetryState {

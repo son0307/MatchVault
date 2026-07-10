@@ -40,6 +40,7 @@ public class ApiFootballFixtureSyncService {
     )
     @Transactional
     public int syncSeasonFixtures(Integer league, Integer season) {
+        apiFootballSyncStatusService.recordAttempt("fixtures", "Fixtures", season);
         int syncedCount = upsertFixtures(apiFootballClient.getFixtures(league, season), false);
         apiFootballSyncStatusService.recordSuccess("fixtures", "Fixtures", season);
         return syncedCount;
@@ -54,6 +55,7 @@ public class ApiFootballFixtureSyncService {
     )
     @Transactional
     public int syncLiveFixtures(Integer league, Integer season) {
+        apiFootballSyncStatusService.recordAttempt("fixtures", "Fixtures", season);
         List<ApiFootballLiveDto.FixtureResponse> liveFixtures = apiFootballClient.getLiveFixtures(league).stream()
                 .filter(response -> matchesSeason(response, season))
                 .toList();

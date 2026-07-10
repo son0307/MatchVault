@@ -53,6 +53,24 @@ export type LeagueSeasonCoverageResponse = {
   seasons: LeagueSeasonCoverage[];
 };
 
+export type SyncStatusState = "NEVER_SYNCED" | "OK" | "STALE" | "FAILED" | "RETRY_PENDING";
+
+export type SyncStatus = {
+  task: string;
+  label: string;
+  lastSyncedAt: string | null;
+  lastAttemptAt: string | null;
+  lastSuccessAt: string | null;
+  lastFailureAt: string | null;
+  failureCount: number | null;
+  lastErrorMessage: string | null;
+  status: SyncStatusState | string | null;
+};
+
+export type SyncStatusResponse = {
+  statuses: SyncStatus[];
+};
+
 export type LeaguePlayerRankings = {
   leagueId: number;
   season: number;
@@ -952,6 +970,17 @@ export async function fetchLeagueSeasons(leagueId = 39): Promise<LeagueSeasonCov
     "시즌 정보를 불러오지 못했습니다.",
     DETAIL_CACHE_TTL_MS,
   );
+}
+
+export async function fetchSyncStatuses(season: number): Promise<SyncStatusResponse> {
+  return fetchJson<SyncStatusResponse>(
+    `/api/v1/sync/statuses?season=${normalizeSeason(season)}`,
+    "Failed to load sync status.",
+  );
+}
+
+export async function requestPublicSync(task: "standings" | "fixtures", season: number): Promise<void> {
+  await postJson(`/api/v1/sync/${task}?league=39&season=${normalizeSeason(season)}`, {});
 }
 
 export async function fetchLeaguePlayerRankings(

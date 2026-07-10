@@ -97,11 +97,13 @@ function LeagueHomeRoute() {
 }
 
 function LeagueStandingsRoute() {
-  return <LeagueStandingsPage season={useLeagueAuthState().season} />;
+  const authState = useLeagueAuthState();
+  return <LeagueStandingsPage currentUser={authState.currentUser} season={authState.season} />;
 }
 
 function LeagueFixturesRoute() {
-  return <LeagueFixturesPage season={useLeagueAuthState().season} />;
+  const authState = useLeagueAuthState();
+  return <LeagueFixturesPage currentUser={authState.currentUser} season={authState.season} />;
 }
 
 function LeaguePlayerStatsRoute() {

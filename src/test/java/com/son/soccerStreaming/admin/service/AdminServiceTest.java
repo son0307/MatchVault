@@ -39,6 +39,8 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.LocalDateTime;
@@ -139,6 +141,41 @@ class AdminServiceTest {
         assertThat(logCaptor.getValue().getTargetType()).isEqualTo("LEAGUE");
         assertThat(logCaptor.getValue().getTargetId()).isEqualTo(39L);
         assertThat(logCaptor.getValue().getDetails()).isEqualTo("league=39");
+    }
+
+    @Test
+    void auditLogsExposeOnlyUsefulRequestParameters() {
+        AppUser admin = adminUser();
+        AdminAuditLog syncLog = AdminAuditLog.of(
+                admin,
+                AdminAuditType.SYNC,
+                "FIXTURE",
+                null,
+                "fixtures sync completed. league=39; season=2025; count=380",
+                "league=39; season=2025",
+                true
+        );
+        AdminAuditLog fixtureLog = AdminAuditLog.of(
+                admin,
+                AdminAuditType.FIXTURE_UPDATE,
+                "FIXTURE",
+                1000L,
+                "Fixture player stats updated: player=10",
+                "shotsTotal: 2 -> 3",
+                true
+        );
+        PageRequest pageable = PageRequest.of(0, 20);
+        when(adminAuditLogRepository.findAllByOrderByCreatedAtDesc(pageable))
+                .thenReturn(new PageImpl<>(List.of(syncLog, fixtureLog), pageable, 2));
+
+        AdminDto.AuditLogListResponse response = adminService.getAuditLogs(0, 20);
+
+        assertThat(response.getLogs()).extracting(AdminDto.AuditLogResponse::getDetails)
+                .containsExactly(
+                        "leagueId=39; season=2025",
+                        "fixtureId=1000; playerId=10"
+                );
+        assertThat(response.getLogs().get(1).getDetails()).doesNotContain("shotsTotal", "2", "3");
     }
 
     @Test

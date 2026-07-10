@@ -5,8 +5,12 @@ import {
   fetchFixtureMeta,
   fetchFixtures,
   fetchStandings,
+  fetchSyncStatuses,
+  requestPublicSync,
+  type CurrentUser,
   type FixtureMeta,
   type FixtureSummary,
+  type SyncStatus,
   type TeamStanding,
 } from "../api";
 import { formatFixtureDateKey, parseKoreaDateTime } from "../dateUtils";
@@ -29,7 +33,7 @@ const fixtureModes: Array<{ label: string; value: FixtureMode }> = [
   { label: "팀별", value: "team" },
 ];
 
-export function LeagueFixturesPage({ season }: { season: number }) {
+export function LeagueFixturesPage({ currentUser, season }: { currentUser: CurrentUser | null; season: number }) {
   const [searchParams, setSearchParams] = useSearchParams();
   const mode = fixtureMode(searchParams.get("mode")) ?? "date";
   const urlSeason = positiveInteger(searchParams.get("season"));
@@ -47,6 +51,9 @@ export function LeagueFixturesPage({ season }: { season: number }) {
   const [teams, setTeams] = useState<FixtureTeamOption[]>([]);
   const selectedTeamId = positiveInteger(searchParams.get("teamId"));
   const [fixtures, setFixtures] = useState<FixtureSummary[]>([]);
+  const [syncStatus, setSyncStatus] = useState<SyncStatus | null>(null);
+  const [syncMessage, setSyncMessage] = useState("");
+  const [syncCooldownUntil, setSyncCooldownUntil] = useState(0);
   const teamPage = Math.max(0, (positiveInteger(searchParams.get("page")) ?? 1) - 1);
   const [isLoading, setIsLoading] = useState(true);
   const [isLoadingTeams, setIsLoadingTeams] = useState(true);
@@ -84,6 +91,7 @@ export function LeagueFixturesPage({ season }: { season: number }) {
     setMetaSeason(null);
     void loadFixtureMeta();
     void loadTeamOptions();
+    void loadSyncStatus(season);
   }, [season]);
 
   useEffect(() => {
@@ -225,6 +233,31 @@ export function LeagueFixturesPage({ season }: { season: number }) {
     }
   }
 
+  async function loadSyncStatus(targetSeason = season) {
+    try {
+      const response = await fetchSyncStatuses(targetSeason);
+      setSyncStatus(response.statuses.find((status) => status.task === "fixtures") ?? null);
+    } catch {
+      setSyncStatus(null);
+    }
+  }
+
+  async function refreshFixtureSync() {
+    if (!currentUser || Date.now() < syncCooldownUntil) {
+      return;
+    }
+    setSyncMessage("");
+    setSyncCooldownUntil(Date.now() + 30_000);
+    try {
+      await requestPublicSync("fixtures", season);
+      setSyncMessage("Latest fixture data was requested.");
+      await Promise.all([loadFixtures(), loadFixtureMeta(), loadSyncStatus(season)]);
+    } catch (error) {
+      setSyncMessage(error instanceof Error ? error.message : "Fixture sync request failed.");
+      await loadSyncStatus(season);
+    }
+  }
+
   function moveWeek(dayDelta: number) {
     updateQuery({ week: addDaysToDateKey(weekStart, dayDelta) });
   }
@@ -254,6 +287,9 @@ export function LeagueFixturesPage({ season }: { season: number }) {
       return next;
     }, { replace });
   }
+
+  const isStale = isSyncStatusStale(syncStatus);
+  const cooldownSeconds = Math.max(0, Math.ceil((syncCooldownUntil - Date.now()) / 1000));
 
   return (
     <section className="league-content fixtures-page">
@@ -332,6 +368,16 @@ export function LeagueFixturesPage({ season }: { season: number }) {
         ) : null}
       </div>
 
+      <div className={`data-freshness ${isStale ? "stale" : ""}`}>
+        <span>{syncFreshnessText(syncStatus, "Fixtures")}</span>
+        {isStale && currentUser ? (
+            <button type="button" onClick={() => void refreshFixtureSync()} disabled={cooldownSeconds > 0}>
+              {cooldownSeconds > 0 ? `${cooldownSeconds}s` : "Refresh data"}
+            </button>
+        ) : null}
+      </div>
+      {syncMessage ? <div className="notice">{syncMessage}</div> : null}
+
       {mode === "team" ? (
         <TeamFixtureHeader
           selectedTeam={selectedTeam}
@@ -373,6 +419,49 @@ export function LeagueFixturesPage({ season }: { season: number }) {
       ) : null}
     </section>
   );
+}
+
+function isSyncStatusStale(status: SyncStatus | null) {
+  if (!status) {
+    return false;
+  }
+  if (status.status === "FAILED" || status.status === "RETRY_PENDING") {
+    return true;
+  }
+  const lastSuccess = lastSuccessfulSyncTime(status);
+  return lastSuccess ? Date.now() - Date.parse(lastSuccess) > 24 * 60 * 60 * 1000 : false;
+}
+
+function syncFreshnessText(status: SyncStatus | null, label: string) {
+  const lastSuccess = lastSuccessfulSyncTime(status);
+  if (!lastSuccess) {
+    return `${label}: no sync timestamp`;
+  }
+  return `${label}: data as of ${formatDateTime(lastSuccess)}`;
+}
+
+function formatDateTime(value: string) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+  return new Intl.DateTimeFormat("ko-KR", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(date);
+}
+
+function lastSuccessfulSyncTime(status: SyncStatus | null) {
+  if (!status) {
+    return null;
+  }
+  if (status.lastSuccessAt) {
+    return status.lastSuccessAt;
+  }
+  return status.status === "OK" || status.status === "STALE" ? status.lastSyncedAt : null;
 }
 
 function TeamFixtureHeader({

@@ -44,6 +44,7 @@ public class ApiFootballFixtureDetailSyncService {
 
     @Transactional
     public FixtureDetailSyncResult syncFixtureDetail(Long fixtureId, boolean applyLiveStandingImpact) {
+        apiFootballSyncStatusService.recordAttempt("fixture-detail", "Fixture Detail");
         FixtureDetailSyncResult result = apiFootballClient.getFixture(fixtureId).stream()
                 .findFirst()
                 .map(response -> syncFixtureDetail(response, applyLiveStandingImpact))
@@ -226,6 +227,7 @@ public class ApiFootballFixtureDetailSyncService {
 
     public int syncSeasonFixtureDetails(Integer season, boolean applyLiveStandingImpact,
                                         SyncProgressReporter progressReporter) {
+        apiFootballSyncStatusService.recordAttempt("fixture-details", "Season Details", season);
         List<Long> fixtureIds = fixtureRepository.findAllBySeasonOrderByFixtureDateAsc(season).stream()
                 .map(Fixture::getFixtureId)
                 .toList();
