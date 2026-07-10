@@ -43,6 +43,7 @@ public class ApiFootballStandingSyncService {
     })
     @Transactional
     public int syncStandings(Integer league, Integer season) {
+        apiFootballSyncStatusService.recordAttempt("standings", "Standings", season);
         List<ApiFootballStandingDto.StandingResponse> responses = apiFootballClient.getStandings(league, season);
         int syncedCount = 0;
 

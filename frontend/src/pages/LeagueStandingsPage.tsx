@@ -3,8 +3,12 @@ import { RefreshCw } from "lucide-react";
 import { Link } from "react-router-dom";
 import {
   fetchStandings,
+  fetchSyncStatuses,
+  requestPublicSync,
+  type CurrentUser,
   type RecentForm,
   type StandingRecord,
+  type SyncStatus,
   type TeamStanding,
 } from "../api";
 import { displayLocalizedName } from "../teamNames";
@@ -18,8 +22,11 @@ const standingModes: Array<{ label: string; value: StandingMode }> = [
   { label: "최근 5경기", value: "recent" },
 ];
 
-export function LeagueStandingsPage({ season }: { season: number }) {
+export function LeagueStandingsPage({ currentUser, season }: { currentUser: CurrentUser | null; season: number }) {
   const [standings, setStandings] = useState<TeamStanding[]>([]);
+  const [syncStatus, setSyncStatus] = useState<SyncStatus | null>(null);
+  const [syncMessage, setSyncMessage] = useState("");
+  const [syncCooldownUntil, setSyncCooldownUntil] = useState(0);
   const [mode, setMode] = useState<StandingMode>("all");
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState("");
@@ -60,9 +67,38 @@ export function LeagueStandingsPage({ season }: { season: number }) {
     }
   }
 
+  async function loadSyncStatus(targetSeason = season) {
+    try {
+      const response = await fetchSyncStatuses(targetSeason);
+      setSyncStatus(response.statuses.find((status) => status.task === "standings") ?? null);
+    } catch {
+      setSyncStatus(null);
+    }
+  }
+
+  async function refreshStandingsSync() {
+    if (!currentUser || Date.now() < syncCooldownUntil) {
+      return;
+    }
+    setSyncMessage("");
+    setSyncCooldownUntil(Date.now() + 30_000);
+    try {
+      await requestPublicSync("standings", season);
+      setSyncMessage("Latest standings data was requested.");
+      await Promise.all([loadStandings(season), loadSyncStatus(season)]);
+    } catch (error) {
+      setSyncMessage(error instanceof Error ? error.message : "Standings sync request failed.");
+      await loadSyncStatus(season);
+    }
+  }
+
   useEffect(() => {
     void loadStandings(season);
+    void loadSyncStatus(season);
   }, [season]);
+
+  const isStale = isSyncStatusStale(syncStatus);
+  const cooldownSeconds = Math.max(0, Math.ceil((syncCooldownUntil - Date.now()) / 1000));
 
   return (
     <section className="league-content">
@@ -92,6 +128,16 @@ export function LeagueStandingsPage({ season }: { season: number }) {
           </button>
         </div>
       </div>
+
+      <div className={`data-freshness ${isStale ? "stale" : ""}`}>
+        <span>{syncFreshnessText(syncStatus, "Standings")}</span>
+        {isStale && currentUser ? (
+          <button type="button" onClick={() => void refreshStandingsSync()} disabled={cooldownSeconds > 0}>
+            {cooldownSeconds > 0 ? `${cooldownSeconds}s` : "Refresh data"}
+          </button>
+        ) : null}
+      </div>
+      {syncMessage ? <div className="notice">{syncMessage}</div> : null}
 
       {errorMessage ? <div className="notice error">{errorMessage}</div> : null}
 
@@ -179,6 +225,49 @@ function ResultChips({ results }: { results: string[] }) {
       ))}
     </div>
   );
+}
+
+function isSyncStatusStale(status: SyncStatus | null) {
+  if (!status) {
+    return false;
+  }
+  if (status.status === "FAILED" || status.status === "RETRY_PENDING") {
+    return true;
+  }
+  const lastSuccess = lastSuccessfulSyncTime(status);
+  return lastSuccess ? Date.now() - Date.parse(lastSuccess) > 24 * 60 * 60 * 1000 : false;
+}
+
+function syncFreshnessText(status: SyncStatus | null, label: string) {
+  const lastSuccess = lastSuccessfulSyncTime(status);
+  if (!lastSuccess) {
+    return `${label}: no sync timestamp`;
+  }
+  return `${label}: data as of ${formatDateTime(lastSuccess)}`;
+}
+
+function lastSuccessfulSyncTime(status: SyncStatus | null) {
+  if (!status) {
+    return null;
+  }
+  if (status.lastSuccessAt) {
+    return status.lastSuccessAt;
+  }
+  return status.status === "OK" || status.status === "STALE" ? status.lastSyncedAt : null;
+}
+
+function formatDateTime(value: string) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+  return new Intl.DateTimeFormat("ko-KR", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(date);
 }
 
 type StandingRow = {

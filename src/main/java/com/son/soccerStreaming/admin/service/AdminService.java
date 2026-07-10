@@ -34,6 +34,7 @@ import com.son.soccerStreaming.global.config.RedisCacheConfig;
 import com.son.soccerStreaming.media.service.MediaUrlService;
 import com.son.soccerStreaming.admin.repository.AdminAuditLogRepository;
 import com.son.soccerStreaming.apifootball.repository.ApiFootballSyncStatusRepository;
+import com.son.soccerStreaming.apifootball.service.ApiFootballSyncStatusService;
 import com.son.soccerStreaming.auth.repository.AppUserRepository;
 import com.son.soccerStreaming.player.repository.PlayerRepository;
 import com.son.soccerStreaming.team.repository.TeamRepository;
@@ -51,9 +52,11 @@ import java.time.OffsetDateTime;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
@@ -107,8 +110,11 @@ public class AdminService {
             "Var", Set.of("Goal cancelled", "Penalty confirmed")
     );
     private static final Pattern SUBSTITUTION_DETAIL_PATTERN = Pattern.compile("Substitution\\s+\\d+");
+    private static final Pattern AUDIT_MESSAGE_PARAMETER_PATTERN = Pattern.compile("\\b(sequence|player|team)=(\\d+)\\b");
+    private static final Set<String> PUBLIC_SYNC_DETAIL_KEYS = Set.of("league", "season", "fixtureId");
 
     private static final List<SyncStatusDefinition> SYNC_STATUS_DEFINITIONS = List.of(
+            new SyncStatusDefinition("api-football", "API-Football"),
             new SyncStatusDefinition("seasons", "Seasons"),
             new SyncStatusDefinition("teams", "Teams"),
             new SyncStatusDefinition("standings", "Standings"),
@@ -132,6 +138,7 @@ public class AdminService {
     private final AdminOverrideService adminOverrideService;
     private final AdminAuditLogRepository adminAuditLogRepository;
     private final ApiFootballSyncStatusRepository apiFootballSyncStatusRepository;
+    private final ApiFootballSyncStatusService apiFootballSyncStatusService;
     private final ApiFootballTeamSyncService apiFootballTeamSyncService;
     private final ApiFootballStandingSyncService apiFootballStandingSyncService;
     private final ApiFootballFixtureSyncService apiFootballFixtureSyncService;
@@ -634,6 +641,7 @@ public class AdminService {
                     .message(message)
                     .build();
         } catch (Exception exception) {
+            recordSyncFailure(task, seasonFromDetails(details), exception);
             String message = task + " sync failed. " + details + ": " + exception.getMessage();
             adminAuditLogRepository.save(AdminAuditLog.of(admin, AdminAuditType.SYNC, targetType, targetId, message, details, false));
             return AdminDto.SyncResponse.builder()
@@ -678,9 +686,17 @@ public class AdminService {
         String syncKey = manualSyncKey(task, details);
         acquireManualSync(syncKey);
         var job = adminSyncJobService.create(adminUserId, task, targetType, targetId, season, details);
+        AdminSyncTaskRunner.SyncTask trackedSyncTask = progress -> {
+            try {
+                return syncTask.run(progress);
+            } catch (Exception exception) {
+                recordSyncFailure(task, season, exception);
+                throw exception;
+            }
+        };
         try {
             adminSyncTaskRunner.run(job.getId(), adminUserId, task, targetType, targetId, details,
-                    syncTask, () -> releaseManualSync(syncKey));
+                    trackedSyncTask, () -> releaseManualSync(syncKey));
         } catch (RuntimeException exception) {
             adminSyncJobService.markFailed(job.getId(), task + " sync could not be queued: " + exception.getMessage());
             releaseManualSync(syncKey);
@@ -1283,10 +1299,94 @@ public class AdminService {
                 .targetType(log.getTargetType())
                 .targetId(log.getTargetId())
                 .message(publicAuditMessage(log))
-                .details(null)
+                .details(publicAuditDetails(log))
                 .success(log.isSuccess())
                 .createdAt(log.getCreatedAt())
                 .build();
+    }
+
+    private String publicAuditDetails(AdminAuditLog log) {
+        Map<String, String> parameters = new LinkedHashMap<>();
+        addAuditTargetParameter(parameters, log.getTargetType(), log.getTargetId());
+
+        if (log.getType() == AdminAuditType.SYNC) {
+            addSyncAuditParameters(parameters, log.getDetails());
+        }
+        if (log.getType() == AdminAuditType.FIXTURE_UPDATE) {
+            addFixtureAuditParameters(parameters, log.getMessage());
+        }
+        if (log.getType() == AdminAuditType.OVERRIDE_CLEAR) {
+            addAllowedDetailParameter(parameters, log.getDetails(), "field", "field");
+        }
+
+        if (parameters.isEmpty()) {
+            return null;
+        }
+        return parameters.entrySet().stream()
+                .map(entry -> entry.getKey() + "=" + entry.getValue())
+                .collect(Collectors.joining("; "));
+    }
+
+    private void addAuditTargetParameter(Map<String, String> parameters, String targetType, Long targetId) {
+        if (targetType == null || targetId == null) {
+            return;
+        }
+        String parameterName = switch (targetType) {
+            case "LEAGUE" -> "leagueId";
+            case "TEAM", "TEAM_LOGO" -> "teamId";
+            case "PLAYER", "PLAYER_PHOTO" -> "playerId";
+            case "FIXTURE" -> "fixtureId";
+            case "VENUE", "VENUE_IMAGE" -> "venueId";
+            case "SYNC_JOB" -> "syncJobId";
+            default -> "targetId";
+        };
+        parameters.put(parameterName, String.valueOf(targetId));
+    }
+
+    private void addSyncAuditParameters(Map<String, String> parameters, String details) {
+        if (details == null || details.isBlank()) {
+            return;
+        }
+        for (String part : details.split(";")) {
+            String[] pair = part.trim().split("=", 2);
+            if (pair.length != 2 || !PUBLIC_SYNC_DETAIL_KEYS.contains(pair[0])) {
+                continue;
+            }
+            String parameterName = "league".equals(pair[0]) ? "leagueId" : pair[0];
+            if (!pair[1].isBlank()) {
+                parameters.put(parameterName, pair[1].trim());
+            }
+        }
+    }
+
+    private void addFixtureAuditParameters(Map<String, String> parameters, String message) {
+        if (message == null || message.isBlank()) {
+            return;
+        }
+        var matcher = AUDIT_MESSAGE_PARAMETER_PATTERN.matcher(message);
+        while (matcher.find()) {
+            String parameterName = switch (matcher.group(1)) {
+                case "sequence" -> "eventSequence";
+                case "player" -> "playerId";
+                case "team" -> "teamId";
+                default -> matcher.group(1);
+            };
+            parameters.put(parameterName, matcher.group(2));
+        }
+    }
+
+    private void addAllowedDetailParameter(Map<String, String> parameters, String details,
+                                           String sourceName, String outputName) {
+        if (details == null || details.isBlank()) {
+            return;
+        }
+        for (String part : details.split(";")) {
+            String[] pair = part.trim().split("=", 2);
+            if (pair.length == 2 && sourceName.equals(pair[0]) && !pair[1].isBlank()) {
+                parameters.put(outputName, pair[1].trim());
+                return;
+            }
+        }
     }
 
     private String publicAuditMessage(AdminAuditLog log) {
@@ -1319,25 +1419,47 @@ public class AdminService {
     }
 
     private AdminDto.SyncStatusItem toSyncStatusItem(SyncStatusDefinition definition, Integer season) {
+        String statusKey = syncStatusKey(definition.task(), season);
+        var status = apiFootballSyncStatusRepository.findById(statusKey).orElse(null);
         return AdminDto.SyncStatusItem.builder()
                 .task(definition.task())
                 .label(definition.label())
-                .lastSyncedAt(latestCompletedSyncTime(definition.task(), season))
+                .lastSyncedAt(status == null ? null : toKoreaOffsetDateTime(status.getLastSyncedAt()))
+                .lastAttemptAt(status == null ? null : toKoreaOffsetDateTime(status.getLastAttemptAt()))
+                .lastSuccessAt(status == null ? null : toKoreaOffsetDateTime(status.getLastSuccessAt()))
+                .lastFailureAt(status == null ? null : toKoreaOffsetDateTime(status.getLastFailureAt()))
+                .failureCount(syncFailureCount(status))
+                .lastErrorMessage(status == null ? null : status.getLastErrorMessage())
+                .status(syncDisplayStatus(status))
                 .build();
     }
 
-    private OffsetDateTime latestCompletedSyncTime(String task, Integer season) {
-        return apiFootballSyncStatusRepository.findById(syncStatusKey(task, season))
-                .map(status -> status.getLastSyncedAt())
-                .map(this::toKoreaOffsetDateTime)
-                .orElse(null);
-    }
-
     private String syncStatusKey(String task, Integer season) {
+        if ("api-football".equals(task)) {
+            return task;
+        }
         if ("seasons".equals(task)) {
             return "league-seasons:39";
         }
         return season == null ? task : "%s:%d".formatted(task, season);
+    }
+
+    private String syncDisplayStatus(com.son.soccerStreaming.apifootball.entity.ApiFootballSyncStatus status) {
+        if (status == null || status.getStatus() == null || status.getStatus().isBlank()) {
+            return "NEVER_SYNCED";
+        }
+        if ("OK".equals(status.getStatus()) && status.getLastSuccessAt() != null
+                && Duration.between(status.getLastSuccessAt(), LocalDateTime.now(KOREA_ZONE)).toHours() >= 24) {
+            return "STALE";
+        }
+        return status.getStatus();
+    }
+
+    private int syncFailureCount(com.son.soccerStreaming.apifootball.entity.ApiFootballSyncStatus status) {
+        if (status == null || status.getFailureCount() == null) {
+            return 0;
+        }
+        return status.getFailureCount();
     }
 
     private void evictFixtureCaches(Long fixtureId) {
@@ -1345,7 +1467,7 @@ public class AdminService {
     }
 
     private OffsetDateTime toKoreaOffsetDateTime(LocalDateTime dateTime) {
-        return dateTime.atZone(KOREA_ZONE).toOffsetDateTime();
+        return dateTime == null ? null : dateTime.atZone(KOREA_ZONE).toOffsetDateTime();
     }
 
     private OffsetDateTime utcToKoreaOffsetDateTime(LocalDateTime dateTime) {
@@ -1355,6 +1477,43 @@ public class AdminService {
     }
 
     private record SyncStatusDefinition(String task, String label) {
+    }
+
+    private void recordSyncFailure(String task, Integer season, Exception exception) {
+        if ("fixture-detail".equals(task)) {
+            apiFootballSyncStatusService.recordFailure("fixture-detail", "Fixture Detail", null, exception);
+            return;
+        }
+        if ("seasons".equals(task)) {
+            apiFootballSyncStatusService.recordFailureByKey("league-seasons:39", "League Seasons", exception);
+            return;
+        }
+        syncDisplayName(task).ifPresent(displayName ->
+                apiFootballSyncStatusService.recordFailure(task, displayName, season, exception));
+    }
+
+    private Optional<String> syncDisplayName(String task) {
+        return SYNC_STATUS_DEFINITIONS.stream()
+                .filter(definition -> definition.task().equals(task))
+                .map(SyncStatusDefinition::label)
+                .findFirst();
+    }
+
+    private Integer seasonFromDetails(String details) {
+        if (details == null) {
+            return null;
+        }
+        for (String part : details.split(";")) {
+            String trimmed = part.trim();
+            if (trimmed.startsWith("season=")) {
+                try {
+                    return Integer.parseInt(trimmed.substring("season=".length()));
+                } catch (NumberFormatException ignored) {
+                    return null;
+                }
+            }
+        }
+        return null;
     }
 
     @FunctionalInterface

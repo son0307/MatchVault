@@ -25,6 +25,10 @@ live:
       max-attempts: ${LIVE_API_FOOTBALL_RETRY_MAX_ATTEMPTS:3}
       initial-delay-ms: ${LIVE_API_FOOTBALL_RETRY_INITIAL_DELAY_MS:500}
       multiplier: ${LIVE_API_FOOTBALL_RETRY_MULTIPLIER:2.0}
+    circuit-breaker:
+      enabled: ${LIVE_API_FOOTBALL_CIRCUIT_BREAKER_ENABLED:true}
+      failure-threshold: ${LIVE_API_FOOTBALL_CIRCUIT_BREAKER_FAILURE_THRESHOLD:5}
+      cooldown-ms: ${LIVE_API_FOOTBALL_CIRCUIT_BREAKER_COOLDOWN_MS:60000}
   sync:
     enabled: ${LIVE_SYNC_ENABLED:false}
     interval-ms: ${LIVE_SYNC_INTERVAL_MS:5000}

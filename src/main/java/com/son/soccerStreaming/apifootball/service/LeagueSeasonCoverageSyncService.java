@@ -23,6 +23,7 @@ public class LeagueSeasonCoverageSyncService {
 
     @Transactional
     public int syncLeagueSeasons(Integer leagueId) {
+        apiFootballSyncStatusService.recordAttempt("league-seasons:%s".formatted(leagueId), "League Seasons");
         List<ApiFootballLeagueDto.LeagueResponse> responses = apiFootballClient.getLeagueSeasons(leagueId);
         LocalDateTime syncedAt = LocalDateTime.now();
         int syncedCount = 0;

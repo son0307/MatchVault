@@ -42,6 +42,7 @@ public class ApiFootballInjurySyncService {
     }
 
     public int syncInjuries(Integer league, Integer season, SyncProgressReporter progressReporter) {
+        apiFootballSyncStatusService.recordAttempt("injuries", "Injuries", season);
         progressReporter.beginPhase("FETCHING_INJURIES", 0, "request", 0);
         progressReporter.checkCancelled();
         List<ApiFootballInjuryDto.InjuryResponse> injuries = Optional.ofNullable(apiFootballClient.getInjuries(league, season))

@@ -529,5 +529,11 @@ public class AdminDto {
         private String task;
         private String label;
         private OffsetDateTime lastSyncedAt;
+        private OffsetDateTime lastAttemptAt;
+        private OffsetDateTime lastSuccessAt;
+        private OffsetDateTime lastFailureAt;
+        private Integer failureCount;
+        private String lastErrorMessage;
+        private String status;
     }
 }

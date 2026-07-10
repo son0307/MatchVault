@@ -29,6 +29,7 @@ import java.util.stream.Collectors;
 public class ApiFootballClient {
 
     private final RestClient apiFootballRestClient;
+    private final ApiFootballCircuitBreaker apiFootballCircuitBreaker;
 
     @Value("${live.api-football.base-url:https://v3.football.api-sports.io}")
     private String baseUrl;
@@ -293,9 +294,13 @@ public class ApiFootballClient {
 
         for (int attempt = 1; attempt <= maxAttempts; attempt++) {
             try {
-                return request.get();
+                apiFootballCircuitBreaker.beforeRequest(operation);
+                T response = request.get();
+                apiFootballCircuitBreaker.recordSuccess();
+                return response;
             } catch (RestClientException e) {
                 if (attempt >= maxAttempts || !isRetryable(e)) {
+                    apiFootballCircuitBreaker.recordFailure(operation, e);
                     throw e;
                 }
 
@@ -310,6 +315,9 @@ public class ApiFootballClient {
     }
 
     private boolean isRetryable(RestClientException e) {
+        if (e instanceof ApiFootballCircuitOpenException) {
+            return false;
+        }
         if (e instanceof RestClientResponseException responseException) {
             HttpStatusCode statusCode = responseException.getStatusCode();
             return statusCode.is5xxServerError() || statusCode.value() == 429;

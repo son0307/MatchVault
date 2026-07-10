@@ -33,6 +33,7 @@ public class ApiFootballTeamSyncService {
 
     @Transactional
     public int syncTeams(Integer league, Integer season) {
+        apiFootballSyncStatusService.recordAttempt("teams", "Teams", season);
         List<ApiFootballTeamDto.TeamResponse> responses = apiFootballClient.getTeams(league, season);
         int syncedCount = 0;
 

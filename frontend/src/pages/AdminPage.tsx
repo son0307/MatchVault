@@ -185,6 +185,12 @@ type SyncStatus = {
   task: string;
   label: string;
   lastSyncedAt: string | null;
+  lastAttemptAt: string | null;
+  lastSuccessAt: string | null;
+  lastFailureAt: string | null;
+  failureCount: number | null;
+  lastErrorMessage: string | null;
+  status: string | null;
 };
 
 type CoverageStatus = "loading" | "ready" | "error";
@@ -1158,6 +1164,7 @@ export function AdminPage({ authState }: AdminPageProps) {
   }
 
   const syncStatusByTask = new Map(syncStatuses.map((status) => [status.task, status]));
+  const apiFootballStatus = syncStatusByTask.get("api-football");
   const activeSyncTasks = new Set(syncJobs.filter((job) => job.active).map((job) => job.task));
   const runningSyncJobs = syncJobs.filter((job) => job.status === "RUNNING" || job.status === "CANCEL_REQUESTED");
   const queuedSyncJobs = syncJobs.filter((job) => job.status === "QUEUED");
@@ -1452,7 +1459,14 @@ export function AdminPage({ authState }: AdminPageProps) {
                   {isSyncing ? <LoaderCircle className="admin-loading-icon" aria-hidden="true" /> : null}
                   {item.label}
                 </button>
-                <span>Last sync: {formatDateTime(status?.lastSyncedAt ?? null)}</span>
+                <span className={`status-pill sync-status-${(status?.status ?? "NEVER_SYNCED").toLowerCase()}`}>
+                  {syncStatusLabel(status?.status)}
+                </span>
+                <span>Last success: {formatDateTime(lastSuccessfulSyncTime(status))}</span>
+                <span>Last attempt: {formatDateTime(status?.lastAttemptAt ?? null)}</span>
+                {status?.lastFailureAt ? <span>Last failure: {formatDateTime(status.lastFailureAt)}</span> : null}
+                {(status?.failureCount ?? 0) > 0 ? <span className="admin-sync-warning">Failures: {status?.failureCount}</span> : null}
+                {status?.lastErrorMessage ? <span className="admin-sync-warning">{status.lastErrorMessage}</span> : null}
                 {cooldownSeconds > 0 ? <span className="admin-sync-warning">{cooldownSeconds}초 후 재요청 가능</span> : null}
                 {!availability.enabled ? <span className="admin-sync-warning">{availability.message}</span> : null}
               </div>
@@ -2396,6 +2410,27 @@ async function loadSyncStatuses(season: number, setSyncStatuses: (statuses: Sync
 
 function syncTaskLabel(task: string) {
   return syncTasks.find((item) => item.task === task)?.label ?? task;
+}
+
+function syncStatusLabel(status?: string | null) {
+  const labels: Record<string, string> = {
+    OK: "정상",
+    STALE: "지연",
+    FAILED: "실패",
+    RETRY_PENDING: "재시도 대기중",
+    NEVER_SYNCED: "기록 없음",
+  };
+  return labels[status ?? "NEVER_SYNCED"] ?? status ?? "기록 없음";
+}
+
+function lastSuccessfulSyncTime(status?: SyncStatus | null) {
+  if (!status) {
+    return null;
+  }
+  if (status.lastSuccessAt) {
+    return status.lastSuccessAt;
+  }
+  return status.status === "OK" || status.status === "STALE" ? status.lastSyncedAt : null;
 }
 
 function syncJobStatusLabel(status: SyncJobStatus) {
