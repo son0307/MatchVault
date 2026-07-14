@@ -365,21 +365,30 @@ function formatDiff(value: number) {
 }
 
 function compareStandingRows(a: StandingRow, b: StandingRow, mode: StandingMode) {
-  if (mode === "all" && a.sourceRank !== b.sourceRank) {
-    if (a.sourceRank <= 0) {
-      return 1;
-    }
-    if (b.sourceRank <= 0) {
-      return -1;
-    }
-    return a.sourceRank - b.sourceRank;
+  const sourceRankDifference = compareSourceRanks(a.sourceRank, b.sourceRank);
+  if (mode === "all" && sourceRankDifference !== 0) {
+    return sourceRankDifference;
   }
   return (
     b.points - a.points ||
     b.goalsDiff - a.goalsDiff ||
     b.goalsFor - a.goalsFor ||
+    sourceRankDifference ||
     String(a.teamName).localeCompare(String(b.teamName))
   );
+}
+
+function compareSourceRanks(a: number, b: number) {
+  if (a === b) {
+    return 0;
+  }
+  if (a <= 0) {
+    return 1;
+  }
+  if (b <= 0) {
+    return -1;
+  }
+  return a - b;
 }
 
 function parseFormResults(form: string | null) {

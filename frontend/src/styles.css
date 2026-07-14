@@ -1856,6 +1856,10 @@ h2 {
   gap: 6px;
 }
 
+.fixture-control-group .round-trigger {
+  padding: 0 12px;
+}
+
 .round-menu {
   position: absolute;
   z-index: 20;
