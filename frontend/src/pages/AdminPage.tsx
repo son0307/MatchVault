@@ -1,5 +1,5 @@
 import { FormEvent, useEffect, useRef, useState } from "react";
-import { LoaderCircle, X } from "lucide-react";
+import { ChevronDown, LoaderCircle, X } from "lucide-react";
 import { Navigate, useSearchParams } from "react-router-dom";
 import {
   clearApiMemoryCache,
@@ -173,6 +173,7 @@ type AuditLog = {
   id: number;
   adminEmail: string | null;
   type: string;
+  syncCategory: string | null;
   targetType: string | null;
   targetId: number | null;
   message: string;
@@ -1447,6 +1448,21 @@ export function AdminPage({ authState }: AdminPageProps) {
         <p className="muted admin-sync-message">
           새로운 시즌은 Teams → Standings 순서로 동기화한 뒤 나머지 동기화를 진행해 주세요.
         </p>
+        <div className={`admin-api-health admin-api-health-${(apiFootballStatus?.status ?? "NEVER_SYNCED").toLowerCase()}`}>
+          <div className="admin-api-health-heading">
+            <strong>API-Football 전체 상태</strong>
+            <span className={`status-pill sync-status-${(apiFootballStatus?.status ?? "NEVER_SYNCED").toLowerCase()}`}>
+              {apiFootballStatusLabel(apiFootballStatus?.status)}
+            </span>
+          </div>
+          <div className="admin-api-health-details">
+            <span>마지막 성공: {formatDateTime(lastSuccessfulSyncTime(apiFootballStatus))}</span>
+            <span>마지막 시도: {formatDateTime(apiFootballStatus?.lastAttemptAt ?? null)}</span>
+            {apiFootballStatus?.lastFailureAt ? <span>마지막 실패: {formatDateTime(apiFootballStatus.lastFailureAt)}</span> : null}
+            {(apiFootballStatus?.failureCount ?? 0) > 0 ? <span>기록된 장애: {apiFootballStatus?.failureCount}회</span> : null}
+          </div>
+          {apiFootballStatus?.lastErrorMessage ? <p className="admin-api-health-error">{apiFootballStatus.lastErrorMessage}</p> : null}
+        </div>
         <div className="admin-sync-actions">
           {syncTasks.map((item) => {
             const status = syncStatusByTask.get(item.task);
@@ -1499,11 +1515,12 @@ export function AdminPage({ authState }: AdminPageProps) {
             onCancel={cancelSyncJob}
           />
           <SyncJobSection
-            title="최근 완료된 작업"
             jobs={completedSyncJobs}
+            title="최근 완료된 작업"
             emptyMessage="최근 완료된 작업이 없습니다."
             cancellingJobId={cancellingJobId}
             onCancel={cancelSyncJob}
+            collapsible
           />
         </div>
         {coverageStatus === "error" ? (
@@ -1550,7 +1567,10 @@ export function AdminPage({ authState }: AdminPageProps) {
         <div className="admin-log-list">
           {logs.map((log) => (
             <article className="admin-log-item" key={log.id}>
-              <span className="status-pill">{log.type}</span>
+              <div className="admin-log-badges">
+                <span className="status-pill">{log.type}</span>
+                {log.syncCategory ? <span className="status-pill admin-log-category">{log.syncCategory}</span> : null}
+              </div>
               <div>
                 <strong>{log.message}</strong>
                 {log.details ? <p className="muted">{log.details}</p> : null}
@@ -1584,16 +1604,17 @@ function SyncJobSection({
   emptyMessage,
   cancellingJobId,
   onCancel,
+  collapsible = false,
 }: {
   title: string;
   jobs: SyncJob[];
   emptyMessage: string;
   cancellingJobId: number | null;
   onCancel: (job: SyncJob) => Promise<void>;
+  collapsible?: boolean;
 }) {
-  return (
-    <section className="admin-sync-job-section">
-      <h4>{title} <span>{jobs.length}</span></h4>
+  const content = (
+    <>
       {jobs.length === 0 ? <p className="muted admin-sync-job-empty">{emptyMessage}</p> : null}
       {jobs.map((job) => (
         <SyncJobCard
@@ -1603,6 +1624,25 @@ function SyncJobSection({
           onCancel={onCancel}
         />
       ))}
+    </>
+  );
+
+  if (collapsible) {
+    return (
+      <details className="admin-sync-job-section admin-sync-job-section-collapsible">
+        <summary>
+          <h4>{title} <span>{jobs.length}</span></h4>
+          <ChevronDown size={18} aria-hidden="true" />
+        </summary>
+        {content}
+      </details>
+    );
+  }
+
+  return (
+    <section className="admin-sync-job-section">
+      <h4>{title} <span>{jobs.length}</span></h4>
+      {content}
     </section>
   );
 }
@@ -2421,6 +2461,14 @@ function syncStatusLabel(status?: string | null) {
     NEVER_SYNCED: "기록 없음",
   };
   return labels[status ?? "NEVER_SYNCED"] ?? status ?? "기록 없음";
+}
+
+function apiFootballStatusLabel(status?: string | null) {
+  if (status === "FAILED") return "전체 API 장애";
+  if (status === "RETRY_PENDING") return "재시도 대기중";
+  if (status === "STALE") return "상태 확인 지연";
+  if (status === "OK") return "정상";
+  return "확인 전";
 }
 
 function lastSuccessfulSyncTime(status?: SyncStatus | null) {

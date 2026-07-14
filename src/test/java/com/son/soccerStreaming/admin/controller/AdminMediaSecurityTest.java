@@ -111,6 +111,22 @@ class AdminMediaSecurityTest {
         verifyNoInteractions(adminMediaService);
     }
 
+    @Test
+    void rejectsNonAdminManualSyncRequests() throws Exception {
+        mockMvc.perform(post("/api/v1/admin/sync/standings")
+                        .with(user("user@example.com").roles("USER"))
+                        .param("league", "39")
+                        .param("season", "2026"))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(post("/api/v1/admin/sync/fixtures")
+                        .with(user("user@example.com").roles("USER"))
+                        .param("league", "39")
+                        .param("season", "2026"))
+                .andExpect(status().isForbidden());
+
+        verifyNoInteractions(adminService);
+    }
+
     private Object keyValue(ILoggingEvent event, String key) {
         return event.getKeyValuePairs().stream()
                 .filter(pair -> pair.key.equals(key))

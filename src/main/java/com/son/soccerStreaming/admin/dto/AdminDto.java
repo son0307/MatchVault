@@ -499,6 +499,7 @@ public class AdminDto {
         private Long id;
         private String adminEmail;
         private String type;
+        private String syncCategory;
         private String targetType;
         private Long targetId;
         private String message;

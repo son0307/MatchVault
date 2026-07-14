@@ -175,6 +175,8 @@ class AdminServiceTest {
                         "leagueId=39; season=2025",
                         "fixtureId=1000; playerId=10"
                 );
+        assertThat(response.getLogs()).extracting(AdminDto.AuditLogResponse::getSyncCategory)
+                .containsExactly("Fixtures", null);
         assertThat(response.getLogs().get(1).getDetails()).doesNotContain("shotsTotal", "2", "3");
     }
 

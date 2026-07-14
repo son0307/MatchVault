@@ -52,6 +52,7 @@ public class ApiFootballCircuitBreaker {
         }
         consecutiveFailures.set(0);
         openUntilEpochMs.set(0L);
+        syncStatusService.recordSuccessByKey(GLOBAL_SYNC_KEY, GLOBAL_DISPLAY_NAME);
     }
 
     public void recordFailure(String operation, Exception exception) {

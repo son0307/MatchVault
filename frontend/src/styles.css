@@ -887,6 +887,37 @@ h2 {
   opacity: 0.55;
 }
 
+.sync-status-failed {
+  background: #fde7e3;
+  color: #9b2418;
+}
+
+.sync-status-retry_pending,
+.sync-status-stale {
+  background: #fff2cc;
+  color: #7a4b00;
+}
+
+.sync-status-never_synced {
+  background: #eef1f4;
+  color: #52606d;
+}
+
+.data-freshness {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 10px;
+  margin: 0 0 12px;
+  color: #66736b;
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.data-freshness.stale {
+  color: #8a5a11;
+}
+
 .standing-row {
   grid-template-columns: 28px 34px minmax(0, 1fr) 64px 48px;
 }
@@ -1309,6 +1340,31 @@ h2 {
   background: #ffffff;
   box-shadow: inset 0 0 0 1px #c8d5c8;
   color: #162018;
+}
+
+.segmented-control .sync-refresh-button {
+  display: grid;
+  width: 40px;
+  height: 40px;
+  place-items: center;
+  border: 1px solid #c8d5c8;
+  padding: 0;
+  background: #ffffff;
+  color: #1f3d2a;
+}
+
+.segmented-control .sync-refresh-button:hover:not(:disabled) {
+  border-color: #1b5e20;
+  background: #eef6ed;
+}
+
+.segmented-control .sync-refresh-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.sync-refresh-icon.spinning {
+  animation: admin-spin 0.8s linear infinite;
 }
 
 .standings-panel {
@@ -4455,7 +4511,8 @@ h2 {
   min-height: 34px;
 }
 
-.admin-media-toast {
+.admin-media-toast,
+.sync-toast {
   position: fixed;
   top: 18px;
   right: 18px;
@@ -4474,18 +4531,21 @@ h2 {
   font-weight: 800;
 }
 
-.admin-media-toast.error {
+.admin-media-toast.error,
+.sync-toast.error {
   border-color: #ef9a9a;
   background: #fff3f3;
   color: #b71c1c;
 }
 
-.admin-media-toast span {
+.admin-media-toast span,
+.sync-toast span {
   min-width: 0;
   overflow-wrap: anywhere;
 }
 
-.admin-media-toast button {
+.admin-media-toast button,
+.sync-toast button {
   display: inline-grid;
   flex: 0 0 auto;
   width: 32px;
@@ -4499,7 +4559,8 @@ h2 {
   cursor: pointer;
 }
 
-.admin-media-toast button:hover {
+.admin-media-toast button:hover,
+.sync-toast button:hover {
   background: rgba(0, 0, 0, 0.06);
 }
 
@@ -4652,6 +4713,59 @@ h2 {
   padding: 14px;
 }
 
+.admin-api-health {
+  display: grid;
+  gap: 8px;
+  margin: 14px 14px 0;
+  border: 1px solid #d8e2d8;
+  border-left: 4px solid #87958a;
+  border-radius: 6px;
+  padding: 12px;
+  background: #f7faf7;
+}
+
+.admin-api-health-ok {
+  border-left-color: #2f7d45;
+  background: #f2f8f3;
+}
+
+.admin-api-health-failed {
+  border-color: #efc4bd;
+  border-left-color: #b63325;
+  background: #fff5f3;
+}
+
+.admin-api-health-retry_pending,
+.admin-api-health-stale {
+  border-color: #ead79d;
+  border-left-color: #a76a0a;
+  background: #fffaeb;
+}
+
+.admin-api-health-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.admin-api-health-details {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px 14px;
+  color: #66736b;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.admin-api-health-error {
+  margin: 0;
+  color: #9b2418;
+  font-size: 0.8rem;
+  font-weight: 800;
+  overflow-wrap: anywhere;
+}
+
 .admin-sync-action {
   display: grid;
   grid-template-rows: 38px auto;
@@ -4772,6 +4886,28 @@ h2 {
   font-size: 0.72rem;
 }
 
+.admin-sync-job-section-collapsible > summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.admin-sync-job-section-collapsible > summary::-webkit-details-marker {
+  display: none;
+}
+
+.admin-sync-job-section-collapsible > summary svg {
+  flex: 0 0 auto;
+  transition: transform 160ms ease;
+}
+
+.admin-sync-job-section-collapsible[open] > summary svg {
+  transform: rotate(180deg);
+}
+
 .admin-sync-job-empty {
   margin: 0;
   padding: 8px 0;
@@ -4888,6 +5024,17 @@ h2 {
   overflow-wrap: anywhere;
 }
 
+.admin-log-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.admin-log-category {
+  background: #e8f2ec;
+  color: #28553a;
+}
+
 .admin-utility-section > summary {
   display: flex;
   align-items: center;
@@ -4917,6 +5064,15 @@ h2 {
   .player-rankings-heading {
     align-items: stretch;
     flex-direction: column;
+  }
+
+  .standings-toolbar .segmented-control button {
+    padding-right: 12px;
+    padding-left: 12px;
+  }
+
+  .standings-toolbar .segmented-control .sync-refresh-button {
+    padding: 0;
   }
 
   .player-ranking-table {

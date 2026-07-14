@@ -4,7 +4,7 @@ import { Link } from "react-router-dom";
 import {
   fetchStandings,
   fetchSyncStatuses,
-  requestPublicSync,
+  requestAdminSync,
   type CurrentUser,
   type RecentForm,
   type StandingRecord,
@@ -12,6 +12,8 @@ import {
   type TeamStanding,
 } from "../api";
 import { displayLocalizedName } from "../teamNames";
+import { SyncToast } from "../components/SyncToast";
+import { useManualSyncCooldown } from "../useManualSyncCooldown";
 
 type StandingMode = "all" | "home" | "away" | "recent";
 
@@ -25,8 +27,9 @@ const standingModes: Array<{ label: string; value: StandingMode }> = [
 export function LeagueStandingsPage({ currentUser, season }: { currentUser: CurrentUser | null; season: number }) {
   const [standings, setStandings] = useState<TeamStanding[]>([]);
   const [syncStatus, setSyncStatus] = useState<SyncStatus | null>(null);
-  const [syncMessage, setSyncMessage] = useState("");
-  const [syncCooldownUntil, setSyncCooldownUntil] = useState(0);
+  const [syncToast, setSyncToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
+  const { cooldownUntil: syncCooldownUntil, cooldownSeconds, startCooldown } = useManualSyncCooldown("standings", season);
+  const [isSyncing, setIsSyncing] = useState(false);
   const [mode, setMode] = useState<StandingMode>("all");
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState("");
@@ -36,8 +39,11 @@ export function LeagueStandingsPage({ currentUser, season }: { currentUser: Curr
     () =>
       standings
         .map((standing) => toStandingRow(standing, mode))
-        .sort(compareStandingRows)
-        .map((row, index) => ({ ...row, displayRank: index + 1 })),
+        .sort((a, b) => compareStandingRows(a, b, mode))
+        .map((row, index) => ({
+          ...row,
+          displayRank: mode === "all" && row.sourceRank > 0 ? row.sourceRank : index + 1,
+        })),
     [standings, mode],
   );
 
@@ -77,18 +83,24 @@ export function LeagueStandingsPage({ currentUser, season }: { currentUser: Curr
   }
 
   async function refreshStandingsSync() {
-    if (!currentUser || Date.now() < syncCooldownUntil) {
+    if (currentUser?.role !== "ADMIN" || isSyncing || Date.now() < syncCooldownUntil) {
       return;
     }
-    setSyncMessage("");
-    setSyncCooldownUntil(Date.now() + 30_000);
+    setSyncToast(null);
+    startCooldown();
+    setIsSyncing(true);
     try {
-      await requestPublicSync("standings", season);
-      setSyncMessage("Latest standings data was requested.");
+      await requestAdminSync("standings", season);
+      setSyncToast({ message: "최신 순위 데이터로 갱신했습니다.", type: "success" });
       await Promise.all([loadStandings(season), loadSyncStatus(season)]);
     } catch (error) {
-      setSyncMessage(error instanceof Error ? error.message : "Standings sync request failed.");
+      setSyncToast({
+        message: error instanceof Error ? error.message : "순위 데이터 갱신 요청에 실패했습니다.",
+        type: "error",
+      });
       await loadSyncStatus(season);
+    } finally {
+      setIsSyncing(false);
     }
   }
 
@@ -98,10 +110,16 @@ export function LeagueStandingsPage({ currentUser, season }: { currentUser: Curr
   }, [season]);
 
   const isStale = isSyncStatusStale(syncStatus);
-  const cooldownSeconds = Math.max(0, Math.ceil((syncCooldownUntil - Date.now()) / 1000));
 
   return (
     <section className="league-content">
+      {syncToast ? (
+        <SyncToast
+          message={syncToast.message}
+          type={syncToast.type}
+          onClose={() => setSyncToast(null)}
+        />
+      ) : null}
       <div className="standings-toolbar">
         <div className="segmented-control" aria-label="순위 범위">
           {standingModes.map((item) => (
@@ -114,31 +132,24 @@ export function LeagueStandingsPage({ currentUser, season }: { currentUser: Curr
               {item.label}
             </button>
           ))}
-        </div>
-
-        <div className="toolbar" aria-label="시즌과 새로고침">
-          <button
-            className="icon-button"
-            type="button"
-            onClick={() => void loadStandings()}
-            aria-label="새로고침"
-            title="새로고침"
-          >
-            <RefreshCw size={18} aria-hidden="true" />
-          </button>
+          {currentUser?.role === "ADMIN" ? (
+            <button
+              className="sync-refresh-button"
+              type="button"
+              onClick={() => void refreshStandingsSync()}
+              disabled={isSyncing || cooldownSeconds > 0}
+              aria-label={cooldownSeconds > 0 ? `${cooldownSeconds}초 후 데이터 갱신 가능` : "순위 데이터 갱신"}
+              title={cooldownSeconds > 0 ? `${cooldownSeconds}초 후 다시 요청할 수 있습니다.` : "순위 데이터 갱신"}
+            >
+              <RefreshCw className={`sync-refresh-icon${isSyncing ? " spinning" : ""}`} size={18} aria-hidden="true" />
+            </button>
+          ) : null}
         </div>
       </div>
 
       <div className={`data-freshness ${isStale ? "stale" : ""}`}>
-        <span>{syncFreshnessText(syncStatus, "Standings")}</span>
-        {isStale && currentUser ? (
-          <button type="button" onClick={() => void refreshStandingsSync()} disabled={cooldownSeconds > 0}>
-            {cooldownSeconds > 0 ? `${cooldownSeconds}s` : "Refresh data"}
-          </button>
-        ) : null}
+        <span>{syncFreshnessText(syncStatus)}</span>
       </div>
-      {syncMessage ? <div className="notice">{syncMessage}</div> : null}
-
       {errorMessage ? <div className="notice error">{errorMessage}</div> : null}
 
       <article className="panel standings-panel">
@@ -238,12 +249,12 @@ function isSyncStatusStale(status: SyncStatus | null) {
   return lastSuccess ? Date.now() - Date.parse(lastSuccess) > 24 * 60 * 60 * 1000 : false;
 }
 
-function syncFreshnessText(status: SyncStatus | null, label: string) {
+function syncFreshnessText(status: SyncStatus | null) {
   const lastSuccess = lastSuccessfulSyncTime(status);
   if (!lastSuccess) {
-    return `${label}: no sync timestamp`;
+    return "최근 업데이트 시간: 확인할 수 없음";
   }
-  return `${label}: data as of ${formatDateTime(lastSuccess)}`;
+  return `최근 업데이트 시간: ${formatDateTime(lastSuccess)}`;
 }
 
 function lastSuccessfulSyncTime(status: SyncStatus | null) {
@@ -272,6 +283,7 @@ function formatDateTime(value: string) {
 
 type StandingRow = {
   teamId: number;
+  sourceRank: number;
   displayRank: number;
   teamName: string;
   logo: string | null;
@@ -302,6 +314,7 @@ function toStandingRow(standing: TeamStanding, mode: StandingMode): StandingRow 
 
   return {
     teamId: standing.team?.id ?? standing.rank ?? 0,
+    sourceRank: standing.rank ?? 0,
     displayRank: standing.rank ?? 0,
     teamName: displayLocalizedName(standing.team?.nameKo, standing.team?.name),
     logo: standing.team?.logo ?? null,
@@ -351,7 +364,16 @@ function formatDiff(value: number) {
   return value > 0 ? `+${value}` : String(value);
 }
 
-function compareStandingRows(a: StandingRow, b: StandingRow) {
+function compareStandingRows(a: StandingRow, b: StandingRow, mode: StandingMode) {
+  if (mode === "all" && a.sourceRank !== b.sourceRank) {
+    if (a.sourceRank <= 0) {
+      return 1;
+    }
+    if (b.sourceRank <= 0) {
+      return -1;
+    }
+    return a.sourceRank - b.sourceRank;
+  }
   return (
     b.points - a.points ||
     b.goalsDiff - a.goalsDiff ||

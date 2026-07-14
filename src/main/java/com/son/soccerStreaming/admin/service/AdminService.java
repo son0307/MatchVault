@@ -112,6 +112,16 @@ public class AdminService {
     private static final Pattern SUBSTITUTION_DETAIL_PATTERN = Pattern.compile("Substitution\\s+\\d+");
     private static final Pattern AUDIT_MESSAGE_PARAMETER_PATTERN = Pattern.compile("\\b(sequence|player|team)=(\\d+)\\b");
     private static final Set<String> PUBLIC_SYNC_DETAIL_KEYS = Set.of("league", "season", "fixtureId");
+    private static final Map<String, String> SYNC_CATEGORY_LABELS = Map.of(
+            "seasons", "Seasons",
+            "teams", "Teams",
+            "standings", "Standings",
+            "fixtures", "Fixtures",
+            "fixture-details", "Season Details",
+            "fixture-detail", "Fixture Detail",
+            "players", "Players",
+            "injuries", "Injuries"
+    );
 
     private static final List<SyncStatusDefinition> SYNC_STATUS_DEFINITIONS = List.of(
             new SyncStatusDefinition("api-football", "API-Football"),
@@ -1296,6 +1306,7 @@ public class AdminService {
                 .id(log.getId())
                 .adminEmail(log.getAdminUser() != null ? log.getAdminUser().getEmail() : null)
                 .type(log.getType().name())
+                .syncCategory(syncCategory(log))
                 .targetType(log.getTargetType())
                 .targetId(log.getTargetId())
                 .message(publicAuditMessage(log))
@@ -1303,6 +1314,18 @@ public class AdminService {
                 .success(log.isSuccess())
                 .createdAt(log.getCreatedAt())
                 .build();
+    }
+
+    private String syncCategory(AdminAuditLog log) {
+        if (log.getType() != AdminAuditType.SYNC || log.getMessage() == null) {
+            return null;
+        }
+        String message = log.getMessage().toLowerCase();
+        return SYNC_CATEGORY_LABELS.entrySet().stream()
+                .filter(entry -> message.startsWith(entry.getKey() + " sync"))
+                .map(Map.Entry::getValue)
+                .findFirst()
+                .orElse(null);
     }
 
     private String publicAuditDetails(AdminAuditLog log) {

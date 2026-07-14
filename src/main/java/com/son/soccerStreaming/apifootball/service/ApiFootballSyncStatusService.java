@@ -4,6 +4,7 @@ import com.son.soccerStreaming.apifootball.entity.ApiFootballSyncStatus;
 import com.son.soccerStreaming.apifootball.repository.ApiFootballSyncStatusRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
@@ -44,6 +45,14 @@ public class ApiFootballSyncStatusService {
         apiFootballSyncStatusRepository.save(status);
     }
 
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void recordSuccessByKey(String syncKey, String displayName) {
+        LocalDateTime now = LocalDateTime.now(KOREA_ZONE);
+        ApiFootballSyncStatus status = statusByKey(syncKey, displayName, now);
+        status.recordSuccess(displayName, now);
+        apiFootballSyncStatusRepository.save(status);
+    }
+
     @Transactional
     public void recordFailure(String syncKey, String displayName, Integer season, Exception exception) {
         LocalDateTime now = LocalDateTime.now(KOREA_ZONE);
@@ -52,7 +61,7 @@ public class ApiFootballSyncStatusService {
         apiFootballSyncStatusRepository.save(status);
     }
 
-    @Transactional
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void recordFailureByKey(String syncKey, String displayName, Exception exception) {
         LocalDateTime now = LocalDateTime.now(KOREA_ZONE);
         ApiFootballSyncStatus status = statusByKey(syncKey, displayName, now);

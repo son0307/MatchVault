@@ -979,8 +979,14 @@ export async function fetchSyncStatuses(season: number): Promise<SyncStatusRespo
   );
 }
 
-export async function requestPublicSync(task: "standings" | "fixtures", season: number): Promise<void> {
-  await postJson(`/api/v1/sync/${task}?league=39&season=${normalizeSeason(season)}`, {});
+export async function requestAdminSync(task: "standings" | "fixtures", season: number): Promise<void> {
+  const response = await postJson(
+    `/api/v1/admin/sync/${task}?league=39&season=${normalizeSeason(season)}`,
+    {},
+  ) as { success?: boolean; message?: string };
+  if (!response.success) {
+    throw new Error(response.message || "데이터 동기화에 실패했습니다.");
+  }
 }
 
 export async function fetchLeaguePlayerRankings(

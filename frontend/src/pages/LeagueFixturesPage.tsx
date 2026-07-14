@@ -1,12 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ChevronDown, ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronDown, ChevronLeft, ChevronRight, RefreshCw } from "lucide-react";
 import { Link, useSearchParams } from "react-router-dom";
 import {
   fetchFixtureMeta,
   fetchFixtures,
   fetchStandings,
   fetchSyncStatuses,
-  requestPublicSync,
+  requestAdminSync,
   type CurrentUser,
   type FixtureMeta,
   type FixtureSummary,
@@ -15,6 +15,8 @@ import {
 } from "../api";
 import { formatFixtureDateKey, parseKoreaDateTime } from "../dateUtils";
 import { displayLocalizedName } from "../teamNames";
+import { SyncToast } from "../components/SyncToast";
+import { useManualSyncCooldown } from "../useManualSyncCooldown";
 
 const TEAM_PAGE_SIZE = 10;
 const TEAM_FETCH_SIZE = 100;
@@ -52,8 +54,9 @@ export function LeagueFixturesPage({ currentUser, season }: { currentUser: Curre
   const selectedTeamId = positiveInteger(searchParams.get("teamId"));
   const [fixtures, setFixtures] = useState<FixtureSummary[]>([]);
   const [syncStatus, setSyncStatus] = useState<SyncStatus | null>(null);
-  const [syncMessage, setSyncMessage] = useState("");
-  const [syncCooldownUntil, setSyncCooldownUntil] = useState(0);
+  const [syncToast, setSyncToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
+  const { cooldownUntil: syncCooldownUntil, cooldownSeconds, startCooldown } = useManualSyncCooldown("fixtures", season);
+  const [isSyncing, setIsSyncing] = useState(false);
   const teamPage = Math.max(0, (positiveInteger(searchParams.get("page")) ?? 1) - 1);
   const [isLoading, setIsLoading] = useState(true);
   const [isLoadingTeams, setIsLoadingTeams] = useState(true);
@@ -243,18 +246,24 @@ export function LeagueFixturesPage({ currentUser, season }: { currentUser: Curre
   }
 
   async function refreshFixtureSync() {
-    if (!currentUser || Date.now() < syncCooldownUntil) {
+    if (currentUser?.role !== "ADMIN" || isSyncing || Date.now() < syncCooldownUntil) {
       return;
     }
-    setSyncMessage("");
-    setSyncCooldownUntil(Date.now() + 30_000);
+    setSyncToast(null);
+    startCooldown();
+    setIsSyncing(true);
     try {
-      await requestPublicSync("fixtures", season);
-      setSyncMessage("Latest fixture data was requested.");
+      await requestAdminSync("fixtures", season);
+      setSyncToast({ message: "최신 경기 데이터로 갱신했습니다.", type: "success" });
       await Promise.all([loadFixtures(), loadFixtureMeta(), loadSyncStatus(season)]);
     } catch (error) {
-      setSyncMessage(error instanceof Error ? error.message : "Fixture sync request failed.");
+      setSyncToast({
+        message: error instanceof Error ? error.message : "경기 데이터 갱신 요청에 실패했습니다.",
+        type: "error",
+      });
       await loadSyncStatus(season);
+    } finally {
+      setIsSyncing(false);
     }
   }
 
@@ -289,10 +298,16 @@ export function LeagueFixturesPage({ currentUser, season }: { currentUser: Curre
   }
 
   const isStale = isSyncStatusStale(syncStatus);
-  const cooldownSeconds = Math.max(0, Math.ceil((syncCooldownUntil - Date.now()) / 1000));
 
   return (
     <section className="league-content fixtures-page">
+      {syncToast ? (
+        <SyncToast
+          message={syncToast.message}
+          type={syncToast.type}
+          onClose={() => setSyncToast(null)}
+        />
+      ) : null}
       <div className="fixtures-toolbar">
         <div className="segmented-control" aria-label="경기 조회 방식">
           {fixtureModes.map((item) => (
@@ -305,6 +320,18 @@ export function LeagueFixturesPage({ currentUser, season }: { currentUser: Curre
               {item.label}
             </button>
           ))}
+          {currentUser?.role === "ADMIN" ? (
+            <button
+              className="sync-refresh-button"
+              type="button"
+              onClick={() => void refreshFixtureSync()}
+              disabled={isSyncing || cooldownSeconds > 0}
+              aria-label={cooldownSeconds > 0 ? `${cooldownSeconds}초 후 데이터 갱신 가능` : "경기 데이터 갱신"}
+              title={cooldownSeconds > 0 ? `${cooldownSeconds}초 후 다시 요청할 수 있습니다.` : "경기 데이터 갱신"}
+            >
+              <RefreshCw className={`sync-refresh-icon${isSyncing ? " spinning" : ""}`} size={18} aria-hidden="true" />
+            </button>
+          ) : null}
         </div>
 
         {mode === "date" ? (
@@ -369,15 +396,8 @@ export function LeagueFixturesPage({ currentUser, season }: { currentUser: Curre
       </div>
 
       <div className={`data-freshness ${isStale ? "stale" : ""}`}>
-        <span>{syncFreshnessText(syncStatus, "Fixtures")}</span>
-        {isStale && currentUser ? (
-            <button type="button" onClick={() => void refreshFixtureSync()} disabled={cooldownSeconds > 0}>
-              {cooldownSeconds > 0 ? `${cooldownSeconds}s` : "Refresh data"}
-            </button>
-        ) : null}
+        <span>{syncFreshnessText(syncStatus)}</span>
       </div>
-      {syncMessage ? <div className="notice">{syncMessage}</div> : null}
-
       {mode === "team" ? (
         <TeamFixtureHeader
           selectedTeam={selectedTeam}
@@ -432,12 +452,12 @@ function isSyncStatusStale(status: SyncStatus | null) {
   return lastSuccess ? Date.now() - Date.parse(lastSuccess) > 24 * 60 * 60 * 1000 : false;
 }
 
-function syncFreshnessText(status: SyncStatus | null, label: string) {
+function syncFreshnessText(status: SyncStatus | null) {
   const lastSuccess = lastSuccessfulSyncTime(status);
   if (!lastSuccess) {
-    return `${label}: no sync timestamp`;
+    return "최근 업데이트 시간: 확인할 수 없음";
   }
-  return `${label}: data as of ${formatDateTime(lastSuccess)}`;
+  return `최근 업데이트 시간: ${formatDateTime(lastSuccess)}`;
 }
 
 function formatDateTime(value: string) {
