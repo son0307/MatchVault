@@ -14,8 +14,6 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 
 import java.time.Instant;
-import java.util.Objects;
-
 @Entity
 @Table(name = "news_article", indexes = {
         @Index(name = "idx_news_article_published_at", columnList = "published_at")
@@ -72,15 +70,22 @@ public class NewsArticle {
 
     public void updateMetadata(String originalUrl, String originalTitle, String publisherName,
                                String publisherDomain, Instant publishedAt, Instant seenAt) {
+        boolean titleChanged = !normalizeTitleForComparison(this.originalTitle)
+                .equals(normalizeTitleForComparison(originalTitle));
         this.originalUrl = originalUrl;
+        this.originalTitle = originalTitle;
         this.publisherName = publisherName;
         this.publisherDomain = publisherDomain;
         this.publishedAt = publishedAt;
         this.lastSeenAt = seenAt;
-        if (!Objects.equals(this.originalTitle, originalTitle)) {
-            this.originalTitle = originalTitle;
+        if (titleChanged) {
             this.translatedTitle = null;
+            this.autoTranslationAttempted = false;
         }
+    }
+
+    private String normalizeTitleForComparison(String title) {
+        return title == null ? "" : title.strip().replaceAll("[\\s\\u00A0]+", " ");
     }
 
     public void markTranslated(String translatedTitle) {

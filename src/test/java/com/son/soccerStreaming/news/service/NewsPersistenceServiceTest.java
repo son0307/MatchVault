@@ -71,6 +71,70 @@ class NewsPersistenceServiceTest {
     }
 
     @Test
+    void preservesTranslationWhenRecollectedTitleOnlyDiffersByWhitespace() {
+        Team team = Team.builder().teamId(1L).name("Arsenal").build();
+        NewsArticle existing = NewsArticle.builder()
+                .id(7L)
+                .urlHash("hash")
+                .originalUrl("https://bbc.com/sport/football/articles/shared")
+                .originalTitle("Arsenal complete major signing")
+                .translatedTitle("아스널, 대형 영입 완료")
+                .autoTranslationAttempted(true)
+                .publisherName("BBC Sport")
+                .publisherDomain("bbc.com")
+                .build();
+        var item = new SerpApiNewsClient.SearchArticle(
+                "  Arsenal   complete\u00a0major signing  ",
+                existing.getOriginalUrl(),
+                "BBC Sport",
+                Instant.parse("2026-07-14T01:00:00Z")
+        );
+        when(teamRepository.findByTeamId(1L)).thenReturn(Optional.of(team));
+        when(articleRepository.findByUrlHash(any())).thenReturn(Optional.of(existing));
+        when(articleRepository.save(existing)).thenReturn(existing);
+        when(serpApiNewsClient.publisherDomain(any())).thenReturn("bbc.com");
+        when(relationRepository.findByTeamAndArticle(any(), any())).thenReturn(Optional.empty());
+
+        service().saveTeamArticles(1L, List.of(item), Instant.now());
+
+        assertThat(existing.getOriginalTitle()).isEqualTo(item.title());
+        assertThat(existing.getTranslatedTitle()).isEqualTo("아스널, 대형 영입 완료");
+        assertThat(existing.getAutoTranslationAttempted()).isTrue();
+    }
+
+    @Test
+    void queuesAutomaticRetranslationWhenRecollectedTitleMeaningfullyChanges() {
+        Team team = Team.builder().teamId(1L).name("Arsenal").build();
+        NewsArticle existing = NewsArticle.builder()
+                .id(7L)
+                .urlHash("hash")
+                .originalUrl("https://bbc.com/sport/football/articles/shared")
+                .originalTitle("Arsenal agree deal in principle")
+                .translatedTitle("아스널, 원칙적 합의")
+                .autoTranslationAttempted(true)
+                .publisherName("BBC Sport")
+                .publisherDomain("bbc.com")
+                .build();
+        var item = new SerpApiNewsClient.SearchArticle(
+                "Arsenal complete the signing",
+                existing.getOriginalUrl(),
+                "BBC Sport",
+                Instant.parse("2026-07-14T01:00:00Z")
+        );
+        when(teamRepository.findByTeamId(1L)).thenReturn(Optional.of(team));
+        when(articleRepository.findByUrlHash(any())).thenReturn(Optional.of(existing));
+        when(articleRepository.save(existing)).thenReturn(existing);
+        when(serpApiNewsClient.publisherDomain(any())).thenReturn("bbc.com");
+        when(relationRepository.findByTeamAndArticle(any(), any())).thenReturn(Optional.empty());
+
+        service().saveTeamArticles(1L, List.of(item), Instant.now());
+
+        assertThat(existing.getOriginalTitle()).isEqualTo(item.title());
+        assertThat(existing.getTranslatedTitle()).isNull();
+        assertThat(existing.getAutoTranslationAttempted()).isFalse();
+    }
+
+    @Test
     void storesArticlesInSerpApiResultOrder() {
         Team team = Team.builder().teamId(1L).name("Arsenal").build();
         var first = new SerpApiNewsClient.SearchArticle(
@@ -120,5 +184,10 @@ class NewsPersistenceServiceTest {
         ArgumentCaptor<TeamNewsCollectionState> captor = ArgumentCaptor.forClass(TeamNewsCollectionState.class);
         verify(collectionStateRepository).save(captor.capture());
         assertThat(captor.getValue().getLastCollectedAt()).isEqualTo(collectedAt);
+    }
+
+    private NewsPersistenceService service() {
+        return new NewsPersistenceService(
+                teamRepository, articleRepository, relationRepository, collectionStateRepository, serpApiNewsClient);
     }
 }
