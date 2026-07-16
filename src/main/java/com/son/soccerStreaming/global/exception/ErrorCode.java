@@ -32,9 +32,12 @@ public enum ErrorCode {
     USER_NOT_FOUND(HttpStatus.NOT_FOUND, "사용자를 찾을 수 없습니다."),
     ADMIN_SYNC_JOB_NOT_FOUND(HttpStatus.NOT_FOUND, "해당 관리자 동기화 작업을 찾을 수 없습니다."),
     ADMIN_MEDIA_OBJECT_NOT_FOUND(HttpStatus.NOT_FOUND, "업로드된 이미지 객체를 찾을 수 없습니다."),
+    NEWS_ARTICLE_NOT_FOUND(HttpStatus.NOT_FOUND, "해당 팀의 뉴스 기사를 찾을 수 없습니다."),
 
     // 503 SERVICE_UNAVAILABLE
     ADMIN_MEDIA_STORAGE_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "이미지 저장소를 사용할 수 없습니다."),
+    NEWS_REFRESH_FAILED(HttpStatus.BAD_GATEWAY, "뉴스를 새로고침하지 못했습니다. 잠시 후 다시 시도해 주세요."),
+    NEWS_TRANSLATION_FAILED(HttpStatus.BAD_GATEWAY, "뉴스 제목을 번역하지 못했습니다. 잠시 후 다시 시도해 주세요."),
 
     // 500 INTERNAL_SERVER_ERROR
     INTERNAL_SERVER_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "예기치 못한 서버 오류가 발생했습니다."),

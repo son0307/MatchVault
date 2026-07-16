@@ -16,6 +16,30 @@ app:
     team-player-rankings-ttl: ${TEAM_PLAYER_RANKINGS_CACHE_TTL:10m}
     favorite-card-ttl: ${FAVORITE_CARD_CACHE_TTL:30s}
 
+news:
+  serp-api:
+    base-url: ${SERPAPI_BASE_URL:https://serpapi.com}
+    api-key: ${SERPAPI_API_KEY:}
+    lookback-days: ${NEWS_LOOKBACK_DAYS:7}
+    max-articles-per-team: ${NEWS_MAX_ARTICLES_PER_TEAM:20}
+    search-sites:
+      - bbc.com/sport/football
+      - skysports.com/football
+      - theguardian.com/football
+      - nytimes.com/athletic
+      - goal.com
+      - telegraph.co.uk/football
+  translation:
+    base-url: ${OPENAI_BASE_URL:https://api.openai.com}
+    api-key: ${OPENAI_API_KEY:}
+    model: ${OPENAI_NEWS_TRANSLATION_MODEL:gpt-5.6-luna}
+    batch-size: ${NEWS_TRANSLATION_BATCH_SIZE:50}
+  sync:
+    enabled: ${NEWS_SYNC_ENABLED:false}
+    cron: ${NEWS_SYNC_CRON:0 0 6 * * *}
+    zone: ${NEWS_SYNC_ZONE:Asia/Seoul}
+    retention-days: ${NEWS_RETENTION_DAYS:90}
+
 live:
   api-football:
     base-url: ${LIVE_API_FOOTBALL_BASE_URL:https://v3.football.api-sports.io}
