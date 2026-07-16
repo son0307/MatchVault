@@ -1,21 +1,26 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { Dispatch, SetStateAction } from "react";
-import { CalendarDays, Clock, Goal, Pencil, Star, Users } from "lucide-react";
+import { CalendarDays, Clock, ExternalLink, Goal, Languages, Newspaper, Pencil, RefreshCw, Star, Users } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useParams, useSearchParams } from "react-router-dom";
 import {
   ApiError,
   addFavoriteTeam,
   fetchFavoriteDashboard,
   fetchFixtures,
   fetchTeamDetails,
+  fetchTeamNews,
   fetchTeamPlayerRankings,
   fetchTeamPlayers,
   removeFavoriteTeam,
+  refreshTeamNews,
+  translateTeamNewsArticle,
   type CurrentUser,
   type FixtureSummary,
   type PlayerSummary,
   type TeamDetails,
+  type TeamNewsResponse,
+  type TeamNewsRefreshResult,
   type TeamPlayerRanking,
 } from "../api";
 import type { AuthStatus } from "../App";
@@ -33,8 +38,13 @@ const TEAM_FIXTURE_PAGE_SIZE = 10;
 
 export function TeamDetailPage({ authStatus, currentUser, season }: { authStatus: AuthStatus; currentUser: CurrentUser | null; season: number }) {
   const { teamId } = useParams();
+  const [searchParams] = useSearchParams();
   const numericTeamId = Number(teamId);
+  const activeTab = searchParams.get("tab") === "news" ? "news" : "info";
   const loadRequestId = useRef(0);
+  const newsRequestId = useRef(0);
+  const activeNewsTeamId = useRef(numericTeamId);
+  activeNewsTeamId.current = numericTeamId;
   const [teamState, setTeamState] = useState<LoadState<TeamDetails>>({
     data: null,
     error: "",
@@ -55,10 +65,26 @@ export function TeamDetailPage({ authStatus, currentUser, season }: { authStatus
     error: "",
     isLoading: true,
   });
+  const [newsState, setNewsState] = useState<LoadState<TeamNewsResponse>>({
+    data: null,
+    error: "",
+    isLoading: false,
+  });
+  const [newsLanguage, setNewsLanguage] = useState<"ko" | "en">("ko");
+  const [isNewsRefreshing, setIsNewsRefreshing] = useState(false);
+  const [newsRefreshMessage, setNewsRefreshMessage] = useState("");
+  const [newsRefreshError, setNewsRefreshError] = useState("");
+  const [translatingArticleIds, setTranslatingArticleIds] = useState<Set<number>>(() => new Set());
+  const [newsTranslationErrors, setNewsTranslationErrors] = useState<Record<number, string>>({});
   const [fixturePage, setFixturePage] = useState(0);
   const [isFavorite, setIsFavorite] = useState(false);
   const [isFavoriteLoading, setIsFavoriteLoading] = useState(false);
   const [favoriteError, setFavoriteError] = useState("");
+
+  useEffect(() => {
+    setTranslatingArticleIds(new Set());
+    setNewsTranslationErrors({});
+  }, [numericTeamId]);
 
   useEffect(() => {
     if (!Number.isFinite(numericTeamId) || numericTeamId <= 0) {
@@ -149,6 +175,51 @@ export function TeamDetailPage({ authStatus, currentUser, season }: { authStatus
       isCurrent = false;
     };
   }, [numericTeamId, season]);
+
+  useEffect(() => {
+    setNewsLanguage("ko");
+    setNewsState({ data: null, error: "", isLoading: false });
+    setIsNewsRefreshing(false);
+    setNewsRefreshMessage("");
+    setNewsRefreshError("");
+    newsRequestId.current += 1;
+  }, [numericTeamId]);
+
+  useEffect(() => {
+    if (activeTab !== "news") {
+      newsRequestId.current += 1;
+      return;
+    }
+    if (!Number.isFinite(numericTeamId) || numericTeamId <= 0) {
+      setNewsState({ data: null, error: "올바른 팀 ID가 아닙니다.", isLoading: false });
+      return;
+    }
+
+    const requestId = newsRequestId.current + 1;
+    newsRequestId.current = requestId;
+    let isCurrent = true;
+    setNewsState({ data: null, error: "", isLoading: true });
+
+    fetchTeamNews(numericTeamId)
+      .then((articles) => {
+        if (isCurrent && newsRequestId.current === requestId) {
+          setNewsState({ data: articles, error: "", isLoading: false });
+        }
+      })
+      .catch((error) => {
+        if (isCurrent && newsRequestId.current === requestId) {
+          setNewsState({
+            data: null,
+            error: error instanceof Error ? error.message : "팀 뉴스를 불러오지 못했습니다.",
+            isLoading: false,
+          });
+        }
+      });
+
+    return () => {
+      isCurrent = false;
+    };
+  }, [activeTab, numericTeamId]);
 
   useEffect(() => {
     if (!Number.isFinite(numericTeamId) || numericTeamId <= 0) {
@@ -346,6 +417,108 @@ export function TeamDetailPage({ authStatus, currentUser, season }: { authStatus
       });
   }
 
+  function retryNews() {
+    if (!Number.isFinite(numericTeamId) || numericTeamId <= 0) {
+      return;
+    }
+
+    const requestId = newsRequestId.current + 1;
+    newsRequestId.current = requestId;
+    setNewsState({ data: null, error: "", isLoading: true });
+    fetchTeamNews(numericTeamId)
+      .then((articles) => {
+        if (newsRequestId.current === requestId) {
+          setNewsState({ data: articles, error: "", isLoading: false });
+        }
+      })
+      .catch((error) => {
+        if (newsRequestId.current === requestId) {
+          setNewsState({
+            data: null,
+            error: error instanceof Error ? error.message : "팀 뉴스를 불러오지 못했습니다.",
+            isLoading: false,
+          });
+        }
+      });
+  }
+
+  async function refreshNewsFromProviders() {
+    if (!Number.isFinite(numericTeamId) || numericTeamId <= 0 || isNewsRefreshing) {
+      return;
+    }
+
+    const requestId = newsRequestId.current + 1;
+    newsRequestId.current = requestId;
+    setIsNewsRefreshing(true);
+    setNewsRefreshMessage("");
+    setNewsRefreshError("");
+    try {
+      const result = await refreshTeamNews(numericTeamId);
+      if (newsRequestId.current !== requestId) {
+        return;
+      }
+      const articles = await fetchTeamNews(numericTeamId);
+      if (newsRequestId.current === requestId) {
+        setNewsState({ data: articles, error: "", isLoading: false });
+        setNewsRefreshMessage(newsRefreshResultMessage(result));
+      }
+    } catch (error) {
+      if (newsRequestId.current === requestId) {
+        setNewsRefreshError(error instanceof Error ? error.message : "뉴스 새로고침에 실패했습니다.");
+      }
+    } finally {
+      if (newsRequestId.current === requestId) {
+        setIsNewsRefreshing(false);
+      }
+    }
+  }
+
+  async function translateNewsArticle(articleId: number) {
+    if (!Number.isFinite(numericTeamId) || numericTeamId <= 0 || translatingArticleIds.has(articleId)) {
+      return;
+    }
+
+    const requestedTeamId = numericTeamId;
+    setTranslatingArticleIds((current) => new Set(current).add(articleId));
+    setNewsTranslationErrors((current) => {
+      const next = { ...current };
+      delete next[articleId];
+      return next;
+    });
+    try {
+      const result = await translateTeamNewsArticle(requestedTeamId, articleId);
+      if (activeNewsTeamId.current !== requestedTeamId) {
+        return;
+      }
+      setNewsState((current) => ({
+        ...current,
+        data: current.data ? {
+          ...current.data,
+          articles: current.data.articles.map((article) => (
+            article.articleId === result.articleId
+              ? { ...article, translatedTitle: result.translatedTitle }
+              : article
+          )),
+        } : null,
+      }));
+    } catch (error) {
+      if (activeNewsTeamId.current === requestedTeamId) {
+        setNewsTranslationErrors((current) => ({
+          ...current,
+          [articleId]: error instanceof Error ? error.message : "뉴스 제목을 번역하지 못했습니다.",
+        }));
+      }
+    } finally {
+      if (activeNewsTeamId.current === requestedTeamId) {
+        setTranslatingArticleIds((current) => {
+          const next = new Set(current);
+          next.delete(articleId);
+          return next;
+        });
+      }
+    }
+  }
+
   if (teamState.isLoading) {
     return (
       <section className="league-content team-detail-page">
@@ -386,15 +559,158 @@ export function TeamDetailPage({ authStatus, currentUser, season }: { authStatus
         />
         <TeamVenueCard venue={teamState.data.venue} />
       </div>
-      <TeamFixturePanel
-        fixturePage={fixturePage}
-        fixturesState={fixturesState}
-        onRetry={retryFixtures}
-        setFixturePage={setFixturePage}
-      />
-      <TeamPlayersPanel onRetry={retryPlayers} playersState={playersState} />
-      <TeamPlayerRanksPanel onRetry={retryRankings} rankState={rankState} />
+      <nav className="team-detail-tabs" aria-label="팀 상세 메뉴">
+        <Link className={activeTab === "info" ? "active" : ""} to={`/teams/${numericTeamId}`}>
+          정보
+        </Link>
+        <Link className={activeTab === "news" ? "active" : ""} to={`/teams/${numericTeamId}?tab=news`}>
+          뉴스
+        </Link>
+      </nav>
+      {activeTab === "info" ? (
+        <>
+          <TeamFixturePanel
+            fixturePage={fixturePage}
+            fixturesState={fixturesState}
+            onRetry={retryFixtures}
+            setFixturePage={setFixturePage}
+          />
+          <TeamPlayersPanel onRetry={retryPlayers} playersState={playersState} />
+          <TeamPlayerRanksPanel onRetry={retryRankings} rankState={rankState} />
+        </>
+      ) : (
+        <TeamNewsPanel
+          canRefresh={currentUser?.role === "ADMIN"}
+          isRefreshing={isNewsRefreshing}
+          language={newsLanguage}
+          newsState={newsState}
+          onLanguageChange={setNewsLanguage}
+          onRefresh={refreshNewsFromProviders}
+          onRetry={retryNews}
+          refreshError={newsRefreshError}
+          refreshMessage={newsRefreshMessage}
+          translatingArticleIds={translatingArticleIds}
+          translationErrors={newsTranslationErrors}
+          onTranslate={translateNewsArticle}
+        />
+      )}
     </section>
+  );
+}
+
+function TeamNewsPanel({
+  canRefresh,
+  isRefreshing,
+  language,
+  newsState,
+  onLanguageChange,
+  onRefresh,
+  onRetry,
+  onTranslate,
+  refreshError,
+  refreshMessage,
+  translatingArticleIds,
+  translationErrors,
+}: {
+  canRefresh: boolean;
+  isRefreshing: boolean;
+  language: "ko" | "en";
+  newsState: LoadState<TeamNewsResponse>;
+  onLanguageChange: (language: "ko" | "en") => void;
+  onRefresh: () => void;
+  onRetry: () => void;
+  onTranslate: (articleId: number) => void;
+  refreshError: string;
+  refreshMessage: string;
+  translatingArticleIds: Set<number>;
+  translationErrors: Record<number, string>;
+}) {
+  const articles = newsState.data?.articles ?? [];
+
+  return (
+    <article className="panel team-news-panel">
+      <div className="team-news-heading">
+        <div className="detail-panel-heading player-panel-title">
+          <Newspaper size={19} aria-hidden="true" />
+          <h2>관련 뉴스</h2>
+        </div>
+        <div className="team-news-actions">
+          {canRefresh ? (
+            <button className="team-news-refresh" type="button" disabled={isRefreshing} onClick={onRefresh}>
+              <RefreshCw className={isRefreshing ? "spinning" : ""} size={15} aria-hidden="true" />
+              {isRefreshing ? "새로고침 중" : "새로고침"}
+            </button>
+          ) : null}
+          <div className="team-news-language" role="group" aria-label="뉴스 제목 언어">
+            <button
+              className={language === "ko" ? "active" : ""}
+              type="button"
+              aria-pressed={language === "ko"}
+              onClick={() => onLanguageChange("ko")}
+            >
+              한국어
+            </button>
+            <button
+              className={language === "en" ? "active" : ""}
+              type="button"
+              aria-pressed={language === "en"}
+              onClick={() => onLanguageChange("en")}
+            >
+              English
+            </button>
+          </div>
+        </div>
+      </div>
+      <p className="team-news-collected-at">
+        <Clock size={14} aria-hidden="true" />
+        마지막 수집: {newsState.data?.lastCollectedAt ? formatNewsDate(newsState.data.lastCollectedAt) : "수집 기록 없음"}
+      </p>
+      {refreshMessage ? <p className="team-news-refresh-status success">{refreshMessage}</p> : null}
+      {refreshError ? <p className="team-news-refresh-status error">{refreshError}</p> : null}
+      {newsState.isLoading ? <div className="empty-state">팀 뉴스를 불러오는 중입니다.</div> : null}
+      {newsState.error ? <SectionRetryError message={newsState.error} onRetry={onRetry} /> : null}
+      {!newsState.isLoading && !newsState.error && !articles.length ? (
+        <div className="empty-state">표시할 팀 뉴스가 없습니다.</div>
+      ) : null}
+      {!newsState.isLoading && !newsState.error && articles.length ? (
+        <div className="team-news-list">
+          {articles.map((article) => {
+            const title = language === "ko" ? article.translatedTitle ?? article.originalTitle : article.originalTitle;
+            const isTranslating = translatingArticleIds.has(article.articleId);
+            return (
+              <div className="team-news-row" key={article.articleId}>
+                <a
+                  className="team-news-link"
+                  href={article.originalUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  <div>
+                    <strong>{title}</strong>
+                    <p>
+                      <span>{article.publisherName}</span>
+                      {article.publishedAt ? <time dateTime={article.publishedAt}>{formatNewsDate(article.publishedAt)}</time> : null}
+                    </p>
+                  </div>
+                  <ExternalLink size={18} aria-hidden="true" />
+                </a>
+                {canRefresh && !article.translatedTitle ? (
+                  <div className="team-news-translation-action">
+                    <button type="button" disabled={isTranslating} onClick={() => onTranslate(article.articleId)}>
+                      <Languages size={15} aria-hidden="true" />
+                      {isTranslating ? "번역 중" : "번역"}
+                    </button>
+                    {translationErrors[article.articleId] ? (
+                      <span role="alert">{translationErrors[article.articleId]}</span>
+                    ) : null}
+                  </div>
+                ) : null}
+              </div>
+            );
+          })}
+        </div>
+      ) : null}
+    </article>
   );
 }
 
@@ -795,6 +1111,23 @@ function compareNullableStringLast(left: string | null | undefined, right: strin
     return 1;
   }
   return 0;
+}
+
+function formatNewsDate(value: string) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+  return new Intl.DateTimeFormat("ko-KR", {
+    dateStyle: "medium",
+    timeStyle: "short",
+    timeZone: "Asia/Seoul",
+  }).format(date);
+}
+
+function newsRefreshResultMessage(result: TeamNewsRefreshResult) {
+  const failed = result.failedTranslations > 0 ? `, ${result.failedTranslations}건 실패` : "";
+  return `${result.collectedArticles}건 확인, 번역 ${result.translatedArticles}/${result.translationCandidates}건 완료${failed}`;
 }
 
 function groupFixturesByDate(fixtures: FixtureSummary[]) {

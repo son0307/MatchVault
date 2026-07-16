@@ -375,6 +375,32 @@ export type TeamDetails = TeamSummary & {
   venue: TeamVenue | null;
 };
 
+export type TeamNewsArticle = {
+  articleId: number;
+  originalTitle: string;
+  translatedTitle: string | null;
+  publisherName: string;
+  originalUrl: string;
+  publishedAt: string | null;
+};
+
+export type TeamNewsResponse = {
+  lastCollectedAt: string | null;
+  articles: TeamNewsArticle[];
+};
+
+export type TeamNewsRefreshResult = {
+  collectedArticles: number;
+  translationCandidates: number;
+  translatedArticles: number;
+  failedTranslations: number;
+};
+
+export type TeamNewsTranslationResult = {
+  articleId: number;
+  translatedTitle: string;
+};
+
 export type TeamVenue = {
   venueId: number | null;
   venueName: string | null;
@@ -800,6 +826,24 @@ export async function fetchTeamDetails(teamId: number): Promise<TeamDetails> {
     "팀 정보를 불러오지 못했습니다.",
     DETAIL_CACHE_TTL_MS,
   );
+}
+
+export async function fetchTeamNews(teamId: number): Promise<TeamNewsResponse> {
+  return cachedGetJson<TeamNewsResponse>(
+    `/api/v1/teams/${teamId}/news`,
+    "팀 뉴스를 불러오지 못했습니다.",
+    DETAIL_CACHE_TTL_MS,
+  );
+}
+
+export async function refreshTeamNews(teamId: number): Promise<TeamNewsRefreshResult> {
+  const result = await postJson(`/api/v1/admin/teams/${teamId}/news/refresh`, {}) as TeamNewsRefreshResult;
+  clearApiMemoryCache();
+  return result;
+}
+
+export async function translateTeamNewsArticle(teamId: number, articleId: number): Promise<TeamNewsTranslationResult> {
+  return await postJson(`/api/v1/admin/teams/${teamId}/news/${articleId}/translate`, {}) as TeamNewsTranslationResult;
 }
 
 export async function fetchTeamPlayers(teamId: number, season: number): Promise<PlayerSummary[]> {
