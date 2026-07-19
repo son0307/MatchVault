@@ -6,10 +6,14 @@ import org.springframework.http.MediaType;
 import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.RestClient;
 import tools.jackson.databind.ObjectMapper;
+import com.son.soccerStreaming.global.externalapi.ExternalApiExecutor;
 
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.header;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.jsonPath;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
@@ -24,8 +28,13 @@ class OpenAiTitleTranslationClientTest {
         properties.getTranslation().setModel("test-model");
         RestClient.Builder builder = RestClient.builder().baseUrl("https://openai.test");
         MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+        ExternalApiExecutor executor = mock(ExternalApiExecutor.class);
+        when(executor.execute(any(), any(), any(), any())).thenAnswer(invocation -> {
+            java.util.function.Supplier<?> supplier = invocation.getArgument(3);
+            return supplier.get();
+        });
         OpenAiTitleTranslationClient client = new OpenAiTitleTranslationClient(
-                builder.build(), properties, new ObjectMapper());
+                builder.build(), properties, new ObjectMapper(), executor);
 
         server.expect(requestTo("https://openai.test/v1/responses"))
                 .andExpect(header("Authorization", "Bearer openai-test-key"))

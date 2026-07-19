@@ -9,27 +9,25 @@ import com.son.soccerStreaming.apifootball.dto.ApiFootballPlayerDto;
 import com.son.soccerStreaming.apifootball.dto.ApiFootballStandingDto;
 import com.son.soccerStreaming.apifootball.dto.ApiFootballTeamDto;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
+import com.son.soccerStreaming.global.externalapi.ExternalApiException;
+import com.son.soccerStreaming.global.externalapi.ExternalApiExecutor;
+import com.son.soccerStreaming.global.externalapi.ExternalApiProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpStatusCode;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
-import org.springframework.web.client.RestClientException;
-import org.springframework.web.client.RestClientResponseException;
 
 import java.util.List;
-import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
 @Component
-@Slf4j
 @RequiredArgsConstructor
 public class ApiFootballClient {
 
     private final RestClient apiFootballRestClient;
     private final ApiFootballCircuitBreaker apiFootballCircuitBreaker;
+    private final ExternalApiExecutor externalApiExecutor;
 
     @Value("${live.api-football.base-url:https://v3.football.api-sports.io}")
     private String baseUrl;
@@ -39,15 +37,6 @@ public class ApiFootballClient {
 
     @Value("${live.api-football.api-host:}")
     private String apiHost;
-
-    @Value("${live.api-football.retry.max-attempts:3}")
-    private int retryMaxAttempts;
-
-    @Value("${live.api-football.retry.initial-delay-ms:500}")
-    private long retryInitialDelayMs;
-
-    @Value("${live.api-football.retry.multiplier:2.0}")
-    private double retryMultiplier;
 
     public List<ApiFootballLiveDto.FixtureResponse> getFixture(Long fixtureId) {
         ApiFootballLiveDto.ApiResponse<ApiFootballLiveDto.FixtureResponse> body = get(
@@ -279,69 +268,21 @@ public class ApiFootballClient {
     }
 
     private <T> T get(String operation, String path, ParameterizedTypeReference<T> responseType, Object... uriVariables) {
-        return executeWithRetry(operation, () -> apiFootballRestClient.get()
-                .uri(baseUrl + path, uriVariables)
-                .headers(this::setApiHeaders)
-                .retrieve()
-                .body(responseType));
-    }
-
-    // Retry transient API-Football failures before the scheduler handles the final error.
-    private <T> T executeWithRetry(String operation, Supplier<T> request) {
-        int maxAttempts = Math.max(1, retryMaxAttempts);
-        long delayMs = Math.max(0, retryInitialDelayMs);
-        double multiplier = Math.max(1.0, retryMultiplier);
-
-        for (int attempt = 1; attempt <= maxAttempts; attempt++) {
-            try {
+        try {
+            return externalApiExecutor.execute(ExternalApiProvider.API_FOOTBALL, operation, () -> {
                 apiFootballCircuitBreaker.beforeRequest(operation);
-                T response = request.get();
+                T response = apiFootballRestClient.get()
+                        .uri(baseUrl + path, uriVariables)
+                        .headers(this::setApiHeaders)
+                        .retrieve()
+                        .body(responseType);
                 apiFootballCircuitBreaker.recordSuccess();
                 return response;
-            } catch (RestClientException e) {
-                if (attempt >= maxAttempts || !isRetryable(e)) {
-                    apiFootballCircuitBreaker.recordFailure(operation, e);
-                    throw e;
-                }
-
-                log.warn("API-Football request failed. operation={}, attempt={}/{}, retryDelayMs={}, reason={}",
-                        operation, attempt, maxAttempts, delayMs, e.getMessage());
-                sleepBeforeRetry(delayMs);
-                delayMs = nextDelay(delayMs, multiplier);
-            }
+            });
+        } catch (ExternalApiException exception) {
+            apiFootballCircuitBreaker.recordFailure(operation, exception);
+            throw exception;
         }
-
-        throw new IllegalStateException("API-Football retry loop ended unexpectedly. operation=" + operation);
-    }
-
-    private boolean isRetryable(RestClientException e) {
-        if (e instanceof ApiFootballCircuitOpenException) {
-            return false;
-        }
-        if (e instanceof RestClientResponseException responseException) {
-            HttpStatusCode statusCode = responseException.getStatusCode();
-            return statusCode.is5xxServerError() || statusCode.value() == 429;
-        }
-        return true;
-    }
-
-    private void sleepBeforeRetry(long delayMs) {
-        if (delayMs <= 0) {
-            return;
-        }
-        try {
-            Thread.sleep(delayMs);
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            throw new IllegalStateException("API-Football retry interrupted.", e);
-        }
-    }
-
-    private long nextDelay(long delayMs, double multiplier) {
-        if (delayMs <= 0) {
-            return 0;
-        }
-        return Math.round(delayMs * multiplier);
     }
 
     private void setApiHeaders(HttpHeaders headers) {

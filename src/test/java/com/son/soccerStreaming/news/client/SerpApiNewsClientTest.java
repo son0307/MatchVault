@@ -6,11 +6,15 @@ import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.RestClient;
+import com.son.soccerStreaming.global.externalapi.ExternalApiExecutor;
 
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 
@@ -34,7 +38,12 @@ class SerpApiNewsClientTest {
         ));
         RestClient.Builder builder = RestClient.builder().baseUrl("https://serpapi.test");
         server = MockRestServiceServer.bindTo(builder).build();
-        client = new SerpApiNewsClient(builder.build(), properties);
+        ExternalApiExecutor executor = mock(ExternalApiExecutor.class);
+        when(executor.execute(any(), any(), any(), any())).thenAnswer(invocation -> {
+            java.util.function.Supplier<?> supplier = invocation.getArgument(3);
+            return supplier.get();
+        });
+        client = new SerpApiNewsClient(builder.build(), properties, executor);
     }
 
     @Test

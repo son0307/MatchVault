@@ -44,6 +44,19 @@ public class ApiFootballSyncStatus {
     @Column(length = 30)
     private String status;
 
+    @Column(length = 30)
+    private String provider;
+
+    @Column(length = 100)
+    private String lastOperation;
+
+    @Column(length = 30)
+    private String lastErrorCategory;
+
+    private Integer lastHttpStatus;
+
+    private Integer lastAttemptCount;
+
     public void recordAttempt(String displayName, LocalDateTime attemptedAt) {
         this.displayName = displayName;
         this.lastAttemptAt = attemptedAt;
@@ -81,5 +94,30 @@ public class ApiFootballSyncStatus {
         this.failureCount = Math.max(1, this.failureCount == null ? 0 : this.failureCount);
         this.lastErrorMessage = errorMessage;
         this.status = ApiFootballSyncState.RETRY_PENDING.name();
+    }
+
+    public void recordProviderSuccess(String displayName, String provider, String operation,
+                                      int attemptCount, LocalDateTime succeededAt) {
+        recordSuccess(displayName, succeededAt);
+        this.provider = provider;
+        this.lastOperation = operation;
+        this.lastErrorCategory = null;
+        this.lastHttpStatus = null;
+        this.lastAttemptCount = attemptCount;
+    }
+
+    public void recordProviderFailure(String displayName, String provider, String operation,
+                                      String errorCategory, Integer httpStatus, int attemptCount,
+                                      LocalDateTime failedAt, String errorMessage) {
+        recordFailure(displayName, failedAt, errorMessage);
+        this.provider = provider;
+        this.lastOperation = operation;
+        this.lastErrorCategory = errorCategory;
+        this.lastHttpStatus = httpStatus;
+        this.lastAttemptCount = attemptCount;
+    }
+
+    public void markProvider(String provider) {
+        this.provider = provider;
     }
 }

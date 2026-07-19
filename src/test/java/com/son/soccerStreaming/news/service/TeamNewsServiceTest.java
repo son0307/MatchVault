@@ -45,7 +45,7 @@ class TeamNewsServiceTest {
         TeamNewsArticle relation = TeamNewsArticle.builder().team(team).article(article).build();
         when(teamRepository.findByTeamId(42L)).thenReturn(Optional.of(team));
         when(repository.findLatestByTeamId(42L, PageRequest.of(0, 20))).thenReturn(List.of(relation));
-        when(collectionStateRepository.findById(42L)).thenReturn(Optional.of(
+        when(collectionStateRepository.findByTeamTeamId(42L)).thenReturn(Optional.of(
                 TeamNewsCollectionState.builder().team(team).lastCollectedAt(publishedAt).build()
         ));
 
@@ -56,6 +56,7 @@ class TeamNewsServiceTest {
         assertThat(result.articles().get(0).publishedAt()).isEqualTo(publishedAt);
         assertThat(result.lastCollectedAt()).isEqualTo(publishedAt);
         verify(repository).findLatestByTeamId(42L, PageRequest.of(0, 20));
+        verify(collectionStateRepository).findByTeamTeamId(42L);
     }
 
     @Test

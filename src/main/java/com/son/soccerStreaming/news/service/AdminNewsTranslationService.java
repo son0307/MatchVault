@@ -12,6 +12,7 @@ import org.springframework.util.StringUtils;
 
 import java.util.List;
 import java.util.Map;
+import com.son.soccerStreaming.global.externalapi.ExternalApiInvocationContext;
 
 @Slf4j
 @Service
@@ -23,6 +24,10 @@ public class AdminNewsTranslationService {
     private final NewsTranslationPersistenceService persistenceService;
 
     public TranslationResult translate(Long teamId, Long articleId) {
+        return translate(null, teamId, articleId);
+    }
+
+    public TranslationResult translate(Long adminUserId, Long teamId, Long articleId) {
         NewsArticle article = teamNewsArticleRepository.findByTeamIdAndArticleId(teamId, articleId)
                 .orElseThrow(() -> new CustomException(ErrorCode.NEWS_ARTICLE_NOT_FOUND))
                 .getArticle();
@@ -31,9 +36,12 @@ public class AdminNewsTranslationService {
         }
 
         try {
-            Map<Long, String> translations = translationClient.translate(List.of(
-                    new OpenAiTitleTranslationClient.TranslationInput(articleId, article.getOriginalTitle())
-            ));
+            List<OpenAiTitleTranslationClient.TranslationInput> inputs = List.of(
+                    new OpenAiTitleTranslationClient.TranslationInput(articleId, article.getOriginalTitle()));
+            Map<Long, String> translations = adminUserId == null
+                    ? translationClient.translate(inputs)
+                    : translationClient.translate(inputs,
+                    ExternalApiInvocationContext.admin(adminUserId, teamId, articleId, 1));
             String translatedTitle = translations.get(articleId);
             if (!StringUtils.hasText(translatedTitle) || translatedTitle.length() > 1000) {
                 throw new IllegalStateException("OpenAI did not return a valid translation for the requested article.");

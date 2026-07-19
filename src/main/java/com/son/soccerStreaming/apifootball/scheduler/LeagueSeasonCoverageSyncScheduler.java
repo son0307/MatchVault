@@ -26,6 +26,7 @@ public class LeagueSeasonCoverageSyncScheduler {
             leagueSeasonCoverageSyncService.syncLeagueSeasons(league);
         } catch (Exception e) {
             log.error("API-Football league season coverage sync failed. league={}", league, e);
+            if (!failureRetryScheduler.shouldRetry(e)) return;
             failureRetryScheduler.schedule(
                     "league-seasons:%s".formatted(league),
                     "league season coverage sync league=%s".formatted(league),

@@ -52,6 +52,7 @@ public class ApiFootballFixtureSyncScheduler {
             apiFootballFixtureSyncService.syncLiveFixtures(league, season);
         } catch (Exception e) {
             log.error("API-Football live fixture sync failed.", e);
+            if (!failureRetryScheduler.shouldRetry(e)) return;
             failureRetryScheduler.schedule(
                     "fixtures:live:%s:%s".formatted(league, season),
                     "live fixture sync league=%s season=%s".formatted(league, season),
@@ -65,6 +66,7 @@ public class ApiFootballFixtureSyncScheduler {
             apiFootballFixtureSyncService.syncSeasonFixtures(league, season);
         } catch (Exception e) {
             log.error("API-Football season fixture sync failed. reason={}, league={}, season={}", reason, league, season, e);
+            if (!failureRetryScheduler.shouldRetry(e)) return;
             failureRetryScheduler.schedule(
                     "fixtures:%s:%s:%s".formatted(reason, league, season),
                     "season fixture sync reason=%s league=%s season=%s".formatted(reason, league, season),

@@ -7,5 +7,6 @@ public enum AdminAuditType {
     MEDIA_UPLOAD,
     MEDIA_RESTORE,
     OVERRIDE_CLEAR,
-    SYNC
+    SYNC,
+    EXTERNAL_API_CALL
 }

@@ -29,6 +29,7 @@ public class ApiFootballInjurySyncScheduler {
             apiFootballInjurySyncService.syncInjuries(league, season);
         } catch (Exception e) {
             log.error("API-Football injury sync failed. league={}, season={}", league, season, e);
+            if (!failureRetryScheduler.shouldRetry(e)) return;
             failureRetryScheduler.schedule(
                     "injuries:%s:%s".formatted(league, season),
                     "injury sync league=%s season=%s".formatted(league, season),

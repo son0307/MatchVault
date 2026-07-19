@@ -142,6 +142,7 @@ public class ApiFootballFixtureDetailSyncService {
         List<FixtureDetailSyncResult> results = new ArrayList<>();
         List<List<Long>> chunks = chunks(fixtureIds);
         List<List<Long>> failedChunks = new ArrayList<>();
+        Exception firstFailure = null;
         int processedUnits = 0;
         int successfulUnits = 0;
         int failedUnits = 0;
@@ -200,6 +201,9 @@ public class ApiFootballFixtureDetailSyncService {
             } catch (SyncCancelledException exception) {
                 throw exception;
             } catch (Exception e) {
+                if (firstFailure == null) {
+                    firstFailure = e;
+                }
                 if (chunkWatch.isRunning()) {
                     chunkWatch.stop();
                 }
@@ -212,7 +216,7 @@ public class ApiFootballFixtureDetailSyncService {
             }
         }
         if (!failedChunks.isEmpty()) {
-            throw new ApiFootballFixtureDetailSyncException(failedChunks, chunks.size());
+            throw new ApiFootballFixtureDetailSyncException(failedChunks, chunks.size(), firstFailure);
         }
         long totalMs = (System.nanoTime() - startedAtNanos) / 1_000_000;
         log.info("API-Football fixture detail sync completed. requestedCount={}, processedCount={}, "

@@ -35,6 +35,7 @@ public class ApiFootballStandingStartupSyncRunner implements CommandLineRunner {
             apiFootballStandingSyncService.syncStandings(league, season);
         } catch (Exception e) {
             log.error("API-Football startup standing sync failed. league={}, season={}", league, season, e);
+            if (!failureRetryScheduler.shouldRetry(e)) return;
             failureRetryScheduler.schedule(
                     "startup:standings:%s:%s".formatted(league, season),
                     "startup standing sync league=%s season=%s".formatted(league, season),

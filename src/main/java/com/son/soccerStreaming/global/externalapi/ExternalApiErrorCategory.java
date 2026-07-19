@@ -1,0 +1,7 @@
+package com.son.soccerStreaming.global.externalapi;
+
+public enum ExternalApiErrorCategory {
+    CONFIGURATION, BAD_REQUEST, AUTHENTICATION, PERMISSION, NOT_FOUND,
+    RATE_LIMITED, QUOTA_EXHAUSTED, TIMEOUT, NETWORK, UPSTREAM_SERVER,
+    INVALID_RESPONSE, CIRCUIT_OPEN, UNKNOWN
+}

@@ -6,9 +6,9 @@ public class ApiFootballFixtureDetailSyncException extends RuntimeException {
 
     private final List<List<Long>> failedChunks;
 
-    public ApiFootballFixtureDetailSyncException(List<List<Long>> failedChunks, int totalChunks) {
+    public ApiFootballFixtureDetailSyncException(List<List<Long>> failedChunks, int totalChunks, Throwable cause) {
         super("API-Football fixture detail sync failed. failedChunks="
-                + failedChunks.size() + ", totalChunks=" + totalChunks);
+                + failedChunks.size() + ", totalChunks=" + totalChunks, cause);
         this.failedChunks = failedChunks.stream()
                 .map(List::copyOf)
                 .toList();

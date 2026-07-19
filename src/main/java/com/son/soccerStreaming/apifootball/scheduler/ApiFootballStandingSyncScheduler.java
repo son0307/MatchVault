@@ -43,6 +43,7 @@ public class ApiFootballStandingSyncScheduler {
             apiFootballStandingSyncService.syncStandings(league, season);
         } catch (Exception e) {
             log.error("API-Football standing sync failed. reason={}, league={}, season={}", reason, league, season, e);
+            if (!failureRetryScheduler.shouldRetry(e)) return;
             failureRetryScheduler.schedule(
                     "standings:%s:%s:%s".formatted(reason, league, season),
                     "standing sync reason=%s league=%s season=%s".formatted(reason, league, season),

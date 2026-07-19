@@ -22,6 +22,8 @@ news:
     api-key: ${SERPAPI_API_KEY:}
     lookback-days: ${NEWS_LOOKBACK_DAYS:7}
     max-articles-per-team: ${NEWS_MAX_ARTICLES_PER_TEAM:20}
+    connect-timeout: ${SERPAPI_CONNECT_TIMEOUT:3s}
+    request-timeout: ${SERPAPI_REQUEST_TIMEOUT:15s}
     search-sites:
       - bbc.com/sport/football
       - skysports.com/football
@@ -34,6 +36,8 @@ news:
     api-key: ${OPENAI_API_KEY:}
     model: ${OPENAI_NEWS_TRANSLATION_MODEL:gpt-5.6-luna}
     batch-size: ${NEWS_TRANSLATION_BATCH_SIZE:50}
+    connect-timeout: ${OPENAI_CONNECT_TIMEOUT:3s}
+    request-timeout: ${OPENAI_REQUEST_TIMEOUT:60s}
   sync:
     enabled: ${NEWS_SYNC_ENABLED:false}
     cron: ${NEWS_SYNC_CRON:0 0 6 * * *}
@@ -45,10 +49,8 @@ live:
     base-url: ${LIVE_API_FOOTBALL_BASE_URL:https://v3.football.api-sports.io}
     api-key: ${API_FOOTBALL_KEY:}
     api-host: ${API_FOOTBALL_HOST:}
-    retry:
-      max-attempts: ${LIVE_API_FOOTBALL_RETRY_MAX_ATTEMPTS:3}
-      initial-delay-ms: ${LIVE_API_FOOTBALL_RETRY_INITIAL_DELAY_MS:500}
-      multiplier: ${LIVE_API_FOOTBALL_RETRY_MULTIPLIER:2.0}
+    connect-timeout: ${LIVE_API_FOOTBALL_CONNECT_TIMEOUT:3s}
+    request-timeout: ${LIVE_API_FOOTBALL_REQUEST_TIMEOUT:15s}
     circuit-breaker:
       enabled: ${LIVE_API_FOOTBALL_CIRCUIT_BREAKER_ENABLED:true}
       failure-threshold: ${LIVE_API_FOOTBALL_CIRCUIT_BREAKER_FAILURE_THRESHOLD:5}
@@ -58,6 +60,14 @@ live:
     interval-ms: ${LIVE_SYNC_INTERVAL_MS:5000}
     failure-threshold: ${LIVE_SYNC_FAILURE_THRESHOLD:3}
     failure-cooldown-ms: ${LIVE_SYNC_FAILURE_COOLDOWN_MS:60000}
+
+external-api:
+  retry:
+    max-attempts: ${EXTERNAL_API_RETRY_MAX_ATTEMPTS:3}
+    initial-delay: ${EXTERNAL_API_RETRY_INITIAL_DELAY:500ms}
+    max-delay: ${EXTERNAL_API_RETRY_MAX_DELAY:5s}
+    max-retry-after: ${EXTERNAL_API_RETRY_MAX_RETRY_AFTER:30s}
+    jitter-max: ${EXTERNAL_API_RETRY_JITTER_MAX:250ms}
 
 media:
   public-base-url: ${MEDIA_PUBLIC_BASE_URL:}

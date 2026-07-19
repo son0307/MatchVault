@@ -6,8 +6,8 @@ public class ApiFootballRegisteredPlayerSyncException extends RuntimeException {
 
     private final List<Long> failedTeamIds;
 
-    public ApiFootballRegisteredPlayerSyncException(List<Long> failedTeamIds) {
-        super("API-Football registered players sync failed. failedTeams=" + failedTeamIds.size());
+    public ApiFootballRegisteredPlayerSyncException(List<Long> failedTeamIds, Throwable cause) {
+        super("API-Football registered players sync failed. failedTeams=" + failedTeamIds.size(), cause);
         this.failedTeamIds = List.copyOf(failedTeamIds);
     }
 

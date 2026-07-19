@@ -178,6 +178,7 @@ type AuditLog = {
   targetId: number | null;
   message: string;
   details: string | null;
+  provider: string | null;
   success: boolean;
   createdAt: string | null;
 };
@@ -192,6 +193,11 @@ type SyncStatus = {
   failureCount: number | null;
   lastErrorMessage: string | null;
   status: string | null;
+  provider: string | null;
+  lastOperation: string | null;
+  lastErrorCategory: string | null;
+  lastHttpStatus: number | null;
+  lastAttemptCount: number | null;
 };
 
 type CoverageStatus = "loading" | "ready" | "error";
@@ -1166,6 +1172,9 @@ export function AdminPage({ authState }: AdminPageProps) {
 
   const syncStatusByTask = new Map(syncStatuses.map((status) => [status.task, status]));
   const apiFootballStatus = syncStatusByTask.get("api-football");
+  const newsProviderStatuses = [syncStatusByTask.get("serp-api"), syncStatusByTask.get("openai")].filter(
+    (status): status is SyncStatus => status !== undefined,
+  );
   const activeSyncTasks = new Set(syncJobs.filter((job) => job.active).map((job) => job.task));
   const runningSyncJobs = syncJobs.filter((job) => job.status === "RUNNING" || job.status === "CANCEL_REQUESTED");
   const queuedSyncJobs = syncJobs.filter((job) => job.status === "QUEUED");
@@ -1441,8 +1450,8 @@ export function AdminPage({ authState }: AdminPageProps) {
       <details className="panel admin-page-panel admin-utility-section">
         <summary>
           <span>
-            <span className="eyebrow">API-Football</span>
-            <strong>Manual Sync</strong>
+            <span className="eyebrow">External APIs</span>
+            <strong>Provider Status &amp; API-Football Sync</strong>
           </span>
         </summary>
         <p className="muted admin-sync-message">
@@ -1460,9 +1469,32 @@ export function AdminPage({ authState }: AdminPageProps) {
             <span>마지막 시도: {formatDateTime(apiFootballStatus?.lastAttemptAt ?? null)}</span>
             {apiFootballStatus?.lastFailureAt ? <span>마지막 실패: {formatDateTime(apiFootballStatus.lastFailureAt)}</span> : null}
             {(apiFootballStatus?.failureCount ?? 0) > 0 ? <span>기록된 장애: {apiFootballStatus?.failureCount}회</span> : null}
+            {apiFootballStatus?.lastOperation ? <span>작업: {apiFootballStatus.lastOperation}</span> : null}
+            {apiFootballStatus?.lastAttemptCount ? <span>시도 횟수: {apiFootballStatus.lastAttemptCount}</span> : null}
+            {apiFootballStatus?.lastErrorCategory ? <span>오류: {apiFootballStatus.lastErrorCategory}{apiFootballStatus.lastHttpStatus ? ` (${apiFootballStatus.lastHttpStatus})` : ""}</span> : null}
           </div>
           {apiFootballStatus?.lastErrorMessage ? <p className="admin-api-health-error">{apiFootballStatus.lastErrorMessage}</p> : null}
         </div>
+        {newsProviderStatuses.map((status) => (
+          <div className={`admin-api-health admin-api-health-${(status.status ?? "NEVER_SYNCED").toLowerCase()}`} key={status.task}>
+            <div className="admin-api-health-heading">
+              <strong>{status.label} 상태</strong>
+              <span className={`status-pill sync-status-${(status.status ?? "NEVER_SYNCED").toLowerCase()}`}>
+                {apiFootballStatusLabel(status.status)}
+              </span>
+            </div>
+            <div className="admin-api-health-details">
+              <span>마지막 성공: {formatDateTime(status.lastSuccessAt)}</span>
+              <span>마지막 시도: {formatDateTime(status.lastAttemptAt)}</span>
+              {status.lastFailureAt ? <span>마지막 실패: {formatDateTime(status.lastFailureAt)}</span> : null}
+              <span>연속 실패: {status.failureCount ?? 0}회</span>
+              {status.lastOperation ? <span>작업: {status.lastOperation}</span> : null}
+              {status.lastAttemptCount ? <span>시도 횟수: {status.lastAttemptCount}</span> : null}
+              {status.lastErrorCategory ? <span>오류: {status.lastErrorCategory}{status.lastHttpStatus ? ` (${status.lastHttpStatus})` : ""}</span> : null}
+            </div>
+            {status.lastErrorMessage ? <p className="admin-api-health-error">{status.lastErrorMessage}</p> : null}
+          </div>
+        ))}
         <div className="admin-sync-actions">
           {syncTasks.map((item) => {
             const status = syncStatusByTask.get(item.task);
@@ -1569,6 +1601,7 @@ export function AdminPage({ authState }: AdminPageProps) {
             <article className="admin-log-item" key={log.id}>
               <div className="admin-log-badges">
                 <span className="status-pill">{log.type}</span>
+                {log.provider ? <span className="status-pill admin-log-category">{externalApiProviderLabel(log.provider)}</span> : null}
                 {log.syncCategory ? <span className="status-pill admin-log-category">{log.syncCategory}</span> : null}
               </div>
               <div>
@@ -2663,4 +2696,11 @@ function formatFixtureScore(fixture: FixtureSummaryAdmin) {
 
 function labelize(value: string) {
   return value.replace(/[A-Z]/g, (letter) => ` ${letter}`).replace(/^./, (letter) => letter.toUpperCase());
+}
+
+function externalApiProviderLabel(provider: string) {
+  if (provider === "SERP_API") return "SerpAPI";
+  if (provider === "OPENAI") return "OpenAI";
+  if (provider === "API_FOOTBALL") return "API-Football";
+  return provider;
 }

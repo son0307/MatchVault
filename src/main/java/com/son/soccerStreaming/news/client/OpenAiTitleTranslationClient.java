@@ -3,6 +3,11 @@ package com.son.soccerStreaming.news.client;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 import com.son.soccerStreaming.news.config.NewsProperties;
+import com.son.soccerStreaming.global.externalapi.ExternalApiErrorCategory;
+import com.son.soccerStreaming.global.externalapi.ExternalApiException;
+import com.son.soccerStreaming.global.externalapi.ExternalApiExecutor;
+import com.son.soccerStreaming.global.externalapi.ExternalApiInvocationContext;
+import com.son.soccerStreaming.global.externalapi.ExternalApiProvider;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
@@ -25,24 +30,38 @@ public class OpenAiTitleTranslationClient {
     private final RestClient restClient;
     private final NewsProperties properties;
     private final ObjectMapper objectMapper;
+    private final ExternalApiExecutor externalApiExecutor;
 
     public OpenAiTitleTranslationClient(
             @Qualifier("openAiNewsRestClient") RestClient restClient,
             NewsProperties properties,
-            ObjectMapper objectMapper
+            ObjectMapper objectMapper,
+            ExternalApiExecutor externalApiExecutor
     ) {
         this.restClient = restClient;
         this.properties = properties;
         this.objectMapper = objectMapper;
+        this.externalApiExecutor = externalApiExecutor;
     }
 
     public Map<Long, String> translate(List<TranslationInput> inputs) {
+        return translate(inputs, ExternalApiInvocationContext.system());
+    }
+
+    public Map<Long, String> translate(List<TranslationInput> inputs, ExternalApiInvocationContext context) {
         if (inputs.isEmpty()) {
             return Map.of();
         }
+        return externalApiExecutor.execute(ExternalApiProvider.OPENAI, "translateNewsTitles", context,
+                () -> doTranslate(inputs));
+    }
+
+    private Map<Long, String> doTranslate(List<TranslationInput> inputs) {
         String apiKey = properties.getTranslation().getApiKey();
         if (!StringUtils.hasText(apiKey)) {
-            throw new IllegalStateException("OpenAI API key is not configured.");
+            throw new ExternalApiException(ExternalApiProvider.OPENAI, "translateNewsTitles",
+                    ExternalApiErrorCategory.CONFIGURATION, null, false, null,
+                    "OpenAI API key is not configured", null);
         }
 
         Map<String, Object> request = new LinkedHashMap<>();

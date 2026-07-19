@@ -11,6 +11,7 @@ import org.springframework.stereotype.Service;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import com.son.soccerStreaming.global.externalapi.ExternalApiInvocationContext;
 
 @Slf4j
 @Service
@@ -24,15 +25,19 @@ public class NewsTitleTranslationService {
 
     public TranslationRunResult translatePending() {
         List<NewsArticle> candidates = newsArticleRepository.findTranslationCandidates();
-        return translateCandidates(candidates);
+        return translateCandidates(candidates, null, null);
     }
 
     public TranslationRunResult translatePendingForTeam(Long teamId) {
-        List<NewsArticle> candidates = newsArticleRepository.findTranslationCandidatesByTeamId(teamId);
-        return translateCandidates(candidates);
+        return translatePendingForTeam(teamId, null);
     }
 
-    private TranslationRunResult translateCandidates(List<NewsArticle> candidates) {
+    public TranslationRunResult translatePendingForTeam(Long teamId, Long adminUserId) {
+        List<NewsArticle> candidates = newsArticleRepository.findTranslationCandidatesByTeamId(teamId);
+        return translateCandidates(candidates, adminUserId, teamId);
+    }
+
+    private TranslationRunResult translateCandidates(List<NewsArticle> candidates, Long adminUserId, Long teamId) {
         int translated = 0;
         int failed = 0;
         int batchSize = Math.max(1, properties.getTranslation().getBatchSize());
@@ -45,12 +50,13 @@ public class NewsTitleTranslationService {
             List<Long> requestedIds = batch.stream().map(NewsArticle::getId).toList();
             persistenceService.markAutoTranslationAttempted(requestedIds);
             try {
-                Map<Long, String> translations = translationClient.translate(batch.stream()
-                        .map(article -> new OpenAiTitleTranslationClient.TranslationInput(
-                                article.getId(),
-                                article.getOriginalTitle()
-                        ))
-                        .toList());
+                List<OpenAiTitleTranslationClient.TranslationInput> inputs = batch.stream()
+                        .map(article -> new OpenAiTitleTranslationClient.TranslationInput(article.getId(), article.getOriginalTitle()))
+                        .toList();
+                Map<Long, String> translations = adminUserId == null
+                        ? translationClient.translate(inputs)
+                        : translationClient.translate(inputs,
+                        ExternalApiInvocationContext.admin(adminUserId, teamId, null, inputs.size()));
                 persistenceService.applyResults(requestedIds, translations);
                 translated += (int) requestedIds.stream()
                         .filter(id -> translations.get(id) != null && !translations.get(id).isBlank())

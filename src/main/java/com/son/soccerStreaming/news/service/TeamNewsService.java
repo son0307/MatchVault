@@ -26,9 +26,8 @@ public class TeamNewsService {
     private final TeamNewsCollectionStateRepository collectionStateRepository;
 
     public TeamNewsListResponseDto getTeamNews(Long teamId) {
-        if (teamRepository.findByTeamId(teamId).isEmpty()) {
-            throw new CustomException(ErrorCode.TEAM_NOT_FOUND);
-        }
+        teamRepository.findByTeamId(teamId)
+                .orElseThrow(() -> new CustomException(ErrorCode.TEAM_NOT_FOUND));
         List<TeamNewsResponseDto> articles = teamNewsArticleRepository
                 .findLatestByTeamId(teamId, PageRequest.of(0, TEAM_NEWS_LIMIT)).stream()
                 .map(relation -> {
@@ -44,7 +43,7 @@ public class TeamNewsService {
                 })
                 .toList();
         return new TeamNewsListResponseDto(
-                collectionStateRepository.findById(teamId)
+                collectionStateRepository.findByTeamTeamId(teamId)
                         .map(state -> state.getLastCollectedAt())
                         .orElse(null),
                 articles

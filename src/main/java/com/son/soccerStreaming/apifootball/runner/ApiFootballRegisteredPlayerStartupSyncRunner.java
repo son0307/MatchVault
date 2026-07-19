@@ -44,6 +44,9 @@ public class ApiFootballRegisteredPlayerStartupSyncRunner implements CommandLine
     }
 
     private void scheduleRetry(Exception exception) {
+        if (!failureRetryScheduler.shouldRetry(exception)) {
+            return;
+        }
         if (exception instanceof ApiFootballRegisteredPlayerSyncException playerSyncException) {
             for (Long teamId : playerSyncException.getFailedTeamIds()) {
                 failureRetryScheduler.schedule(
