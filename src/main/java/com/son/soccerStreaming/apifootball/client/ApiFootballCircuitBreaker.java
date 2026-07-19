@@ -1,7 +1,7 @@
 package com.son.soccerStreaming.apifootball.client;
 
-import com.son.soccerStreaming.apifootball.service.ApiFootballSyncStatusService;
-import lombok.RequiredArgsConstructor;
+import com.son.soccerStreaming.global.externalapi.ExternalApiErrorCategory;
+import com.son.soccerStreaming.global.externalapi.ExternalApiException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
@@ -12,13 +12,7 @@ import java.util.concurrent.atomic.AtomicLong;
 
 @Slf4j
 @Component
-@RequiredArgsConstructor
 public class ApiFootballCircuitBreaker {
-
-    private static final String GLOBAL_SYNC_KEY = "api-football";
-    private static final String GLOBAL_DISPLAY_NAME = "API-Football";
-
-    private final ApiFootballSyncStatusService syncStatusService;
     private final Clock clock = Clock.systemUTC();
     private final AtomicInteger consecutiveFailures = new AtomicInteger();
     private final AtomicLong openUntilEpochMs = new AtomicLong();
@@ -52,11 +46,12 @@ public class ApiFootballCircuitBreaker {
         }
         consecutiveFailures.set(0);
         openUntilEpochMs.set(0L);
-        syncStatusService.recordSuccessByKey(GLOBAL_SYNC_KEY, GLOBAL_DISPLAY_NAME);
     }
 
     public void recordFailure(String operation, Exception exception) {
-        if (!enabled || exception instanceof ApiFootballCircuitOpenException) {
+        if (!enabled || exception instanceof ApiFootballCircuitOpenException
+                || exception instanceof ExternalApiException external
+                && external.getCategory() == ExternalApiErrorCategory.CIRCUIT_OPEN) {
             return;
         }
         int failures = consecutiveFailures.incrementAndGet();
@@ -68,7 +63,6 @@ public class ApiFootballCircuitBreaker {
         openUntilEpochMs.set(openUntil);
         log.warn("API-Football circuit opened. operation={}, failureCount={}, openUntilEpochMs={}",
                 operation, failures, openUntil);
-        syncStatusService.recordFailureByKey(GLOBAL_SYNC_KEY, GLOBAL_DISPLAY_NAME, exception);
     }
 
     private int configuredFailureThreshold() {

@@ -12,6 +12,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import com.son.soccerStreaming.global.externalapi.ExternalApiException;
 
 @Slf4j
 @Component
@@ -63,6 +64,17 @@ public class ApiFootballSyncFailureRetryScheduler {
         scheduleNext(key, newState);
     }
 
+    public boolean shouldRetry(Exception exception) {
+        Throwable current = exception;
+        while (current != null) {
+            if (current instanceof ExternalApiException externalApiException) {
+                return externalApiException.isRetryable();
+            }
+            current = current.getCause();
+        }
+        return true;
+    }
+
     @PreDestroy
     public void shutdown() {
         retryExecutor.shutdownNow();
@@ -92,6 +104,14 @@ public class ApiFootballSyncFailureRetryScheduler {
             log.info("API-Football sync failure retry succeeded. key={}, description={}, attempt={}/{}",
                     key, state.description(), attempt, state.maxAttempts());
         } catch (Exception e) {
+            if (!shouldRetry(e)) {
+                retryStates.remove(key);
+                syncStatusOfRetryKey(key).ifPresent(status ->
+                        syncStatusService.recordFailureByKey(status.syncKey(), status.displayName(), e));
+                log.error("API-Football sync failure retry stopped for a non-retryable error. key={}, description={}, attempt={}/{}",
+                        key, state.description(), attempt, state.maxAttempts(), e);
+                return;
+            }
             if (attempt >= state.maxAttempts()) {
                 retryStates.remove(key);
                 syncStatusOfRetryKey(key).ifPresent(status ->

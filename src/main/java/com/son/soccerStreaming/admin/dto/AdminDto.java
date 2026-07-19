@@ -504,6 +504,7 @@ public class AdminDto {
         private Long targetId;
         private String message;
         private String details;
+        private String provider;
         private boolean success;
         private LocalDateTime createdAt;
     }
@@ -536,5 +537,10 @@ public class AdminDto {
         private Integer failureCount;
         private String lastErrorMessage;
         private String status;
+        private String provider;
+        private String lastOperation;
+        private String lastErrorCategory;
+        private Integer lastHttpStatus;
+        private Integer lastAttemptCount;
     }
 }

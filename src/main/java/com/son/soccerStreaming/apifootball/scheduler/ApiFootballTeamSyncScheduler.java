@@ -29,6 +29,7 @@ public class ApiFootballTeamSyncScheduler {
             apiFootballTeamSyncService.syncTeams(league, season);
         } catch (Exception e) {
             log.error("API-Football team sync failed. league={}, season={}", league, season, e);
+            if (!failureRetryScheduler.shouldRetry(e)) return;
             failureRetryScheduler.schedule(
                     "teams:%s:%s".formatted(league, season),
                     "team sync league=%s season=%s".formatted(league, season),

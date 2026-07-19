@@ -173,7 +173,7 @@ class NewsPersistenceServiceTest {
 
     @Test
     void recordsCollectionTimeEvenWhenNoArticlesAreReturned() {
-        Team team = Team.builder().teamId(1L).name("Arsenal").build();
+        Team team = Team.builder().id(99L).teamId(1L).name("Arsenal").build();
         Instant collectedAt = Instant.parse("2026-07-16T01:00:00Z");
         when(teamRepository.findByTeamId(1L)).thenReturn(Optional.of(team));
 
@@ -184,6 +184,8 @@ class NewsPersistenceServiceTest {
         ArgumentCaptor<TeamNewsCollectionState> captor = ArgumentCaptor.forClass(TeamNewsCollectionState.class);
         verify(collectionStateRepository).save(captor.capture());
         assertThat(captor.getValue().getLastCollectedAt()).isEqualTo(collectedAt);
+        assertThat(captor.getValue().getTeam()).isSameAs(team);
+        verify(collectionStateRepository).findByTeamTeamId(1L);
     }
 
     private NewsPersistenceService service() {

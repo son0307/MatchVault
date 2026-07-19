@@ -112,6 +112,8 @@ public class AdminService {
     private static final Pattern SUBSTITUTION_DETAIL_PATTERN = Pattern.compile("Substitution\\s+\\d+");
     private static final Pattern AUDIT_MESSAGE_PARAMETER_PATTERN = Pattern.compile("\\b(sequence|player|team)=(\\d+)\\b");
     private static final Set<String> PUBLIC_SYNC_DETAIL_KEYS = Set.of("league", "season", "fixtureId");
+    private static final Set<String> PUBLIC_EXTERNAL_API_DETAIL_KEYS = Set.of(
+            "operation", "teamId", "articleId", "batchSize", "resultCount", "attempts", "durationMs", "httpStatus", "errorCategory");
     private static final Map<String, String> SYNC_CATEGORY_LABELS = Map.of(
             "seasons", "Seasons",
             "teams", "Teams",
@@ -125,6 +127,8 @@ public class AdminService {
 
     private static final List<SyncStatusDefinition> SYNC_STATUS_DEFINITIONS = List.of(
             new SyncStatusDefinition("api-football", "API-Football"),
+            new SyncStatusDefinition("serp-api", "SerpAPI"),
+            new SyncStatusDefinition("openai", "OpenAI"),
             new SyncStatusDefinition("seasons", "Seasons"),
             new SyncStatusDefinition("teams", "Teams"),
             new SyncStatusDefinition("standings", "Standings"),
@@ -1311,6 +1315,7 @@ public class AdminService {
                 .targetId(log.getTargetId())
                 .message(publicAuditMessage(log))
                 .details(publicAuditDetails(log))
+                .provider(log.getProvider())
                 .success(log.isSuccess())
                 .createdAt(log.getCreatedAt())
                 .build();
@@ -1340,6 +1345,9 @@ public class AdminService {
         }
         if (log.getType() == AdminAuditType.OVERRIDE_CLEAR) {
             addAllowedDetailParameter(parameters, log.getDetails(), "field", "field");
+        }
+        if (log.getType() == AdminAuditType.EXTERNAL_API_CALL) {
+            addWhitelistedParameters(parameters, log.getDetails(), PUBLIC_EXTERNAL_API_DETAIL_KEYS);
         }
 
         if (parameters.isEmpty()) {
@@ -1398,6 +1406,16 @@ public class AdminService {
         }
     }
 
+    private void addWhitelistedParameters(Map<String, String> parameters, String details, Set<String> allowedKeys) {
+        if (details == null || details.isBlank()) return;
+        for (String part : details.split(";")) {
+            String[] pair = part.trim().split("=", 2);
+            if (pair.length == 2 && allowedKeys.contains(pair[0]) && !pair[1].isBlank()) {
+                parameters.put(pair[0], pair[1].trim());
+            }
+        }
+    }
+
     private void addAllowedDetailParameter(Map<String, String> parameters, String details,
                                            String sourceName, String outputName) {
         if (details == null || details.isBlank()) {
@@ -1421,6 +1439,9 @@ public class AdminService {
             case MEDIA_RESTORE -> "관리자 이미지가 원본으로 복원되었습니다.";
             case OVERRIDE_CLEAR -> "수동 수정 설정이 해제되었습니다.";
             case SYNC -> publicSyncAuditMessage(log);
+            case EXTERNAL_API_CALL -> log.isSuccess()
+                    ? "외부 API 호출이 완료되었습니다."
+                    : "외부 API 호출에 실패했습니다.";
         };
     }
 
@@ -1454,11 +1475,16 @@ public class AdminService {
                 .failureCount(syncFailureCount(status))
                 .lastErrorMessage(status == null ? null : status.getLastErrorMessage())
                 .status(syncDisplayStatus(status))
+                .provider(status == null ? null : status.getProvider())
+                .lastOperation(status == null ? null : status.getLastOperation())
+                .lastErrorCategory(status == null ? null : status.getLastErrorCategory())
+                .lastHttpStatus(status == null ? null : status.getLastHttpStatus())
+                .lastAttemptCount(status == null ? null : status.getLastAttemptCount())
                 .build();
     }
 
     private String syncStatusKey(String task, Integer season) {
-        if ("api-football".equals(task)) {
+        if ("api-football".equals(task) || "serp-api".equals(task) || "openai".equals(task)) {
             return task;
         }
         if ("seasons".equals(task)) {

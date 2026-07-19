@@ -3,6 +3,11 @@ package com.son.soccerStreaming.news.client;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.son.soccerStreaming.news.config.NewsProperties;
+import com.son.soccerStreaming.global.externalapi.ExternalApiErrorCategory;
+import com.son.soccerStreaming.global.externalapi.ExternalApiException;
+import com.son.soccerStreaming.global.externalapi.ExternalApiExecutor;
+import com.son.soccerStreaming.global.externalapi.ExternalApiInvocationContext;
+import com.son.soccerStreaming.global.externalapi.ExternalApiProvider;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
@@ -22,19 +27,33 @@ public class SerpApiNewsClient {
 
     private final RestClient restClient;
     private final NewsProperties properties;
+    private final ExternalApiExecutor externalApiExecutor;
 
     public SerpApiNewsClient(
             @Qualifier("serpApiRestClient") RestClient restClient,
-            NewsProperties properties
+            NewsProperties properties,
+            ExternalApiExecutor externalApiExecutor
     ) {
         this.restClient = restClient;
         this.properties = properties;
+        this.externalApiExecutor = externalApiExecutor;
     }
 
     public List<SearchArticle> searchTeamNews(String teamName) {
+        return searchTeamNews(teamName, ExternalApiInvocationContext.system());
+    }
+
+    public List<SearchArticle> searchTeamNews(String teamName, ExternalApiInvocationContext context) {
+        return externalApiExecutor.execute(ExternalApiProvider.SERP_API, "searchTeamNews", context,
+                () -> doSearchTeamNews(teamName));
+    }
+
+    private List<SearchArticle> doSearchTeamNews(String teamName) {
         String apiKey = properties.getSerpApi().getApiKey();
         if (!StringUtils.hasText(apiKey)) {
-            throw new IllegalStateException("SerpApi API key is not configured.");
+            throw new ExternalApiException(ExternalApiProvider.SERP_API, "searchTeamNews",
+                    ExternalApiErrorCategory.CONFIGURATION, null, false, null,
+                    "SerpAPI API key is not configured", null);
         }
 
         SerpApiResponse response = restClient.get()

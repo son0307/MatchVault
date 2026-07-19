@@ -11,6 +11,7 @@ import org.springframework.stereotype.Service;
 
 import java.time.Instant;
 import java.util.List;
+import com.son.soccerStreaming.global.externalapi.ExternalApiInvocationContext;
 
 @Slf4j
 @Service
@@ -44,9 +45,13 @@ public class NewsCollectionService {
     }
 
     public int collectTeam(Long teamId) {
+        return collectTeam(teamId, ExternalApiInvocationContext.system());
+    }
+
+    public int collectTeam(Long teamId, ExternalApiInvocationContext context) {
         Team team = teamRepository.findByTeamId(teamId)
                 .orElseThrow(() -> new CustomException(ErrorCode.TEAM_NOT_FOUND));
-        List<SerpApiNewsClient.SearchArticle> articles = serpApiNewsClient.searchTeamNews(team.getName());
+        List<SerpApiNewsClient.SearchArticle> articles = serpApiNewsClient.searchTeamNews(team.getName(), context);
         return newsPersistenceService.saveTeamArticles(team.getTeamId(), articles, Instant.now());
     }
 

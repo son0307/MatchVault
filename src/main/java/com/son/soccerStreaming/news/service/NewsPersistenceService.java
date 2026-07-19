@@ -69,7 +69,7 @@ public class NewsPersistenceService {
             teamNewsArticleRepository.save(relation);
             savedCount++;
         }
-        TeamNewsCollectionState collectionState = collectionStateRepository.findById(teamId)
+        TeamNewsCollectionState collectionState = collectionStateRepository.findByTeamTeamId(teamId)
                 .orElseGet(() -> TeamNewsCollectionState.builder()
                         .team(team)
                         .lastCollectedAt(seenAt)

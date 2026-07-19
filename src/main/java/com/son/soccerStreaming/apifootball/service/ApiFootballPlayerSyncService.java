@@ -94,6 +94,7 @@ public class ApiFootballPlayerSyncService {
         apiFootballSyncStatusService.recordAttempt("players", "Players", season);
         int syncedCount = 0;
         List<Long> failedTeamIds = new java.util.ArrayList<>();
+        Exception firstFailure = null;
         Set<Long> syncedPlayerIds = new LinkedHashSet<>();
         List<Team> teams = seasonTeams(league, season);
         int processedTeams = 0;
@@ -110,6 +111,9 @@ public class ApiFootballPlayerSyncService {
             } catch (SyncCancelledException exception) {
                 throw exception;
             } catch (Exception e) {
+                if (firstFailure == null) {
+                    firstFailure = e;
+                }
                 failedTeamIds.add(team.getTeamId());
                 progressReporter.error("TEAM", String.valueOf(team.getTeamId()), e.getMessage());
                 log.error("API-Football registered players team sync failed. teamId={}, season={}",
@@ -120,7 +124,7 @@ public class ApiFootballPlayerSyncService {
         }
 
         if (!failedTeamIds.isEmpty()) {
-            throw new ApiFootballRegisteredPlayerSyncException(failedTeamIds);
+            throw new ApiFootballRegisteredPlayerSyncException(failedTeamIds, firstFailure);
         }
 
         progressReporter.checkCancelled();

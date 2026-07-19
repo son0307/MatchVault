@@ -7,6 +7,7 @@ import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.time.Duration;
 
 @Getter
 @Setter
@@ -25,6 +26,8 @@ public class NewsProperties {
         private String apiKey = "";
         private int lookbackDays = 7;
         private int maxArticlesPerTeam = 20;
+        private Duration connectTimeout = Duration.ofSeconds(3);
+        private Duration requestTimeout = Duration.ofSeconds(15);
         private List<String> searchSites = new ArrayList<>(List.of(
                 "bbc.com/sport/football",
                 "skysports.com/football",
@@ -43,6 +46,8 @@ public class NewsProperties {
         private String apiKey = "";
         private String model = "gpt-5.6-luna";
         private int batchSize = 50;
+        private Duration connectTimeout = Duration.ofSeconds(3);
+        private Duration requestTimeout = Duration.ofSeconds(60);
     }
 
     @Getter

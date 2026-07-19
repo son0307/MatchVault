@@ -43,6 +43,9 @@ public class AdminAuditLog {
     @Column(length = 4000)
     private String details;
 
+    @Column(length = 30)
+    private String provider;
+
     @Column(nullable = false)
     private boolean success;
 
@@ -63,6 +66,20 @@ public class AdminAuditLog {
                 .targetId(targetId)
                 .message(message)
                 .details(details)
+                .success(success)
+                .createdAt(LocalDateTime.now())
+                .build();
+    }
+
+    public static AdminAuditLog externalApiCall(AppUser adminUser, String provider, String message,
+                                                 String details, boolean success) {
+        return AdminAuditLog.builder()
+                .adminUser(adminUser)
+                .type(AdminAuditType.EXTERNAL_API_CALL)
+                .targetType("EXTERNAL_API")
+                .message(message)
+                .details(details)
+                .provider(provider)
                 .success(success)
                 .createdAt(LocalDateTime.now())
                 .build();

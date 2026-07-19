@@ -61,6 +61,9 @@ public class ApiFootballFixtureDetailSyncScheduler {
     }
 
     private void scheduleFixtureDetailRetry(String reason, boolean applyLiveStandingImpact, Exception exception) {
+        if (!failureRetryScheduler.shouldRetry(exception)) {
+            return;
+        }
         if (exception instanceof ApiFootballFixtureDetailSyncException fixtureDetailException) {
             int index = 1;
             for (java.util.List<Long> chunk : fixtureDetailException.getFailedChunks()) {

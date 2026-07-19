@@ -7,6 +7,7 @@ import org.springframework.stereotype.Service;
 
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import com.son.soccerStreaming.global.externalapi.ExternalApiInvocationContext;
 
 @Service
 @RequiredArgsConstructor
@@ -17,13 +18,21 @@ public class AdminTeamNewsRefreshService {
     private final Set<Long> refreshingTeamIds = ConcurrentHashMap.newKeySet();
 
     public RefreshResult refresh(Long teamId) {
+        return refresh(null, teamId);
+    }
+
+    public RefreshResult refresh(Long adminUserId, Long teamId) {
         if (!refreshingTeamIds.add(teamId)) {
             throw new CustomException(ErrorCode.ADMIN_SYNC_TOO_FREQUENT);
         }
         try {
-            int collectedArticles = collectionService.collectTeam(teamId);
-            NewsTitleTranslationService.TranslationRunResult translation =
-                    translationService.translatePendingForTeam(teamId);
+            int collectedArticles = adminUserId == null
+                    ? collectionService.collectTeam(teamId)
+                    : collectionService.collectTeam(teamId,
+                    ExternalApiInvocationContext.admin(adminUserId, teamId, null, null));
+            NewsTitleTranslationService.TranslationRunResult translation = adminUserId == null
+                    ? translationService.translatePendingForTeam(teamId)
+                    : translationService.translatePendingForTeam(teamId, adminUserId);
             return new RefreshResult(
                     collectedArticles,
                     translation.candidates(),

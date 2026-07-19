@@ -2,6 +2,8 @@ package com.son.soccerStreaming.apifootball.service;
 
 import com.son.soccerStreaming.apifootball.entity.ApiFootballSyncStatus;
 import com.son.soccerStreaming.apifootball.repository.ApiFootballSyncStatusRepository;
+import com.son.soccerStreaming.global.externalapi.ExternalApiException;
+import com.son.soccerStreaming.global.externalapi.ExternalApiProvider;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
@@ -29,6 +31,7 @@ public class ApiFootballSyncStatusService {
         LocalDateTime now = LocalDateTime.now(KOREA_ZONE);
         ApiFootballSyncStatus status = status(syncKey, displayName, season, now);
         status.recordAttempt(displayName(displayName, season), now);
+        status.markProvider(ExternalApiProvider.API_FOOTBALL.name());
         apiFootballSyncStatusRepository.save(status);
     }
 
@@ -42,6 +45,7 @@ public class ApiFootballSyncStatusService {
         LocalDateTime now = LocalDateTime.now(KOREA_ZONE);
         ApiFootballSyncStatus status = status(syncKey, displayName, season, now);
         status.recordSuccess(displayName(displayName, season), now);
+        status.markProvider(ExternalApiProvider.API_FOOTBALL.name());
         apiFootballSyncStatusRepository.save(status);
     }
 
@@ -50,6 +54,7 @@ public class ApiFootballSyncStatusService {
         LocalDateTime now = LocalDateTime.now(KOREA_ZONE);
         ApiFootballSyncStatus status = statusByKey(syncKey, displayName, now);
         status.recordSuccess(displayName, now);
+        status.markProvider(ExternalApiProvider.API_FOOTBALL.name());
         apiFootballSyncStatusRepository.save(status);
     }
 
@@ -58,6 +63,7 @@ public class ApiFootballSyncStatusService {
         LocalDateTime now = LocalDateTime.now(KOREA_ZONE);
         ApiFootballSyncStatus status = status(syncKey, displayName, season, now);
         status.recordFailure(displayName(displayName, season), now, errorMessage(exception));
+        status.markProvider(ExternalApiProvider.API_FOOTBALL.name());
         apiFootballSyncStatusRepository.save(status);
     }
 
@@ -66,6 +72,7 @@ public class ApiFootballSyncStatusService {
         LocalDateTime now = LocalDateTime.now(KOREA_ZONE);
         ApiFootballSyncStatus status = statusByKey(syncKey, displayName, now);
         status.recordFailure(displayName, now, errorMessage(exception));
+        status.markProvider(ExternalApiProvider.API_FOOTBALL.name());
         apiFootballSyncStatusRepository.save(status);
     }
 
@@ -74,12 +81,32 @@ public class ApiFootballSyncStatusService {
         LocalDateTime now = LocalDateTime.now(KOREA_ZONE);
         ApiFootballSyncStatus status = statusByKey(syncKey, displayName, now);
         status.recordRetryPending(displayName, now, safeMessage(message));
+        status.markProvider(ExternalApiProvider.API_FOOTBALL.name());
         apiFootballSyncStatusRepository.save(status);
     }
 
     @Transactional(readOnly = true)
     public Optional<ApiFootballSyncStatus> findByKey(String syncKey) {
         return apiFootballSyncStatusRepository.findById(syncKey);
+    }
+
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void recordProviderSuccess(ExternalApiProvider provider, String operation, int attemptCount) {
+        LocalDateTime now = LocalDateTime.now(KOREA_ZONE);
+        ApiFootballSyncStatus status = statusByKey(provider.statusKey(), provider.displayName(), now);
+        status.recordProviderSuccess(provider.displayName(), provider.name(), operation, attemptCount, now);
+        apiFootballSyncStatusRepository.save(status);
+    }
+
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void recordProviderFailure(ExternalApiProvider provider, String operation, int attemptCount,
+                                      ExternalApiException exception) {
+        LocalDateTime now = LocalDateTime.now(KOREA_ZONE);
+        ApiFootballSyncStatus status = statusByKey(provider.statusKey(), provider.displayName(), now);
+        status.recordProviderFailure(provider.displayName(), provider.name(), operation,
+                exception.getCategory().name(), exception.getHttpStatus(), attemptCount, now,
+                safeMessage(exception.getMessage()));
+        apiFootballSyncStatusRepository.save(status);
     }
 
     private ApiFootballSyncStatus status(String syncKey, String displayName, Integer season, LocalDateTime now) {
