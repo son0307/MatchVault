@@ -5,6 +5,7 @@ import com.son.soccerStreaming.admin.repository.AdminAuditLogRepository;
 import com.son.soccerStreaming.auth.repository.AppUserRepository;
 import com.son.soccerStreaming.global.externalapi.ExternalApiCallCompletedEvent;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -13,6 +14,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 @Service
+@Slf4j
 @RequiredArgsConstructor
 public class ExternalApiAuditLogService {
     private final AppUserRepository appUserRepository;
@@ -23,7 +25,17 @@ public class ExternalApiAuditLogService {
         var context = event.context();
         if (context == null || !context.isAdminRequest()) return;
         var admin = appUserRepository.findById(context.adminUserId()).orElse(null);
-        if (admin == null) return;
+        if (admin == null) {
+            log.atWarn()
+                    .addKeyValue("event.action", "external-api-audit-persist")
+                    .addKeyValue("event.outcome", "failure")
+                    .addKeyValue("event.code", "EXTERNAL_API_AUDIT_ADMIN_NOT_FOUND")
+                    .addKeyValue("external_api.provider", event.provider().name())
+                    .addKeyValue("external_api.operation", event.operation())
+                    .addKeyValue("user.id", context.adminUserId())
+                    .log("External API admin audit was skipped because the admin user was not found.");
+            return;
+        }
 
         List<String> details = new ArrayList<>();
         details.add("operation=" + event.operation());

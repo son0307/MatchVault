@@ -1,5 +1,6 @@
 package com.son.soccerStreaming.global.externalapi;
 
+import tools.jackson.databind.ObjectMapper;
 import com.son.soccerStreaming.apifootball.service.ApiFootballSyncStatusService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -36,7 +37,7 @@ class ExternalApiExecutorTest {
     void setUp() {
         statusService = mock(ApiFootballSyncStatusService.class);
         eventPublisher = mock(ApplicationEventPublisher.class);
-        executor = new ExternalApiExecutor(statusService, eventPublisher);
+        executor = new ExternalApiExecutor(statusService, eventPublisher, new ObjectMapper());
         ReflectionTestUtils.setField(executor, "maxAttempts", 3);
         ReflectionTestUtils.setField(executor, "initialDelay", Duration.ZERO);
         ReflectionTestUtils.setField(executor, "maxDelay", Duration.ZERO);
@@ -82,9 +83,11 @@ class ExternalApiExecutorTest {
     @Test
     void distinguishesQuotaExhaustionFromRateLimit() {
         var quota = HttpClientErrorException.create(HttpStatus.TOO_MANY_REQUESTS, "limited", HttpHeaders.EMPTY,
-                "{\"error\":\"insufficient_quota\"}".getBytes(StandardCharsets.UTF_8), StandardCharsets.UTF_8);
+                "{\"error\":{\"code\":\"insufficient_quota\",\"type\":\"insufficient_quota\",\"message\":\"You exceeded your current quota\"}}"
+                        .getBytes(StandardCharsets.UTF_8), StandardCharsets.UTF_8);
         var rate = HttpClientErrorException.create(HttpStatus.TOO_MANY_REQUESTS, "limited", HttpHeaders.EMPTY,
-                "{\"error\":\"slow down\"}".getBytes(StandardCharsets.UTF_8), StandardCharsets.UTF_8);
+                "{\"error\":{\"code\":\"rate_limit_exceeded\",\"type\":\"requests\",\"message\":\"Rate limit reached\"}}"
+                        .getBytes(StandardCharsets.UTF_8), StandardCharsets.UTF_8);
 
         ExternalApiException quotaFailure = executor.classify(ExternalApiProvider.OPENAI, "translate", quota);
         ExternalApiException rateFailure = executor.classify(ExternalApiProvider.OPENAI, "translate", rate);
@@ -93,6 +96,35 @@ class ExternalApiExecutorTest {
         assertThat(quotaFailure.isRetryable()).isFalse();
         assertThat(rateFailure.getCategory()).isEqualTo(ExternalApiErrorCategory.RATE_LIMITED);
         assertThat(rateFailure.isRetryable()).isTrue();
+    }
+
+    @Test
+    void classifiesSerpApiQuotaUsingItsStructuredErrorField() {
+        var quota = HttpClientErrorException.create(HttpStatus.TOO_MANY_REQUESTS, "limited", HttpHeaders.EMPTY,
+                "{\"error\":\"Your account has run out of searches.\"}"
+                        .getBytes(StandardCharsets.UTF_8), StandardCharsets.UTF_8);
+        var throughput = HttpClientErrorException.create(HttpStatus.TOO_MANY_REQUESTS, "limited", HttpHeaders.EMPTY,
+                "{\"error\":\"Hourly throughput limit exceeded.\"}"
+                        .getBytes(StandardCharsets.UTF_8), StandardCharsets.UTF_8);
+
+        ExternalApiException quotaFailure = executor.classify(ExternalApiProvider.SERP_API, "search", quota);
+        ExternalApiException throughputFailure = executor.classify(ExternalApiProvider.SERP_API, "search", throughput);
+
+        assertThat(quotaFailure.getCategory()).isEqualTo(ExternalApiErrorCategory.QUOTA_EXHAUSTED);
+        assertThat(quotaFailure.isRetryable()).isFalse();
+        assertThat(throughputFailure.getCategory()).isEqualTo(ExternalApiErrorCategory.RATE_LIMITED);
+        assertThat(throughputFailure.isRetryable()).isTrue();
+    }
+
+    @Test
+    void keepsUnknownOrMalformed429RetryableWithoutGuessingQuota() {
+        var malformed = HttpClientErrorException.create(HttpStatus.TOO_MANY_REQUESTS, "limited", HttpHeaders.EMPTY,
+                "not-json".getBytes(StandardCharsets.UTF_8), StandardCharsets.UTF_8);
+
+        ExternalApiException failure = executor.classify(ExternalApiProvider.OPENAI, "translate", malformed);
+
+        assertThat(failure.getCategory()).isEqualTo(ExternalApiErrorCategory.RATE_LIMITED);
+        assertThat(failure.isRetryable()).isTrue();
     }
 
     @Test

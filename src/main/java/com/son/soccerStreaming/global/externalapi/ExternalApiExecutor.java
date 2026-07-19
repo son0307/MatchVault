@@ -1,5 +1,7 @@
 package com.son.soccerStreaming.global.externalapi;
 
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 import com.son.soccerStreaming.apifootball.client.ApiFootballCircuitOpenException;
 import com.son.soccerStreaming.apifootball.service.ApiFootballSyncStatusService;
 import lombok.RequiredArgsConstructor;
@@ -31,6 +33,7 @@ import java.util.function.Supplier;
 public class ExternalApiExecutor {
     private final ApiFootballSyncStatusService syncStatusService;
     private final ApplicationEventPublisher eventPublisher;
+    private final ObjectMapper objectMapper;
 
     @Value("${external-api.retry.max-attempts:3}") private int maxAttempts;
     @Value("${external-api.retry.initial-delay:500ms}") private Duration initialDelay;
@@ -83,10 +86,10 @@ public class ExternalApiExecutor {
         }
         if (exception instanceof RestClientResponseException responseException) {
             int status = responseException.getStatusCode().value();
-            String body = responseException.getResponseBodyAsString().toLowerCase(Locale.ROOT);
+            String body = responseException.getResponseBodyAsString();
             Duration retryAfter = retryAfter(responseException.getResponseHeaders());
             if (status == 429) {
-                boolean quota = isQuotaError(body);
+                boolean quota = isQuotaError(provider, body);
                 return failure(provider, operation,
                         quota ? ExternalApiErrorCategory.QUOTA_EXHAUSTED : ExternalApiErrorCategory.RATE_LIMITED,
                         status, !quota, retryAfter,
@@ -127,10 +130,63 @@ public class ExternalApiExecutor {
         return new ExternalApiException(provider, operation, category, status, retryable, retryAfter, message, cause);
     }
 
-    private boolean isQuotaError(String body) {
-        return body.contains("insufficient_quota") || body.contains("run out of searches")
-                || body.contains("quota exhausted") || body.contains("billing")
-                || body.contains("credits exhausted") || body.contains("no credits");
+    private boolean isQuotaError(ExternalApiProvider provider, String body) {
+        ProviderErrorDetails details = providerErrorDetails(provider, body);
+        if (provider == ExternalApiProvider.OPENAI) {
+            if (isOpenAiQuotaCode(details.code()) || isOpenAiQuotaCode(details.type())) {
+                return true;
+            }
+            return isQuotaMessage(details.message());
+        }
+        if (provider == ExternalApiProvider.SERP_API) {
+            return details.message().contains("run out of searches")
+                    || details.message().contains("no searches remaining");
+        }
+        return false;
+    }
+
+    private ProviderErrorDetails providerErrorDetails(ExternalApiProvider provider, String body) {
+        if (body == null || body.isBlank()) return ProviderErrorDetails.EMPTY;
+        try {
+            JsonNode root = objectMapper.readTree(body);
+            if (provider == ExternalApiProvider.OPENAI) {
+                JsonNode error = root.path("error");
+                return new ProviderErrorDetails(
+                        normalized(error.path("code").asText("")),
+                        normalized(error.path("type").asText("")),
+                        normalized(error.path("message").asText(""))
+                );
+            }
+            if (provider == ExternalApiProvider.SERP_API) {
+                return new ProviderErrorDetails("", "", normalized(root.path("error").asText("")));
+            }
+        } catch (RuntimeException parseFailure) {
+            log.atDebug()
+                    .addKeyValue("event.action", "external-api-error-classification")
+                    .addKeyValue("event.outcome", "failure")
+                    .addKeyValue("event.code", "EXTERNAL_API_ERROR_BODY_PARSE_FAILED")
+                    .addKeyValue("external_api.provider", provider.name())
+                    .log("External API error body could not be parsed for classification.");
+        }
+        return ProviderErrorDetails.EMPTY;
+    }
+
+    private boolean isOpenAiQuotaCode(String value) {
+        return value.equals("insufficient_quota")
+                || value.equals("billing_hard_limit_reached")
+                || value.equals("billing_not_active")
+                || value.equals("credits_exhausted");
+    }
+
+    private boolean isQuotaMessage(String message) {
+        return message.contains("exceeded your current quota")
+                || message.contains("quota exhausted")
+                || message.contains("run out of credits")
+                || message.contains("credits exhausted");
+    }
+
+    private String normalized(String value) {
+        return value == null ? "" : value.trim().toLowerCase(Locale.ROOT);
     }
 
     private Duration retryAfter(HttpHeaders headers) {
@@ -181,8 +237,14 @@ public class ExternalApiExecutor {
         try {
             syncStatusService.recordProviderSuccess(provider, operation, attempts);
         } catch (RuntimeException statusFailure) {
-            log.error("Failed to persist external API success status. provider={}, operation={}",
-                    provider, operation, statusFailure);
+            log.atError()
+                    .addKeyValue("event.action", "external-api-status-persist")
+                    .addKeyValue("event.outcome", "failure")
+                    .addKeyValue("event.code", "EXTERNAL_API_STATUS_PERSIST_FAILED")
+                    .addKeyValue("external_api.provider", provider.name())
+                    .addKeyValue("external_api.operation", operation)
+                    .setCause(statusFailure)
+                    .log("Failed to persist external API success status.");
         }
     }
 
@@ -191,8 +253,14 @@ public class ExternalApiExecutor {
         try {
             syncStatusService.recordProviderFailure(provider, operation, attempts, failure);
         } catch (RuntimeException statusFailure) {
-            log.error("Failed to persist external API failure status. provider={}, operation={}",
-                    provider, operation, statusFailure);
+            log.atError()
+                    .addKeyValue("event.action", "external-api-status-persist")
+                    .addKeyValue("event.outcome", "failure")
+                    .addKeyValue("event.code", "EXTERNAL_API_STATUS_PERSIST_FAILED")
+                    .addKeyValue("external_api.provider", provider.name())
+                    .addKeyValue("external_api.operation", operation)
+                    .setCause(statusFailure)
+                    .log("Failed to persist external API failure status.");
         }
     }
 
@@ -205,7 +273,18 @@ public class ExternalApiExecutor {
                     failure == null ? null : failure.getHttpStatus(),
                     failure == null ? null : failure.getCategory()));
         } catch (RuntimeException eventFailure) {
-            log.error("Failed to publish external API completion event. provider={}, operation={}", provider, operation, eventFailure);
+            log.atError()
+                    .addKeyValue("event.action", "external-api-event-publish")
+                    .addKeyValue("event.outcome", "failure")
+                    .addKeyValue("event.code", "EXTERNAL_API_EVENT_PUBLISH_FAILED")
+                    .addKeyValue("external_api.provider", provider.name())
+                    .addKeyValue("external_api.operation", operation)
+                    .setCause(eventFailure)
+                    .log("Failed to publish external API completion event.");
         }
+    }
+
+    private record ProviderErrorDetails(String code, String type, String message) {
+        private static final ProviderErrorDetails EMPTY = new ProviderErrorDetails("", "", "");
     }
 }

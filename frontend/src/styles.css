@@ -5056,6 +5056,11 @@ h2 {
   color: #9b2418;
   font-size: 0.8rem;
   font-weight: 800;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
   overflow-wrap: anywhere;
 }
 
