@@ -128,6 +128,43 @@ class ExternalApiExecutorTest {
     }
 
     @Test
+    void doesNotRetryEarlierThanRetryAfterWhenItExceedsWaitLimit() {
+        ReflectionTestUtils.setField(executor, "maxRetryAfter", Duration.ofSeconds(30));
+        HttpHeaders headers = new HttpHeaders();
+        headers.set(HttpHeaders.RETRY_AFTER, "120");
+        AtomicInteger calls = new AtomicInteger();
+
+        assertThatThrownBy(() -> executor.execute(ExternalApiProvider.OPENAI, "translate", () -> {
+            calls.incrementAndGet();
+            throw HttpClientErrorException.create(HttpStatus.TOO_MANY_REQUESTS, "limited", headers,
+                    "{\"error\":{\"code\":\"rate_limit_exceeded\"}}".getBytes(StandardCharsets.UTF_8),
+                    StandardCharsets.UTF_8);
+        })).isInstanceOfSatisfying(ExternalApiException.class, failure -> {
+            assertThat(failure.isRetryable()).isTrue();
+            assertThat(failure.getRetryAfter()).isEqualTo(Duration.ofSeconds(120));
+        });
+
+        assertThat(calls).hasValue(1);
+        verify(statusService).recordProviderFailure(eq(ExternalApiProvider.OPENAI), eq("translate"), eq(1), any());
+    }
+
+    @Test
+    void parsesHttpDateRetryAfterAsAnAbsoluteInstant() {
+        HttpHeaders headers = new HttpHeaders();
+        String retryAt = java.time.ZonedDateTime.now(java.time.ZoneOffset.UTC)
+                .plusSeconds(60)
+                .format(java.time.format.DateTimeFormatter.RFC_1123_DATE_TIME);
+        headers.set(HttpHeaders.RETRY_AFTER, retryAt);
+        var response = HttpClientErrorException.create(HttpStatus.TOO_MANY_REQUESTS, "limited", headers,
+                "{\"error\":{\"code\":\"rate_limit_exceeded\"}}".getBytes(StandardCharsets.UTF_8),
+                StandardCharsets.UTF_8);
+
+        ExternalApiException failure = executor.classify(ExternalApiProvider.OPENAI, "translate", response);
+
+        assertThat(failure.getRetryAfter()).isBetween(Duration.ofSeconds(55), Duration.ofSeconds(60));
+    }
+
+    @Test
     void classifiesPermanentHttpErrorsWithoutRetry() {
         assertCategory(400, ExternalApiErrorCategory.BAD_REQUEST, false);
         assertCategory(401, ExternalApiErrorCategory.AUTHENTICATION, false);

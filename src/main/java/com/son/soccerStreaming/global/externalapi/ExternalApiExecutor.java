@@ -19,6 +19,7 @@ import java.net.SocketTimeoutException;
 import java.net.http.HttpConnectTimeoutException;
 import java.net.http.HttpTimeoutException;
 import java.time.Duration;
+import java.time.Instant;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
@@ -57,7 +58,19 @@ public class ExternalApiExecutor {
                 return result;
             } catch (Exception exception) {
                 ExternalApiException failure = classify(provider, operation, exception);
-                if (!failure.isRetryable() || attempt >= configuredAttempts) {
+                boolean retryAfterExceedsLimit = retryAfterExceedsLimit(failure);
+                if (!failure.isRetryable() || attempt >= configuredAttempts || retryAfterExceedsLimit) {
+                    if (retryAfterExceedsLimit) {
+                        log.atWarn()
+                                .addKeyValue("event.action", "external-api-retry")
+                                .addKeyValue("event.outcome", "skipped")
+                                .addKeyValue("event.code", "EXTERNAL_API_RETRY_AFTER_EXCEEDS_LIMIT")
+                                .addKeyValue("external_api.provider", provider.name())
+                                .addKeyValue("external_api.operation", operation)
+                                .addKeyValue("external_api.retry_after_ms", failure.getRetryAfter().toMillis())
+                                .addKeyValue("external_api.max_retry_after_ms", maxRetryAfter.toMillis())
+                                .log("External API synchronous retry was skipped because Retry-After exceeds the wait limit.");
+                    }
                     recordFailure(provider, operation, attempt, failure);
                     publish(provider, operation, context, false, attempt, startedAt, null, failure);
                     throw failure;
@@ -198,7 +211,7 @@ public class ExternalApiExecutor {
         } catch (NumberFormatException ignored) {
             try {
                 ZonedDateTime retryAt = ZonedDateTime.parse(value, DateTimeFormatter.RFC_1123_DATE_TIME);
-                Duration delay = Duration.between(ZonedDateTime.now(retryAt.getZone()), retryAt);
+                Duration delay = Duration.between(Instant.now(), retryAt.toInstant());
                 return delay.isNegative() ? Duration.ZERO : delay;
             } catch (DateTimeParseException ignoredDate) {
                 return null;
@@ -207,14 +220,16 @@ public class ExternalApiExecutor {
     }
 
     private Duration retryDelay(ExternalApiException failure, int attempt) {
-        if (failure.getRetryAfter() != null) return min(failure.getRetryAfter(), maxRetryAfter);
+        if (failure.getRetryAfter() != null) return failure.getRetryAfter();
         long exponential = Math.min(maxDelay.toMillis(), initialDelay.toMillis() * (1L << Math.min(attempt - 1, 20)));
         long jitterBound = Math.max(0, jitterMax.toMillis());
         long jitter = jitterBound == 0 ? 0 : ThreadLocalRandom.current().nextLong(jitterBound + 1);
         return Duration.ofMillis(Math.min(maxDelay.toMillis(), exponential + jitter));
     }
 
-    private Duration min(Duration left, Duration right) { return left.compareTo(right) <= 0 ? left : right; }
+    private boolean retryAfterExceedsLimit(ExternalApiException failure) {
+        return failure.getRetryAfter() != null && failure.getRetryAfter().compareTo(maxRetryAfter) > 0;
+    }
 
     private void sleep(Duration delay, ExternalApiProvider provider, String operation) {
         try {
