@@ -85,7 +85,9 @@ public class ApiFootballSyncFailureRetryScheduler {
         }
 
         RetryState newState = new RetryState(executionKey, description, retryAction, configuredMaxAttempts);
-        terminalFailedRetries.remove(retryKey);
+        // A new automatic/startup synchronization supersedes terminal failures from its previous run.
+        // Partial retries use scheduleNext directly, so they do not clear sibling terminal failures here.
+        terminalFailedRetries.entrySet().removeIf(entry -> entry.getValue().equals(executionKey));
         RetryState existingState = retryStates.putIfAbsent(retryKey, newState);
         if (existingState != null) {
             log.warn("API-Football sync failure retry already pending. retryKey={}, executionKey={}, description={}, currentAttempt={}/{}",

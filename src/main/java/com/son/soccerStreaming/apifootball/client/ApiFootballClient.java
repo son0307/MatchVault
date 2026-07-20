@@ -6,6 +6,7 @@ import com.son.soccerStreaming.apifootball.dto.ApiFootballLeagueDto;
 import com.son.soccerStreaming.apifootball.dto.ApiFootballLineupDto;
 import com.son.soccerStreaming.apifootball.dto.ApiFootballLiveDto;
 import com.son.soccerStreaming.apifootball.dto.ApiFootballPlayerDto;
+import com.son.soccerStreaming.apifootball.dto.ApiFootballResponseEnvelope;
 import com.son.soccerStreaming.apifootball.dto.ApiFootballStandingDto;
 import com.son.soccerStreaming.apifootball.dto.ApiFootballTeamDto;
 import lombok.RequiredArgsConstructor;
@@ -267,15 +268,18 @@ public class ApiFootballClient {
         return standingResponseOf(body);
     }
 
-    private <T> T get(String operation, String path, ParameterizedTypeReference<T> responseType, Object... uriVariables) {
+    private <T extends ApiFootballResponseEnvelope<?>> T get(
+            String operation, String path, ParameterizedTypeReference<T> responseType, Object... uriVariables) {
         try {
             T response = externalApiExecutor.execute(ExternalApiProvider.API_FOOTBALL, operation, () -> {
                 apiFootballCircuitBreaker.beforeRequest(operation);
-                return apiFootballRestClient.get()
+                var responseEntity = apiFootballRestClient.get()
                         .uri(baseUrl + path, uriVariables)
                         .headers(this::setApiHeaders)
                         .retrieve()
-                        .body(responseType);
+                        .toEntity(responseType);
+                return ApiFootballResponseValidator.validate(
+                        operation, responseEntity.getStatusCode(), responseEntity.getBody());
             });
             apiFootballCircuitBreaker.recordSuccess();
             return response;

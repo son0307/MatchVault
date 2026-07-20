@@ -160,6 +160,26 @@ class ApiFootballSyncFailureRetrySchedulerTest {
     }
 
     @Test
+    void aNewAutomaticRetryBatchSupersedesTerminalFailuresFromThePreviousRun() {
+        ArgumentCaptor<Runnable> taskCaptor = ArgumentCaptor.forClass(Runnable.class);
+        String executionKey = "players:league=39; season=2025";
+
+        scheduler.schedule("registered-players:39:2025:team:1", executionKey,
+                "previous team failure", new RuntimeException(), () -> {
+                    throw nonRetryableFailure();
+                });
+        verify(executor).schedule(taskCaptor.capture(), anyLong(), eq(TimeUnit.MILLISECONDS));
+        taskCaptor.getValue().run();
+
+        scheduler.schedule("registered-players:39:2025:team:2", executionKey,
+                "current team failure", new RuntimeException(), () -> { });
+        verify(executor, times(2)).schedule(taskCaptor.capture(), anyLong(), eq(TimeUnit.MILLISECONDS));
+        taskCaptor.getValue().run();
+
+        verify(syncStatusService).recordSuccessByKey("players:2025", "Players 2025");
+    }
+
+    @Test
     void activeSynchronizationDefersWithoutRunningTheRetryAction() {
         ArgumentCaptor<Runnable> taskCaptor = ArgumentCaptor.forClass(Runnable.class);
         String executionKey = "fixtures:league=39; season=2025";
