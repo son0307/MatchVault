@@ -24,6 +24,9 @@ public interface AdminSyncJobRepository extends JpaRepository<AdminSyncJob, Long
 
     List<AdminSyncJob> findAllByStatusIn(Collection<AdminSyncJobStatus> statuses);
 
+    boolean existsByTaskAndDetailsAndStatusIn(
+            String task, String details, Collection<AdminSyncJobStatus> statuses);
+
     @EntityGraph(attributePaths = "adminUser")
     List<AdminSyncJob> findAllByStatusInOrderByCreatedAtDesc(Collection<AdminSyncJobStatus> statuses);
 

@@ -1,6 +1,7 @@
 package com.son.soccerStreaming.apifootball.runner;
 
 import com.son.soccerStreaming.apifootball.scheduler.ApiFootballSyncFailureRetryScheduler;
+import com.son.soccerStreaming.apifootball.service.ApiFootballSyncExecutionGuard;
 import com.son.soccerStreaming.apifootball.service.LeagueSeasonCoverageSyncService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -25,15 +26,19 @@ public class LeagueSeasonCoverageStartupSyncRunner implements CommandLineRunner 
 
     @Override
     public void run(String... args) {
+        String syncKey = ApiFootballSyncExecutionGuard.key("seasons", "league=" + league);
         log.info("API-Football startup league season coverage sync started. league={}", league);
         try {
             leagueSeasonCoverageSyncService.syncLeagueSeasons(league);
+            failureRetryScheduler.cancelPendingByExecutionKey(syncKey);
         } catch (Exception e) {
             log.error("API-Football startup league season coverage sync failed. league={}", league, e);
             if (!failureRetryScheduler.shouldRetry(e)) return;
             failureRetryScheduler.schedule(
                     "startup:league-seasons:%s".formatted(league),
+                    syncKey,
                     "startup league season coverage sync league=%s".formatted(league),
+                    e,
                     () -> leagueSeasonCoverageSyncService.syncLeagueSeasons(league)
             );
         }

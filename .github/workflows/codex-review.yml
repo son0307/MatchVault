@@ -20,7 +20,7 @@ jobs:
     if: ${{ github.event.pull_request.draft == false }}
     env:
       OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-      CODEX_REVIEW_MODEL: ${{ vars.CODEX_REVIEW_MODEL || 'gpt-5.4-mini' }}
+      CODEX_REVIEW_MODEL: ${{ vars.CODEX_REVIEW_MODEL || 'gpt-5.6-luna' }}
 
     steps:
       - name: Checkout base branch prompts
@@ -37,7 +37,7 @@ jobs:
 
             const marker = '<!-- codex-pr-review -->';
             const maxDiffChars = 90000;
-            const model = process.env.CODEX_REVIEW_MODEL || 'gpt-5.4-mini';
+            const model = process.env.CODEX_REVIEW_MODEL || 'gpt-5.6-luna';
             const apiKey = process.env.OPENAI_API_KEY;
 
             if (!apiKey) {

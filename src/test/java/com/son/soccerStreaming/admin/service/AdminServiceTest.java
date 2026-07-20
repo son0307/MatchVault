@@ -6,6 +6,10 @@ import com.son.soccerStreaming.apifootball.service.ApiFootballInjurySyncService;
 import com.son.soccerStreaming.apifootball.service.ApiFootballPlayerSyncService;
 import com.son.soccerStreaming.apifootball.service.ApiFootballStandingSyncService;
 import com.son.soccerStreaming.apifootball.service.ApiFootballTeamSyncService;
+import com.son.soccerStreaming.apifootball.service.ApiFootballSyncExecutionGuard;
+import com.son.soccerStreaming.apifootball.service.ApiFootballSyncStatusService;
+import com.son.soccerStreaming.apifootball.scheduler.ApiFootballSyncFailureRetryScheduler;
+import com.son.soccerStreaming.apifootball.service.SyncProgressReporter;
 import com.son.soccerStreaming.apifootball.service.LeagueSeasonCoverageSyncService;
 import com.son.soccerStreaming.admin.dto.AdminDto;
 import com.son.soccerStreaming.admin.entity.AdminAuditLog;
@@ -16,6 +20,7 @@ import com.son.soccerStreaming.admin.entity.AdminSyncJobStatus;
 import com.son.soccerStreaming.apifootball.repository.ApiFootballSyncStatusRepository;
 import com.son.soccerStreaming.auth.entity.AppUser;
 import com.son.soccerStreaming.global.exception.CustomException;
+import com.son.soccerStreaming.global.exception.ErrorCode;
 import com.son.soccerStreaming.fixture.entity.Fixture;
 import com.son.soccerStreaming.fixture.repository.FixtureEventRepository;
 import com.son.soccerStreaming.fixture.repository.FixtureLineupRepository;
@@ -53,7 +58,9 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.mock;
 
 @ExtendWith(MockitoExtension.class)
 class AdminServiceTest {
@@ -87,6 +94,8 @@ class AdminServiceTest {
     @Mock
     private ApiFootballSyncStatusRepository apiFootballSyncStatusRepository;
     @Mock
+    private ApiFootballSyncStatusService apiFootballSyncStatusService;
+    @Mock
     private ApiFootballTeamSyncService apiFootballTeamSyncService;
     @Mock
     private ApiFootballStandingSyncService apiFootballStandingSyncService;
@@ -104,6 +113,10 @@ class AdminServiceTest {
     private AdminSyncTaskRunner adminSyncTaskRunner;
     @Mock
     private AdminSyncJobService adminSyncJobService;
+    @Mock
+    private ApiFootballSyncExecutionGuard apiFootballSyncExecutionGuard;
+    @Mock
+    private ApiFootballSyncFailureRetryScheduler apiFootballSyncFailureRetryScheduler;
     @Mock
     private MediaUrlService mediaUrlService;
 
@@ -259,6 +272,88 @@ class AdminServiceTest {
                 any(AdminSyncTaskRunner.SyncTask.class),
                 any(Runnable.class)
         );
+    }
+
+    @Test
+    void successfulSynchronousAdminSyncCancelsPendingAutomaticRetry() {
+        when(appUserRepository.findById(1L)).thenReturn(Optional.of(adminUser()));
+        when(leagueSeasonCoverageSyncService.syncLeagueSeasons(39)).thenReturn(3);
+
+        AdminDto.SyncResponse response = adminService.syncLeagueSeasons(1L, 39);
+
+        assertThat(response.isSuccess()).isTrue();
+        verify(apiFootballSyncFailureRetryScheduler)
+                .cancelPendingByExecutionKey("seasons:league=39");
+    }
+
+    @Test
+    void failedAdminSyncDoesNotScheduleSlowRetry() {
+        when(appUserRepository.findById(1L)).thenReturn(Optional.of(adminUser()));
+        when(leagueSeasonCoverageSyncService.syncLeagueSeasons(39))
+                .thenThrow(new RuntimeException("upstream failed"));
+
+        AdminDto.SyncResponse response = adminService.syncLeagueSeasons(1L, 39);
+
+        assertThat(response.isSuccess()).isFalse();
+        verifyNoInteractions(apiFootballSyncFailureRetryScheduler);
+    }
+
+    @Test
+    void queuedAdminSyncCancelsPendingRetryOnlyAfterTheWorkerTaskSucceeds() throws Exception {
+        when(appUserRepository.findById(1L)).thenReturn(Optional.of(adminUser()));
+        when(adminSyncJobService.create(
+                1L, "players", "PLAYER", null, 2025, "league=39; season=2025"
+        )).thenReturn(AdminSyncJob.builder().id(99L).build());
+        when(leagueSeasonCoverageRepository.findByLeagueIdAndSeasonYear(39, 2025)).thenReturn(Optional.of(
+                LeagueSeasonCoverage.builder()
+                        .leagueId(39)
+                        .seasonYear(2025)
+                        .players(true)
+                        .build()
+        ));
+        when(teamStandingRepository.existsByLeagueIdAndSeason(39, 2025)).thenReturn(true);
+        when(apiFootballPlayerSyncService.syncRegisteredPlayers(
+                eq(39), eq(2025), eq(7000L), any(SyncProgressReporter.class)))
+                .thenReturn(20);
+
+        adminService.syncPlayers(1L, 39, 2025, 7000L);
+
+        verify(apiFootballSyncFailureRetryScheduler, org.mockito.Mockito.never())
+                .cancelPendingByExecutionKey(any());
+        ArgumentCaptor<AdminSyncTaskRunner.SyncTask> taskCaptor =
+                ArgumentCaptor.forClass(AdminSyncTaskRunner.SyncTask.class);
+        verify(adminSyncTaskRunner).run(
+                eq(99L), eq(1L), eq("players"), eq("PLAYER"), eq((Long) null),
+                eq("league=39; season=2025"), taskCaptor.capture(), any(Runnable.class));
+
+        taskCaptor.getValue().run(mock(SyncProgressReporter.class));
+
+        verify(apiFootballSyncFailureRetryScheduler)
+                .cancelPendingByExecutionKey("players:league=39; season=2025");
+    }
+
+    @Test
+    void syncPlayersDoesNotQueueWhenSameJobIsAlreadyActive() {
+        when(leagueSeasonCoverageRepository.findByLeagueIdAndSeasonYear(39, 2025)).thenReturn(Optional.of(
+                LeagueSeasonCoverage.builder()
+                        .leagueId(39)
+                        .seasonYear(2025)
+                        .players(true)
+                        .build()
+        ));
+        when(teamStandingRepository.existsByLeagueIdAndSeason(39, 2025)).thenReturn(true);
+        when(appUserRepository.findById(1L)).thenReturn(Optional.of(adminUser()));
+        when(adminSyncJobService.hasActiveJob("players", "league=39; season=2025")).thenReturn(true);
+
+        assertThatThrownBy(() -> adminService.syncPlayers(1L, 39, 2025, 7000L))
+                .isInstanceOfSatisfying(CustomException.class,
+                        exception -> assertThat(exception.getErrorCode())
+                                .isEqualTo(ErrorCode.ADMIN_SYNC_ALREADY_RUNNING));
+
+        verify(adminSyncJobService, org.mockito.Mockito.never())
+                .create(any(), any(), any(), any(), any(), any());
+        verify(adminSyncTaskRunner, org.mockito.Mockito.never())
+                .run(any(), any(), any(), any(), any(), any(), any(), any());
     }
 
     @Test

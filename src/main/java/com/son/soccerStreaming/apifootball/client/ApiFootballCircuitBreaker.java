@@ -1,6 +1,5 @@
 package com.son.soccerStreaming.apifootball.client;
 
-import com.son.soccerStreaming.global.externalapi.ExternalApiErrorCategory;
 import com.son.soccerStreaming.global.externalapi.ExternalApiException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -49,9 +48,7 @@ public class ApiFootballCircuitBreaker {
     }
 
     public void recordFailure(String operation, Exception exception) {
-        if (!enabled || exception instanceof ApiFootballCircuitOpenException
-                || exception instanceof ExternalApiException external
-                && external.getCategory() == ExternalApiErrorCategory.CIRCUIT_OPEN) {
+        if (!enabled || !countsAsProviderFailure(exception)) {
             return;
         }
         int failures = consecutiveFailures.incrementAndGet();
@@ -63,6 +60,19 @@ public class ApiFootballCircuitBreaker {
         openUntilEpochMs.set(openUntil);
         log.warn("API-Football circuit opened. operation={}, failureCount={}, openUntilEpochMs={}",
                 operation, failures, openUntil);
+    }
+
+    boolean countsAsProviderFailure(Exception exception) {
+        if (exception instanceof ApiFootballCircuitOpenException) {
+            return false;
+        }
+        if (!(exception instanceof ExternalApiException external)) {
+            return true;
+        }
+        return switch (external.getCategory()) {
+            case TIMEOUT, NETWORK, UPSTREAM_SERVER, INVALID_RESPONSE -> true;
+            default -> false;
+        };
     }
 
     private int configuredFailureThreshold() {

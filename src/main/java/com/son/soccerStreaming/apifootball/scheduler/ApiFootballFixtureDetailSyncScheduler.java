@@ -2,6 +2,7 @@ package com.son.soccerStreaming.apifootball.scheduler;
 
 import com.son.soccerStreaming.apifootball.service.ApiFootballFixtureDetailSyncException;
 import com.son.soccerStreaming.apifootball.service.ApiFootballFixtureDetailSyncService;
+import com.son.soccerStreaming.apifootball.service.ApiFootballSyncExecutionGuard;
 import com.son.soccerStreaming.fixture.entity.Fixture;
 import com.son.soccerStreaming.live.service.LiveFixtureBroadcastService;
 import com.son.soccerStreaming.fixture.repository.FixtureRepository;
@@ -24,43 +25,63 @@ public class ApiFootballFixtureDetailSyncScheduler {
     private final LiveFixtureBroadcastService liveFixtureBroadcastService;
     private final FixtureRepository fixtureRepository;
     private final ApiFootballSyncFailureRetryScheduler failureRetryScheduler;
+    private final ApiFootballSyncExecutionGuard executionGuard;
 
     @Value("${api-football.sync.fixtures.season:2025}")
     private Integer season;
 
     @Scheduled(cron = "${api-football.sync.fixture-details.live-cron:0 * * * * *}")
     public void syncLiveFixtureDetails() {
+        String syncKey = ApiFootballSyncExecutionGuard.key("fixture-details-live", "live");
+        if (!executionGuard.executeIfAvailable(syncKey, () -> syncLiveFixtureDetailsSafely(syncKey))) {
+            log.info("API-Football live fixture detail sync skipped because the same job is active. syncKey={}", syncKey);
+        }
+    }
+
+    private void syncLiveFixtureDetailsSafely(String syncKey) {
         try {
-            syncLiveFixtureDetailsNow();
+            if (syncLiveFixtureDetailsNow()) {
+                failureRetryScheduler.cancelPendingByExecutionKey(syncKey);
+            }
         } catch (Exception e) {
             log.error("API-Football live fixture detail sync failed.", e);
-            scheduleFixtureDetailRetry("live", true, e);
+            scheduleFixtureDetailRetry(syncKey, "live", true, e);
         }
     }
 
     @Scheduled(cron = "${api-football.sync.fixture-details.daily-cron:0 55 4 * * *}")
     public void syncFixtureDetailsDaily() {
-        try {
-            apiFootballFixtureDetailSyncService.syncSeasonFixtureDetails(season, false);
-        } catch (Exception e) {
-            log.error("API-Football daily fixture detail sync failed.", e);
-            scheduleFixtureDetailRetry("daily:%s".formatted(season), false, e);
+        String syncKey = ApiFootballSyncExecutionGuard.key("fixture-details", "season=" + season);
+        if (!executionGuard.executeIfAvailable(syncKey, () -> syncFixtureDetailsDailyNow(syncKey))) {
+            log.info("API-Football daily fixture detail sync skipped because the same job is active. syncKey={}", syncKey);
         }
     }
 
-    private void syncLiveFixtureDetailsNow() {
+    private void syncFixtureDetailsDailyNow(String syncKey) {
+        try {
+            apiFootballFixtureDetailSyncService.syncSeasonFixtureDetails(season, false);
+            failureRetryScheduler.cancelPendingByExecutionKey(syncKey);
+        } catch (Exception e) {
+            log.error("API-Football daily fixture detail sync failed.", e);
+            scheduleFixtureDetailRetry(syncKey, "daily:%s".formatted(season), false, e);
+        }
+    }
+
+    private boolean syncLiveFixtureDetailsNow() {
         List<Fixture> liveFixtures = fixtureRepository.findAllByFixtureStatus("LIVE");
         if (liveFixtures.isEmpty()) {
-            return;
+            return false;
         }
 
         apiFootballFixtureDetailSyncService.syncFixtureDetailsWithResults(
                 liveFixtures,
                 true
         ).forEach(result -> liveFixtureBroadcastService.broadcastFixture(result.fixtureId(), result.latestEvent()));
+        return true;
     }
 
-    private void scheduleFixtureDetailRetry(String reason, boolean applyLiveStandingImpact, Exception exception) {
+    private void scheduleFixtureDetailRetry(String syncKey, String reason,
+                                            boolean applyLiveStandingImpact, Exception exception) {
         if (!failureRetryScheduler.shouldRetry(exception)) {
             return;
         }
@@ -70,7 +91,9 @@ public class ApiFootballFixtureDetailSyncScheduler {
                 String fixtureIds = chunk.stream().map(String::valueOf).collect(java.util.stream.Collectors.joining("-"));
                 failureRetryScheduler.schedule(
                         "fixture-details:%s:chunk:%s".formatted(reason, fixtureIds),
+                        syncKey,
                         "fixture detail sync reason=%s chunk=%s".formatted(reason, index++),
+                        exception,
                         () -> apiFootballFixtureDetailSyncService.syncFixtureDetailsByIds(chunk, applyLiveStandingImpact)
                 );
             }
@@ -79,7 +102,9 @@ public class ApiFootballFixtureDetailSyncScheduler {
 
         failureRetryScheduler.schedule(
                 "fixture-details:%s".formatted(reason),
+                syncKey,
                 "fixture detail sync reason=%s".formatted(reason),
+                exception,
                 applyLiveStandingImpact ? this::syncLiveFixtureDetailsNow
                         : () -> apiFootballFixtureDetailSyncService.syncSeasonFixtureDetails(season, false)
         );

@@ -15,8 +15,7 @@ public final class ApiFootballLiveDto {
     @Getter
     @NoArgsConstructor
     @JsonIgnoreProperties(ignoreUnknown = true)
-    public static class ApiResponse<T> {
-        private List<T> response;
+    public static class ApiResponse<T> extends ApiFootballResponseEnvelope<T> {
     }
 
     @Getter
