@@ -3,6 +3,7 @@ package com.son.soccerStreaming.apifootball.runner;
 import com.son.soccerStreaming.apifootball.scheduler.ApiFootballSyncFailureRetryScheduler;
 import com.son.soccerStreaming.apifootball.service.ApiFootballPlayerSyncService;
 import com.son.soccerStreaming.apifootball.service.ApiFootballRegisteredPlayerSyncException;
+import com.son.soccerStreaming.apifootball.service.ApiFootballSyncExecutionGuard;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -34,16 +35,19 @@ public class ApiFootballRegisteredPlayerStartupSyncRunner implements CommandLine
 
     @Override
     public void run(String... args) {
+        String syncKey = ApiFootballSyncExecutionGuard.key(
+                "players", "league=%s; season=%s".formatted(league, season));
         log.info("API-Football startup registered player sync started. league={}, season={}", league, season);
         try {
             apiFootballPlayerSyncService.syncRegisteredPlayers(league, season, delayMs);
+            failureRetryScheduler.cancelPendingByExecutionKey(syncKey);
         } catch (Exception e) {
             log.error("API-Football startup registered player sync failed. league={}, season={}", league, season, e);
-            scheduleRetry(e);
+            scheduleRetry(syncKey, e);
         }
     }
 
-    private void scheduleRetry(Exception exception) {
+    private void scheduleRetry(String syncKey, Exception exception) {
         if (!failureRetryScheduler.shouldRetry(exception)) {
             return;
         }
@@ -51,7 +55,9 @@ public class ApiFootballRegisteredPlayerStartupSyncRunner implements CommandLine
             for (Long teamId : playerSyncException.getFailedTeamIds()) {
                 failureRetryScheduler.schedule(
                         "startup:registered-players:%s:%s:team:%s".formatted(league, season, teamId),
+                        syncKey,
                         "startup registered player sync league=%s season=%s teamId=%s".formatted(league, season, teamId),
+                        exception,
                         () -> apiFootballPlayerSyncService.syncRegisteredPlayersByTeamId(teamId, league, season, delayMs)
                 );
             }
@@ -60,7 +66,9 @@ public class ApiFootballRegisteredPlayerStartupSyncRunner implements CommandLine
 
         failureRetryScheduler.schedule(
                 "startup:registered-players:%s:%s".formatted(league, season),
+                syncKey,
                 "startup registered player sync league=%s season=%s".formatted(league, season),
+                exception,
                 () -> apiFootballPlayerSyncService.syncRegisteredPlayers(league, season, delayMs)
         );
     }

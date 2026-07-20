@@ -1,6 +1,7 @@
 package com.son.soccerStreaming.apifootball.scheduler;
 
 import com.son.soccerStreaming.apifootball.service.ApiFootballStandingSyncService;
+import com.son.soccerStreaming.apifootball.service.ApiFootballSyncExecutionGuard;
 import com.son.soccerStreaming.fixture.repository.FixtureRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -18,6 +19,7 @@ public class ApiFootballStandingSyncScheduler {
     private final ApiFootballStandingSyncService apiFootballStandingSyncService;
     private final FixtureRepository fixtureRepository;
     private final ApiFootballSyncFailureRetryScheduler failureRetryScheduler;
+    private final ApiFootballSyncExecutionGuard executionGuard;
 
     @Value("${api-football.sync.standings.league:39}")
     private Integer league;
@@ -39,14 +41,26 @@ public class ApiFootballStandingSyncScheduler {
     }
 
     private void syncStandings(String reason) {
+        String syncKey = ApiFootballSyncExecutionGuard.key(
+                "standings", "league=%s; season=%s".formatted(league, season));
+        if (!executionGuard.executeIfAvailable(syncKey, () -> syncStandingsNow(reason, syncKey))) {
+            log.info("API-Football standing sync skipped because the same job is active. syncKey={}, reason={}",
+                    syncKey, reason);
+        }
+    }
+
+    private void syncStandingsNow(String reason, String syncKey) {
         try {
             apiFootballStandingSyncService.syncStandings(league, season);
+            failureRetryScheduler.cancelPendingByExecutionKey(syncKey);
         } catch (Exception e) {
             log.error("API-Football standing sync failed. reason={}, league={}, season={}", reason, league, season, e);
             if (!failureRetryScheduler.shouldRetry(e)) return;
             failureRetryScheduler.schedule(
                     "standings:%s:%s:%s".formatted(reason, league, season),
+                    syncKey,
                     "standing sync reason=%s league=%s season=%s".formatted(reason, league, season),
+                    e,
                     () -> apiFootballStandingSyncService.syncStandings(league, season)
             );
         }

@@ -43,6 +43,7 @@ public enum ErrorCode {
     INTERNAL_SERVER_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "예기치 못한 서버 오류가 발생했습니다."),
 
     // 409 CONFLICT
+    ADMIN_SYNC_ALREADY_RUNNING(HttpStatus.CONFLICT, "동일한 동기화 작업이 이미 대기 중이거나 실행 중입니다."),
     EMAIL_ALREADY_EXISTS(HttpStatus.CONFLICT, "이미 가입된 이메일입니다.");
 
     private final HttpStatus status;

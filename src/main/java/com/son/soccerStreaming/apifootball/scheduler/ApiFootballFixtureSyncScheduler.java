@@ -1,6 +1,7 @@
 package com.son.soccerStreaming.apifootball.scheduler;
 
 import com.son.soccerStreaming.apifootball.service.ApiFootballFixtureSyncService;
+import com.son.soccerStreaming.apifootball.service.ApiFootballSyncExecutionGuard;
 import com.son.soccerStreaming.fixture.repository.FixtureRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -24,6 +25,7 @@ public class ApiFootballFixtureSyncScheduler {
     private final ApiFootballFixtureSyncService apiFootballFixtureSyncService;
     private final FixtureRepository fixtureRepository;
     private final ApiFootballSyncFailureRetryScheduler failureRetryScheduler;
+    private final ApiFootballSyncExecutionGuard executionGuard;
 
     @Value("${api-football.sync.fixtures.league:39}")
     private Integer league;
@@ -48,28 +50,51 @@ public class ApiFootballFixtureSyncScheduler {
             return;
         }
 
+        String syncKey = ApiFootballSyncExecutionGuard.key(
+                "fixtures-live", "league=%s; season=%s".formatted(league, season));
+        if (!executionGuard.executeIfAvailable(syncKey, () -> syncLiveFixturesNow(syncKey))) {
+            log.info("API-Football live fixture sync skipped because the same job is active. syncKey={}", syncKey);
+        }
+    }
+
+    private void syncLiveFixturesNow(String syncKey) {
         try {
             apiFootballFixtureSyncService.syncLiveFixtures(league, season);
+            failureRetryScheduler.cancelPendingByExecutionKey(syncKey);
         } catch (Exception e) {
             log.error("API-Football live fixture sync failed.", e);
             if (!failureRetryScheduler.shouldRetry(e)) return;
             failureRetryScheduler.schedule(
                     "fixtures:live:%s:%s".formatted(league, season),
+                    syncKey,
                     "live fixture sync league=%s season=%s".formatted(league, season),
+                    e,
                     () -> apiFootballFixtureSyncService.syncLiveFixtures(league, season)
             );
         }
     }
 
     private void syncSeasonFixtures(String reason) {
+        String syncKey = ApiFootballSyncExecutionGuard.key(
+                "fixtures", "league=%s; season=%s".formatted(league, season));
+        if (!executionGuard.executeIfAvailable(syncKey, () -> syncSeasonFixturesNow(reason, syncKey))) {
+            log.info("API-Football season fixture sync skipped because the same job is active. syncKey={}, reason={}",
+                    syncKey, reason);
+        }
+    }
+
+    private void syncSeasonFixturesNow(String reason, String syncKey) {
         try {
             apiFootballFixtureSyncService.syncSeasonFixtures(league, season);
+            failureRetryScheduler.cancelPendingByExecutionKey(syncKey);
         } catch (Exception e) {
             log.error("API-Football season fixture sync failed. reason={}, league={}, season={}", reason, league, season, e);
             if (!failureRetryScheduler.shouldRetry(e)) return;
             failureRetryScheduler.schedule(
                     "fixtures:%s:%s:%s".formatted(reason, league, season),
+                    syncKey,
                     "season fixture sync reason=%s league=%s season=%s".formatted(reason, league, season),
+                    e,
                     () -> apiFootballFixtureSyncService.syncSeasonFixtures(league, season)
             );
         }

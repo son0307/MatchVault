@@ -1,8 +1,13 @@
 package com.son.soccerStreaming.apifootball.client;
 
+import com.son.soccerStreaming.global.externalapi.ExternalApiErrorCategory;
+import com.son.soccerStreaming.global.externalapi.ExternalApiException;
+import com.son.soccerStreaming.global.externalapi.ExternalApiProvider;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.util.ReflectionTestUtils;
+
+import java.time.Duration;
 
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -32,5 +37,35 @@ class ApiFootballCircuitBreakerTest {
         circuitBreaker.recordSuccess();
 
         circuitBreaker.beforeRequest("players");
+    }
+
+    @Test
+    void ignoresRequestAndRateLimitFailures() {
+        circuitBreaker.recordFailure("fixtures", failure(ExternalApiErrorCategory.BAD_REQUEST));
+        circuitBreaker.recordFailure("fixtures", failure(ExternalApiErrorCategory.RATE_LIMITED));
+
+        circuitBreaker.beforeRequest("players");
+    }
+
+    @Test
+    void opensForProviderAvailabilityFailures() {
+        circuitBreaker.recordFailure("fixtures", failure(ExternalApiErrorCategory.TIMEOUT));
+        circuitBreaker.recordFailure("standings", failure(ExternalApiErrorCategory.UPSTREAM_SERVER));
+
+        assertThatThrownBy(() -> circuitBreaker.beforeRequest("players"))
+                .isInstanceOf(ApiFootballCircuitOpenException.class);
+    }
+
+    private ExternalApiException failure(ExternalApiErrorCategory category) {
+        return new ExternalApiException(
+                ExternalApiProvider.API_FOOTBALL,
+                "test",
+                category,
+                null,
+                false,
+                Duration.ZERO,
+                "test failure",
+                null
+        );
     }
 }

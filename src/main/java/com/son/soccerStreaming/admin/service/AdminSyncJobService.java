@@ -28,6 +28,12 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class AdminSyncJobService {
 
+    private static final List<AdminSyncJobStatus> ACTIVE_STATUSES = List.of(
+            AdminSyncJobStatus.QUEUED,
+            AdminSyncJobStatus.RUNNING,
+            AdminSyncJobStatus.CANCEL_REQUESTED
+    );
+
     private final AdminSyncJobRepository jobRepository;
     private final AdminSyncJobErrorRepository errorRepository;
     private final AppUserRepository appUserRepository;
@@ -38,6 +44,11 @@ public class AdminSyncJobService {
         AppUser admin = appUserRepository.findById(adminUserId)
                 .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
         return jobRepository.save(AdminSyncJob.queued(admin, task, targetType, targetId, season, details));
+    }
+
+    @Transactional(readOnly = true)
+    public boolean hasActiveJob(String task, String details) {
+        return jobRepository.existsByTaskAndDetailsAndStatusIn(task, details, ACTIVE_STATUSES);
     }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
@@ -93,16 +104,14 @@ public class AdminSyncJobService {
     @Transactional(readOnly = true)
     public AdminDto.SyncJobListResponse recentJobs(Integer limit) {
         int safeLimit = limit == null ? 10 : Math.min(Math.max(limit, 1), 50);
-        List<AdminSyncJobStatus> activeStatuses = List.of(
-                AdminSyncJobStatus.QUEUED, AdminSyncJobStatus.RUNNING, AdminSyncJobStatus.CANCEL_REQUESTED);
         List<AdminSyncJob> activeJobs = new ArrayList<>(
-                jobRepository.findAllByStatusInOrderByCreatedAtDesc(activeStatuses));
+                jobRepository.findAllByStatusInOrderByCreatedAtDesc(ACTIVE_STATUSES));
         activeJobs.sort(Comparator
                 .comparingInt((AdminSyncJob job) -> activeRank(job.getStatus()))
                 .thenComparing(AdminSyncJob::getCreatedAt));
         List<AdminSyncJob> jobs = new ArrayList<>(activeJobs);
         jobs.addAll(jobRepository.findAllByStatusNotInOrderByCompletedAtDesc(
-                activeStatuses, PageRequest.of(0, safeLimit)));
+                ACTIVE_STATUSES, PageRequest.of(0, safeLimit)));
         List<Long> ids = jobs.stream().map(AdminSyncJob::getId).toList();
         Map<Long, List<AdminSyncJobError>> errorsByJob = ids.isEmpty()
                 ? Map.of()

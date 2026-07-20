@@ -2,6 +2,7 @@ package com.son.soccerStreaming.apifootball.scheduler;
 
 import com.son.soccerStreaming.apifootball.service.ApiFootballPlayerSyncService;
 import com.son.soccerStreaming.apifootball.service.ApiFootballRegisteredPlayerSyncException;
+import com.son.soccerStreaming.apifootball.service.ApiFootballSyncExecutionGuard;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -17,6 +18,7 @@ public class ApiFootballRegisteredPlayerSyncScheduler {
 
     private final ApiFootballPlayerSyncService apiFootballPlayerSyncService;
     private final ApiFootballSyncFailureRetryScheduler failureRetryScheduler;
+    private final ApiFootballSyncExecutionGuard executionGuard;
 
     @Value("${api-football.sync.players.registered.league:39}")
     private Integer league;
@@ -29,15 +31,24 @@ public class ApiFootballRegisteredPlayerSyncScheduler {
 
     @Scheduled(cron = "${api-football.sync.players.registered.daily-cron:0 10 5 * * *}")
     public void syncRegisteredPlayersDaily() {
-        try {
-            apiFootballPlayerSyncService.syncRegisteredPlayers(league, season, delayMs);
-        } catch (Exception e) {
-            log.error("API-Football registered player sync failed. league={}, season={}", league, season, e);
-            scheduleRetry(e);
+        String syncKey = ApiFootballSyncExecutionGuard.key(
+                "players", "league=%s; season=%s".formatted(league, season));
+        if (!executionGuard.executeIfAvailable(syncKey, () -> syncRegisteredPlayersNow(syncKey))) {
+            log.info("API-Football registered player sync skipped because the same job is active. syncKey={}", syncKey);
         }
     }
 
-    private void scheduleRetry(Exception exception) {
+    private void syncRegisteredPlayersNow(String syncKey) {
+        try {
+            apiFootballPlayerSyncService.syncRegisteredPlayers(league, season, delayMs);
+            failureRetryScheduler.cancelPendingByExecutionKey(syncKey);
+        } catch (Exception e) {
+            log.error("API-Football registered player sync failed. league={}, season={}", league, season, e);
+            scheduleRetry(syncKey, e);
+        }
+    }
+
+    private void scheduleRetry(String syncKey, Exception exception) {
         if (!failureRetryScheduler.shouldRetry(exception)) {
             return;
         }
@@ -45,7 +56,9 @@ public class ApiFootballRegisteredPlayerSyncScheduler {
             for (Long teamId : playerSyncException.getFailedTeamIds()) {
                 failureRetryScheduler.schedule(
                         "registered-players:%s:%s:team:%s".formatted(league, season, teamId),
+                        syncKey,
                         "registered player sync league=%s season=%s teamId=%s".formatted(league, season, teamId),
+                        exception,
                         () -> apiFootballPlayerSyncService.syncRegisteredPlayersByTeamId(teamId, league, season, delayMs)
                 );
             }
@@ -54,7 +67,9 @@ public class ApiFootballRegisteredPlayerSyncScheduler {
 
         failureRetryScheduler.schedule(
                 "registered-players:%s:%s".formatted(league, season),
+                syncKey,
                 "registered player sync league=%s season=%s".formatted(league, season),
+                exception,
                 () -> apiFootballPlayerSyncService.syncRegisteredPlayers(league, season, delayMs)
         );
     }

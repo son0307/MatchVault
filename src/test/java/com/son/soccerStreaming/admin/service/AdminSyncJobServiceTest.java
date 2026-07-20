@@ -50,6 +50,19 @@ class AdminSyncJobServiceTest {
     }
 
     @Test
+    void detectsQueuedRunningAndCancellationRequestedAsActiveJobs() {
+        List<AdminSyncJobStatus> activeStatuses = List.of(
+                AdminSyncJobStatus.QUEUED,
+                AdminSyncJobStatus.RUNNING,
+                AdminSyncJobStatus.CANCEL_REQUESTED
+        );
+        when(jobRepository.existsByTaskAndDetailsAndStatusIn(
+                "players", "league=39; season=2025", activeStatuses)).thenReturn(true);
+
+        assertThat(service.hasActiveJob("players", "league=39; season=2025")).isTrue();
+    }
+
+    @Test
     void failureAfterSuccessfulUnitsBecomesPartialFailure() {
         AdminSyncJob job = AdminSyncJob.queued(AppUser.builder().email("admin@example.com").build(),
                 "players", "PLAYER", null, 2025, "season=2025");

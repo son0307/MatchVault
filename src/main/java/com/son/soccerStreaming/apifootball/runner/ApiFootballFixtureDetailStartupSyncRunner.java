@@ -3,6 +3,7 @@ package com.son.soccerStreaming.apifootball.runner;
 import com.son.soccerStreaming.apifootball.scheduler.ApiFootballSyncFailureRetryScheduler;
 import com.son.soccerStreaming.apifootball.service.ApiFootballFixtureDetailSyncException;
 import com.son.soccerStreaming.apifootball.service.ApiFootballFixtureDetailSyncService;
+import com.son.soccerStreaming.apifootball.service.ApiFootballSyncExecutionGuard;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -28,17 +29,19 @@ public class ApiFootballFixtureDetailStartupSyncRunner implements CommandLineRun
 
     @Override
     public void run(String... args) {
+        String syncKey = ApiFootballSyncExecutionGuard.key("fixture-details", "season=" + season);
         log.info("API-Football startup fixture detail sync started. season={}", season);
         try {
             int syncedCount = apiFootballFixtureDetailSyncService.syncSeasonFixtureDetails(season, false);
+            failureRetryScheduler.cancelPendingByExecutionKey(syncKey);
             log.info("API-Football startup fixture detail sync completed. season={}, count={}", season, syncedCount);
         } catch (Exception e) {
             log.error("API-Football startup fixture detail sync failed. season={}", season, e);
-            scheduleRetry(e);
+            scheduleRetry(syncKey, e);
         }
     }
 
-    private void scheduleRetry(Exception exception) {
+    private void scheduleRetry(String syncKey, Exception exception) {
         if (!failureRetryScheduler.shouldRetry(exception)) {
             return;
         }
@@ -48,7 +51,9 @@ public class ApiFootballFixtureDetailStartupSyncRunner implements CommandLineRun
                 String fixtureIds = chunk.stream().map(String::valueOf).collect(java.util.stream.Collectors.joining("-"));
                 failureRetryScheduler.schedule(
                         "startup:fixture-details:%s:chunk:%s".formatted(season, fixtureIds),
+                        syncKey,
                         "startup fixture detail sync season=%s chunk=%s".formatted(season, index++),
+                        exception,
                         () -> apiFootballFixtureDetailSyncService.syncFixtureDetailsByIds(chunk, false)
                 );
             }
@@ -57,7 +62,9 @@ public class ApiFootballFixtureDetailStartupSyncRunner implements CommandLineRun
 
         failureRetryScheduler.schedule(
                 "startup:fixture-details:%s".formatted(season),
+                syncKey,
                 "startup fixture detail sync season=%s".formatted(season),
+                exception,
                 () -> apiFootballFixtureDetailSyncService.syncSeasonFixtureDetails(season, false)
         );
     }

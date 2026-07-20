@@ -269,16 +269,16 @@ public class ApiFootballClient {
 
     private <T> T get(String operation, String path, ParameterizedTypeReference<T> responseType, Object... uriVariables) {
         try {
-            return externalApiExecutor.execute(ExternalApiProvider.API_FOOTBALL, operation, () -> {
+            T response = externalApiExecutor.execute(ExternalApiProvider.API_FOOTBALL, operation, () -> {
                 apiFootballCircuitBreaker.beforeRequest(operation);
-                T response = apiFootballRestClient.get()
+                return apiFootballRestClient.get()
                         .uri(baseUrl + path, uriVariables)
                         .headers(this::setApiHeaders)
                         .retrieve()
                         .body(responseType);
-                apiFootballCircuitBreaker.recordSuccess();
-                return response;
             });
+            apiFootballCircuitBreaker.recordSuccess();
+            return response;
         } catch (ExternalApiException exception) {
             apiFootballCircuitBreaker.recordFailure(operation, exception);
             throw exception;

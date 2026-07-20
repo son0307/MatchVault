@@ -6,6 +6,9 @@ import com.son.soccerStreaming.apifootball.service.ApiFootballInjurySyncService;
 import com.son.soccerStreaming.apifootball.service.ApiFootballPlayerSyncService;
 import com.son.soccerStreaming.apifootball.service.ApiFootballStandingSyncService;
 import com.son.soccerStreaming.apifootball.service.ApiFootballTeamSyncService;
+import com.son.soccerStreaming.apifootball.service.ApiFootballSyncAlreadyRunningException;
+import com.son.soccerStreaming.apifootball.service.ApiFootballSyncExecutionGuard;
+import com.son.soccerStreaming.apifootball.scheduler.ApiFootballSyncFailureRetryScheduler;
 import com.son.soccerStreaming.apifootball.service.LeagueSeasonCoverageSyncService;
 import com.son.soccerStreaming.admin.dto.AdminDto;
 import com.son.soccerStreaming.admin.entity.AdminAuditLog;
@@ -162,6 +165,8 @@ public class AdminService {
     private final LeagueSeasonCoverageSyncService leagueSeasonCoverageSyncService;
     private final AdminSyncTaskRunner adminSyncTaskRunner;
     private final AdminSyncJobService adminSyncJobService;
+    private final ApiFootballSyncExecutionGuard apiFootballSyncExecutionGuard;
+    private final ApiFootballSyncFailureRetryScheduler apiFootballSyncFailureRetryScheduler;
     private final MediaUrlService mediaUrlService;
     private final ConcurrentMap<String, ManualSyncState> manualSyncStates = new ConcurrentHashMap<>();
 
@@ -643,9 +648,10 @@ public class AdminService {
     private AdminDto.SyncResponse runSync(Long adminUserId, String task, String targetType, Long targetId, String details, SyncTask syncTask) {
         AppUser admin = findUser(adminUserId);
         String syncKey = manualSyncKey(task, details);
-        acquireManualSync(syncKey);
+        ApiFootballSyncExecutionGuard.Lease reservation = acquireManualSync(syncKey);
         try {
             int count = syncTask.run();
+            apiFootballSyncFailureRetryScheduler.cancelPendingByExecutionKey(syncKey);
             String message = task + " sync completed. " + details + "; count=" + count;
             adminAuditLogRepository.save(AdminAuditLog.of(admin, AdminAuditType.SYNC, targetType, targetId, message, details, true));
             return AdminDto.SyncResponse.builder()
@@ -665,7 +671,7 @@ public class AdminService {
                     .message(message)
                     .build();
         } finally {
-            releaseManualSync(syncKey);
+            releaseManualSync(syncKey, reservation);
         }
     }
 
@@ -677,7 +683,7 @@ public class AdminService {
         AppUser admin = findUser(adminUserId);
         AdminSyncJobService.CancelResult result = adminSyncJobService.requestCancel(jobId);
         if (result.cancelledBeforeStart()) {
-            releaseManualSync(manualSyncKey(result.task(), result.details()));
+            releaseCurrentManualSync(manualSyncKey(result.task(), result.details()));
         }
         String message = result.cancelledBeforeStart()
                 ? result.task() + " sync cancelled before start."
@@ -698,11 +704,25 @@ public class AdminService {
         // Keep the admin request short; the runner writes start/completion audit logs from a worker thread.
         findUser(adminUserId);
         String syncKey = manualSyncKey(task, details);
-        acquireManualSync(syncKey);
-        var job = adminSyncJobService.create(adminUserId, task, targetType, targetId, season, details);
+        if (adminSyncJobService.hasActiveJob(task, details)) {
+            throw new CustomException(ErrorCode.ADMIN_SYNC_ALREADY_RUNNING);
+        }
+        ApiFootballSyncExecutionGuard.Lease reservation = acquireManualSync(syncKey);
+        final com.son.soccerStreaming.admin.entity.AdminSyncJob job;
+        try {
+            if (adminSyncJobService.hasActiveJob(task, details)) {
+                throw new CustomException(ErrorCode.ADMIN_SYNC_ALREADY_RUNNING);
+            }
+            job = adminSyncJobService.create(adminUserId, task, targetType, targetId, season, details);
+        } catch (RuntimeException exception) {
+            releaseManualSync(syncKey, reservation);
+            throw exception;
+        }
         AdminSyncTaskRunner.SyncTask trackedSyncTask = progress -> {
             try {
-                return syncTask.run(progress);
+                int count = syncTask.run(progress);
+                apiFootballSyncFailureRetryScheduler.cancelPendingByExecutionKey(syncKey);
+                return count;
             } catch (Exception exception) {
                 recordSyncFailure(task, season, exception);
                 throw exception;
@@ -710,10 +730,10 @@ public class AdminService {
         };
         try {
             adminSyncTaskRunner.run(job.getId(), adminUserId, task, targetType, targetId, details,
-                    trackedSyncTask, () -> releaseManualSync(syncKey));
+                    trackedSyncTask, () -> releaseManualSync(syncKey, reservation));
         } catch (RuntimeException exception) {
             adminSyncJobService.markFailed(job.getId(), task + " sync could not be queued: " + exception.getMessage());
-            releaseManualSync(syncKey);
+            releaseManualSync(syncKey, reservation);
             throw exception;
         }
         return AdminDto.SyncResponse.builder()
@@ -730,21 +750,44 @@ public class AdminService {
         return task + ":" + details;
     }
 
-    private void acquireManualSync(String syncKey) {
+    private ApiFootballSyncExecutionGuard.Lease acquireManualSync(String syncKey) {
+        final ApiFootballSyncExecutionGuard.Lease reservation;
+        try {
+            reservation = apiFootballSyncExecutionGuard.acquire(syncKey);
+        } catch (ApiFootballSyncAlreadyRunningException exception) {
+            throw new CustomException(ErrorCode.ADMIN_SYNC_ALREADY_RUNNING);
+        }
         Instant now = Instant.now();
-        manualSyncStates.compute(syncKey, (key, current) -> {
-            if (current != null && current.running()) {
-                throw new CustomException(ErrorCode.ADMIN_SYNC_TOO_FREQUENT);
-            }
-            if (current != null && Duration.between(current.requestedAt(), now).compareTo(MANUAL_SYNC_COOLDOWN) < 0) {
-                throw new CustomException(ErrorCode.ADMIN_SYNC_TOO_FREQUENT);
-            }
-            return new ManualSyncState(now, true);
-        });
+        try {
+            manualSyncStates.compute(syncKey, (key, current) -> {
+                if (current != null && current.running()) {
+                    throw new CustomException(ErrorCode.ADMIN_SYNC_ALREADY_RUNNING);
+                }
+                if (current != null && Duration.between(current.requestedAt(), now).compareTo(MANUAL_SYNC_COOLDOWN) < 0) {
+                    throw new CustomException(ErrorCode.ADMIN_SYNC_TOO_FREQUENT);
+                }
+                return new ManualSyncState(now, true, reservation);
+            });
+            return reservation;
+        } catch (RuntimeException exception) {
+            apiFootballSyncExecutionGuard.release(reservation);
+            throw exception;
+        }
     }
 
-    private void releaseManualSync(String syncKey) {
-        manualSyncStates.computeIfPresent(syncKey, (key, current) -> new ManualSyncState(current.requestedAt(), false));
+    private void releaseManualSync(String syncKey, ApiFootballSyncExecutionGuard.Lease reservation) {
+        manualSyncStates.computeIfPresent(syncKey, (key, current) ->
+                Objects.equals(current.reservation(), reservation)
+                        ? new ManualSyncState(current.requestedAt(), false, current.reservation())
+                        : current);
+        apiFootballSyncExecutionGuard.release(reservation);
+    }
+
+    private void releaseCurrentManualSync(String syncKey) {
+        ManualSyncState current = manualSyncStates.get(syncKey);
+        if (current != null) {
+            releaseManualSync(syncKey, current.reservation());
+        }
     }
 
     private String syncDetails(Integer league, Integer season) {
@@ -889,7 +932,8 @@ public class AdminService {
     private record FieldChange(String fieldName, Object previousValue, Object newValue) {
     }
 
-    private record ManualSyncState(Instant requestedAt, boolean running) {
+    private record ManualSyncState(Instant requestedAt, boolean running,
+                                   ApiFootballSyncExecutionGuard.Lease reservation) {
     }
 
     private Fixture findFixtureWithTeams(Long fixtureId) {
