@@ -265,6 +265,22 @@ public class ExternalApiExecutor {
 
     private void recordFailure(ExternalApiProvider provider, String operation, int attempts,
                                ExternalApiException failure) {
+        var failureLog = log.atError()
+                .addKeyValue("event.action", "external-api-call")
+                .addKeyValue("event.outcome", "failure")
+                .addKeyValue("event.code", "EXTERNAL_API_CALL_FAILED")
+                .addKeyValue("external_api.provider", provider.name())
+                .addKeyValue("external_api.operation", operation)
+                .addKeyValue("external_api.error_category", failure.getCategory().name())
+                .addKeyValue("external_api.retryable", failure.isRetryable())
+                .addKeyValue("external_api.attempts", attempts)
+                .addKeyValue("http.response.status_code", failure.getHttpStatus());
+        if (failure.getProviderErrorDetails() != null && !failure.getProviderErrorDetails().isBlank()) {
+            failureLog.addKeyValue("external_api.provider_errors", failure.getProviderErrorDetails());
+        }
+        failureLog.log("External API call failed. provider={}, operation={}, category={}, httpStatus={}, attempts={}",
+                provider, operation, failure.getCategory(), failure.getHttpStatus(), attempts);
+
         try {
             syncStatusService.recordProviderFailure(provider, operation, attempts, failure);
         } catch (RuntimeException statusFailure) {

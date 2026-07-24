@@ -11,10 +11,18 @@ public class ExternalApiException extends RuntimeException {
     private final Integer httpStatus;
     private final boolean retryable;
     private final Duration retryAfter;
+    private final String providerErrorDetails;
 
     public ExternalApiException(ExternalApiProvider provider, String operation,
                                 ExternalApiErrorCategory category, Integer httpStatus,
                                 boolean retryable, Duration retryAfter, String message, Throwable cause) {
+        this(provider, operation, category, httpStatus, retryable, retryAfter, message, cause, null);
+    }
+
+    public ExternalApiException(ExternalApiProvider provider, String operation,
+                                ExternalApiErrorCategory category, Integer httpStatus,
+                                boolean retryable, Duration retryAfter, String message, Throwable cause,
+                                String providerErrorDetails) {
         super(message, cause);
         this.provider = provider;
         this.operation = operation;
@@ -22,5 +30,6 @@ public class ExternalApiException extends RuntimeException {
         this.httpStatus = httpStatus;
         this.retryable = retryable;
         this.retryAfter = retryAfter;
+        this.providerErrorDetails = providerErrorDetails;
     }
 }
