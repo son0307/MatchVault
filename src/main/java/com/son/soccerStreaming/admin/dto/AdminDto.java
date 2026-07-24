@@ -30,6 +30,20 @@ public class AdminDto {
         private Integer capacity;
         private String surface;
         private String venueImageUrl;
+
+        public void normalizeTextFields() {
+            name = normalizeText(name);
+            koreanName = normalizeText(koreanName);
+            code = normalizeText(code);
+            country = normalizeText(country);
+            logoUrl = normalizeText(logoUrl);
+            venueName = normalizeText(venueName);
+            venueNameKo = normalizeText(venueNameKo);
+            venueAddress = normalizeText(venueAddress);
+            venueCity = normalizeText(venueCity);
+            surface = normalizeText(surface);
+            venueImageUrl = normalizeText(venueImageUrl);
+        }
     }
 
     @Getter
@@ -50,6 +64,18 @@ public class AdminDto {
         private String position;
         private Integer number;
         private String photoUrl;
+
+        public void normalizeTextFields() {
+            name = normalizeText(name);
+            koreanName = normalizeText(koreanName);
+            firstname = normalizeText(firstname);
+            lastname = normalizeText(lastname);
+            birthPlace = normalizeText(birthPlace);
+            birthCountry = normalizeText(birthCountry);
+            nationality = normalizeText(nationality);
+            position = normalizeText(position);
+            photoUrl = normalizeText(photoUrl);
+        }
     }
 
     @Getter
@@ -100,6 +126,33 @@ public class AdminDto {
         private String awayGoalkeeperColorPrimary;
         private String awayGoalkeeperColorNumber;
         private String awayGoalkeeperColorBorder;
+
+        public void normalizeTextFields() {
+            referee = normalizeText(referee);
+            timezone = normalizeText(timezone);
+            venueName = normalizeText(venueName);
+            venueNameKo = normalizeText(venueNameKo);
+            venueCity = normalizeText(venueCity);
+            statusShort = normalizeText(statusShort);
+            statusLong = normalizeText(statusLong);
+            fixtureStatus = normalizeText(fixtureStatus);
+            homeFormation = normalizeText(homeFormation);
+            awayFormation = normalizeText(awayFormation);
+            homeCoachName = normalizeText(homeCoachName);
+            awayCoachName = normalizeText(awayCoachName);
+            homePlayerColorPrimary = normalizeText(homePlayerColorPrimary);
+            homePlayerColorNumber = normalizeText(homePlayerColorNumber);
+            homePlayerColorBorder = normalizeText(homePlayerColorBorder);
+            homeGoalkeeperColorPrimary = normalizeText(homeGoalkeeperColorPrimary);
+            homeGoalkeeperColorNumber = normalizeText(homeGoalkeeperColorNumber);
+            homeGoalkeeperColorBorder = normalizeText(homeGoalkeeperColorBorder);
+            awayPlayerColorPrimary = normalizeText(awayPlayerColorPrimary);
+            awayPlayerColorNumber = normalizeText(awayPlayerColorNumber);
+            awayPlayerColorBorder = normalizeText(awayPlayerColorBorder);
+            awayGoalkeeperColorPrimary = normalizeText(awayGoalkeeperColorPrimary);
+            awayGoalkeeperColorNumber = normalizeText(awayGoalkeeperColorNumber);
+            awayGoalkeeperColorBorder = normalizeText(awayGoalkeeperColorBorder);
+        }
     }
 
     @Getter
@@ -114,6 +167,12 @@ public class AdminDto {
         private String eventType;
         private String eventDetail;
         private String comments;
+
+        public void normalizeTextFields() {
+            eventType = normalizeText(eventType);
+            eventDetail = normalizeText(eventDetail);
+            comments = normalizeText(comments);
+        }
     }
 
     @Getter
@@ -124,6 +183,15 @@ public class AdminDto {
         private String position;
         private String grid;
         private Boolean starter;
+
+        public void normalizeTextFields() {
+            position = normalizeText(position);
+            grid = normalizeText(grid);
+        }
+    }
+
+    private static String normalizeText(String value) {
+        return value == null || value.isBlank() ? null : value.trim();
     }
 
     @Getter

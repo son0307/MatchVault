@@ -52,7 +52,9 @@ public class Venue {
     }
 
     public void updateKoreanName(String venueNameKo) {
-        this.venueNameKo = venueNameKo;
+        this.venueNameKo = venueNameKo == null || venueNameKo.isBlank()
+                ? null
+                : venueNameKo.trim();
     }
 
     public void updateVenueImageUrl(String venueImageUrl) {

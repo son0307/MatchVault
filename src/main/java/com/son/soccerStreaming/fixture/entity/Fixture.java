@@ -152,7 +152,9 @@ public class Fixture {
     }
 
     public void updateVenueKoreanName(String venueNameKo) {
-        this.venueNameKo = venueNameKo;
+        this.venueNameKo = venueNameKo == null || venueNameKo.isBlank()
+                ? null
+                : venueNameKo.trim();
     }
 
     public void updateScoreBreakdown(Integer halftimeHomeScore, Integer halftimeAwayScore,

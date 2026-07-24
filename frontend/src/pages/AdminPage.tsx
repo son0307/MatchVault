@@ -1269,12 +1269,28 @@ export function AdminPage({ authState }: AdminPageProps) {
     setSyncingTask(task);
     setError("");
     setMessage("");
+    let result: AdminSyncResponse;
     try {
-      const result = await adminJson<AdminSyncResponse>(url, "POST");
+      result = await adminJson<AdminSyncResponse>(url, "POST");
       if (result.success === false) {
         throw new Error(result.message);
       }
-      clearApiMemoryCache();
+    } catch (nextError) {
+      const requestError = requestErrorMessage(nextError);
+      setMediaToast({ message: requestError, type: "error" });
+      await reloadSyncStatusesSafely();
+      setSyncingTask(null);
+      return;
+    }
+
+    clearApiMemoryCache();
+    if (result.jobId || result.queued) {
+      setMediaToast({ message: `${syncRequestDisplayKey(task, season)} 동기화 요청됨`, type: "success" });
+    } else {
+      setMediaToast({ message: `${syncRequestDisplayKey(task, season)} 동기화 완료`, type: "success" });
+    }
+
+    try {
       if (task === "seasons") {
         await loadSeasonCoverages(setSeasonCoverages, setCoverageStatus);
       }
@@ -1282,14 +1298,11 @@ export function AdminPage({ authState }: AdminPageProps) {
       if (result.jobId) {
         await reloadSyncJobs(true);
       }
-      if (result.jobId || result.queued) {
-        setMediaToast({ message: `${syncRequestDisplayKey(task, season)} 동기화 요청됨`, type: "success" });
-      } else {
-        setMediaToast({ message: `${syncRequestDisplayKey(task, season)} 동기화 완료`, type: "success" });
-      }
-    } catch (nextError) {
-      const requestError = requestErrorMessage(nextError);
-      setMediaToast({ message: requestError, type: "error" });
+    } catch {
+      setMediaToast({
+        message: "동기화 요청은 처리됐지만 최신 상태를 불러오지 못했습니다.",
+        type: "error",
+      });
     } finally {
       await reloadSyncStatusesSafely();
       setSyncingTask(null);
@@ -1659,7 +1672,7 @@ export function AdminPage({ authState }: AdminPageProps) {
                 <button
                   type="button"
                   onClick={() => void runSync(item.task)}
-                  disabled={syncingTask !== null || activeSyncTasks.has(item.task) || !availability.enabled}
+                  disabled={syncingTask !== null || activeSyncTasks.has(item.task) || cooldownSeconds > 0 || !availability.enabled}
                   aria-disabled={cooldownSeconds > 0}
                 >
                   {isSyncing ? <LoaderCircle className="admin-loading-icon" aria-hidden="true" /> : null}
@@ -2629,10 +2642,13 @@ function adminName(koreanName: string | null | undefined, name: string | null | 
 }
 
 function coerceValue(value: unknown, kind: FieldKind = "text") {
-  if (value === null || value === "") {
+  if (value === null || value === undefined) {
     return null;
   }
-  const text = String(value);
+  const text = String(value).trim();
+  if (text === "") {
+    return null;
+  }
   if (kind === "number") {
     return Number(text);
   }

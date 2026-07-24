@@ -732,7 +732,7 @@ function TeamVenueCard({ venue }: { venue: TeamDetails["venue"] }) {
 
   const fullAddress = [venue.venueCity, venue.venueAddress].filter(Boolean).join(" · ");
   const addressPopoverId = `team-venue-address-${venue.venueId ?? "current"}`;
-  const displayVenueName = venue.venueNameKo ?? venue.venueName;
+  const displayVenueName = venue.venueNameKo?.trim() || venue.venueName;
 
   return (
     <article className="panel team-venue-card">

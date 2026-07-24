@@ -424,7 +424,7 @@ function FixtureDetailHero({
         </div>
         <div>
           <dt>경기장</dt>
-          <dd>{fixtureInfo(fixture.venueNameKo ?? fixture.venueName, "미정")}</dd>
+          <dd>{fixtureInfo(fixture.venueNameKo?.trim() || fixture.venueName, "미정")}</dd>
         </div>
       </dl>
     </article>

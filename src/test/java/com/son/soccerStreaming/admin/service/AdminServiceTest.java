@@ -237,6 +237,17 @@ class AdminServiceTest {
     }
 
     @Test
+    void updateTeamRejectsBlankRequiredName() {
+        AdminDto.TeamUpdateRequest request = new AdminDto.TeamUpdateRequest();
+        ReflectionTestUtils.setField(request, "name", "   ");
+
+        assertThatThrownBy(() -> adminService.updateTeam(1L, 47L, request))
+                .isInstanceOfSatisfying(CustomException.class, exception ->
+                        assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.INVALID_ADMIN_EDIT_FIELD));
+        verifyNoInteractions(teamRepository);
+    }
+
+    @Test
     void syncPlayersQueuesBackgroundTask() {
         AppUser admin = AppUser.builder()
                 .email("admin@example.com")
