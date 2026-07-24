@@ -538,6 +538,7 @@ export function AdminPage({ authState }: AdminPageProps) {
   const fixtureListRequestIdRef = useRef(0);
   const fixtureRequestIdRef = useRef(0);
   const auditRequestIdRef = useRef(0);
+  const syncStatusRequestIdRef = useRef(0);
   const syncJobsRequestIdRef = useRef(0);
   const syncJobsInitializedRef = useRef(false);
   const seenTerminalJobIdsRef = useRef<Set<number>>(new Set());
@@ -555,7 +556,7 @@ export function AdminPage({ authState }: AdminPageProps) {
     if (authState.authStatus === "authenticated" && authState.currentUser?.role === "ADMIN") {
       void reloadSyncJobs(false);
       if (activeSection === "sync") {
-        void loadSyncStatuses(authState.season, setSyncStatuses);
+        void reloadSyncStatusesSafely();
         void loadSeasonCoverages(setSeasonCoverages, setCoverageStatus);
       }
       if (activeSection === "logs") {
@@ -948,7 +949,7 @@ export function AdminPage({ authState }: AdminPageProps) {
         if (newlyCompleted.length > 0) {
           await Promise.all([
             reloadAuditLogs(0),
-            loadSyncStatuses(authState.season, setSyncStatuses),
+            reloadSyncStatusesSafely(),
           ]);
         }
       }
@@ -1311,10 +1312,15 @@ export function AdminPage({ authState }: AdminPageProps) {
   }
 
   async function reloadSyncStatusesSafely() {
+    const requestId = syncStatusRequestIdRef.current + 1;
+    syncStatusRequestIdRef.current = requestId;
     const controller = new AbortController();
     const timeoutId = window.setTimeout(() => controller.abort(), SYNC_STATUS_REQUEST_TIMEOUT_MS);
     try {
-      await loadSyncStatuses(authState.season, setSyncStatuses, controller.signal);
+      const statuses = await loadSyncStatuses(authState.season, controller.signal);
+      if (syncStatusRequestIdRef.current === requestId) {
+        setSyncStatuses(statuses);
+      }
     } catch {
       // 상태 조회 실패가 이미 완료된 동기화 요청의 성공·실패 결과를 바꾸지 않도록 분리한다.
     } finally {
@@ -2689,14 +2695,13 @@ function colorInputValue(value: string) {
 
 async function loadSyncStatuses(
   season: number,
-  setSyncStatuses: (statuses: SyncStatus[]) => void,
   signal?: AbortSignal,
 ) {
   const response = await adminGet<{ statuses: SyncStatus[] }>(
     `/api/v1/admin/sync/statuses?season=${season}`,
     { signal },
   );
-  setSyncStatuses(response.statuses ?? []);
+  return response.statuses ?? [];
 }
 
 function syncTaskLabel(task: string) {
