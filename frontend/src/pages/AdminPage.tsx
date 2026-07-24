@@ -266,6 +266,7 @@ const SYNC_JOB_POLL_INTERVAL_MS = 2_000;
 const SYNC_JOB_RETRY_INTERVAL_MS = 5_000;
 const ADMIN_SEARCH_KEYWORD_MAX_LENGTH = 80;
 const MANUAL_SYNC_COOLDOWN_MS = 30_000;
+const SYNC_STATUS_REQUEST_TIMEOUT_MS = 30_000;
 const MANUAL_SYNC_COOLDOWN_STORAGE_PREFIX = "admin-sync-cooldown";
 const ADMIN_IMAGE_MAX_BYTES = 2 * 1024 * 1024;
 const ADMIN_IMAGE_CONTENT_TYPES = new Set(["image/png", "image/jpeg", "image/webp"]);
@@ -1276,13 +1277,14 @@ export function AdminPage({ authState }: AdminPageProps) {
         throw new Error(result.message);
       }
     } catch (nextError) {
+      setSyncingTask(null);
       const requestError = requestErrorMessage(nextError);
       setMediaToast({ message: requestError, type: "error" });
-      await reloadSyncStatusesSafely();
-      setSyncingTask(null);
+      void reloadSyncStatusesSafely();
       return;
     }
 
+    setSyncingTask(null);
     clearApiMemoryCache();
     if (result.jobId || result.queued) {
       setMediaToast({ message: `${syncRequestDisplayKey(task, season)} 동기화 요청됨`, type: "success" });
@@ -1304,16 +1306,19 @@ export function AdminPage({ authState }: AdminPageProps) {
         type: "error",
       });
     } finally {
-      await reloadSyncStatusesSafely();
-      setSyncingTask(null);
+      void reloadSyncStatusesSafely();
     }
   }
 
   async function reloadSyncStatusesSafely() {
+    const controller = new AbortController();
+    const timeoutId = window.setTimeout(() => controller.abort(), SYNC_STATUS_REQUEST_TIMEOUT_MS);
     try {
-      await loadSyncStatuses(authState.season, setSyncStatuses);
+      await loadSyncStatuses(authState.season, setSyncStatuses, controller.signal);
     } catch {
       // 상태 조회 실패가 이미 완료된 동기화 요청의 성공·실패 결과를 바꾸지 않도록 분리한다.
+    } finally {
+      window.clearTimeout(timeoutId);
     }
   }
 
@@ -2682,8 +2687,15 @@ function colorInputValue(value: string) {
   return /^[0-9A-F]{6}$/i.test(value) ? `#${value}` : "";
 }
 
-async function loadSyncStatuses(season: number, setSyncStatuses: (statuses: SyncStatus[]) => void) {
-  const response = await adminGet<{ statuses: SyncStatus[] }>(`/api/v1/admin/sync/statuses?season=${season}`);
+async function loadSyncStatuses(
+  season: number,
+  setSyncStatuses: (statuses: SyncStatus[]) => void,
+  signal?: AbortSignal,
+) {
+  const response = await adminGet<{ statuses: SyncStatus[] }>(
+    `/api/v1/admin/sync/statuses?season=${season}`,
+    { signal },
+  );
   setSyncStatuses(response.statuses ?? []);
 }
 
@@ -2890,8 +2902,8 @@ function syncJobCompletionMessage(job: SyncJob) {
   if (job.status === "SUCCEEDED") {
     return `${syncKey} 동기화 완료`;
   }
-  const errorMessage = job.errors.find((error) => error.message.trim())?.message.trim()
-    || job.message.trim()
+  const errorMessage = job.errors?.find((error) => error.message?.trim())?.message?.trim()
+    || job.message?.trim()
     || "오류 내역을 확인해 주세요.";
   if (job.status === "PARTIAL_FAILED") {
     return `${syncKey} 동기화 일부 실패: ${errorMessage}`;
@@ -2958,8 +2970,8 @@ function supportsFixtureDetails(coverage: LeagueSeasonCoverage) {
   return [coverage.events, coverage.lineups, coverage.fixtureStats, coverage.playerStats].some((value) => value !== false);
 }
 
-async function adminGet<T>(url: string): Promise<T> {
-  return adminRequest<T>(url, { method: "GET" });
+async function adminGet<T>(url: string, init: RequestInit = {}): Promise<T> {
+  return adminRequest<T>(url, { ...init, method: "GET" });
 }
 
 async function adminJson<T>(url: string, method: string, body?: unknown): Promise<T> {
