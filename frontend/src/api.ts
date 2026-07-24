@@ -5,6 +5,7 @@ export type FixtureSummary = {
   round: number | null;
   referee: string | null;
   venueName: string | null;
+  venueNameKo: string | null;
   homeTeamId: number | null;
   awayTeamId: number | null;
   homeTeamName: string | null;
@@ -404,6 +405,7 @@ export type TeamNewsTranslationResult = {
 export type TeamVenue = {
   venueId: number | null;
   venueName: string | null;
+  venueNameKo: string | null;
   venueAddress: string | null;
   venueCity: string | null;
   capacity: number | null;

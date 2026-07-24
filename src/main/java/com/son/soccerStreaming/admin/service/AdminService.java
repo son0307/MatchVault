@@ -84,6 +84,7 @@ public class AdminService {
             "logoUrl",
             "venueId",
             "venueName",
+            "venueNameKo",
             "venueAddress",
             "venueCity",
             "capacity",
@@ -259,6 +260,7 @@ public class AdminService {
                 request.getVenueName(),
                 request.getVenueCity()
         );
+        fixture.updateVenueKoreanName(request.getVenueNameKo());
         fixture.updateTactics(
                 request.getHomeFormation(),
                 request.getAwayFormation(),
@@ -357,7 +359,7 @@ public class AdminService {
     ) {
         Fixture fixture = findFixtureWithTeams(fixtureId);
         validateFixtureTeam(fixture, teamId);
-        validateFixturePlayer(fixtureId, playerId);
+        validateFixturePlayer(fixtureId, teamId, playerId);
         FixtureLineup lineup = fixtureLineupRepository.findByFixtureFixtureIdAndTeamTeamIdAndPlayerPlayerId(fixtureId, teamId, playerId)
                 .orElseThrow(() -> new CustomException(ErrorCode.FIXTURE_NOT_FOUND));
         lineup.updateLineup(
@@ -840,6 +842,7 @@ public class AdminService {
                 request.getSurface(),
                 request.getVenueImageUrl()
         );
+        venue.updateKoreanName(request.getVenueNameKo());
         team.updateVenue(venue);
     }
 
@@ -856,6 +859,7 @@ public class AdminService {
         if (venue != null || request.getVenueId() != null) {
             addIfChanged(changes, "venueId", venue != null ? venue.getVenueId() : null, request.getVenueId());
             addIfChanged(changes, "venueName", venue != null ? venue.getVenueName() : null, request.getVenueName());
+            addIfChanged(changes, "venueNameKo", venue != null ? venue.getVenueNameKo() : null, request.getVenueNameKo());
             addIfChanged(changes, "venueAddress", venue != null ? venue.getVenueAddress() : null, request.getVenueAddress());
             addIfChanged(changes, "venueCity", venue != null ? venue.getVenueCity() : null, request.getVenueCity());
             addIfChanged(changes, "capacity", venue != null ? venue.getCapacity() : null, request.getCapacity());
@@ -954,8 +958,8 @@ public class AdminService {
         validateRange(request.getExtra(), 0, 20);
         validateEventTypeAndDetail(request.getEventType(), request.getEventDetail());
         validateFixtureTeam(fixture, request.getTeamId());
-        validateFixturePlayer(fixture.getFixtureId(), request.getPlayerId());
-        validateFixturePlayer(fixture.getFixtureId(), request.getAssistPlayerId());
+        validateFixturePlayer(fixture.getFixtureId(), request.getTeamId(), request.getPlayerId());
+        validateFixturePlayer(fixture.getFixtureId(), request.getTeamId(), request.getAssistPlayerId());
     }
 
     private void validateRange(Integer value, int min, int max) {
@@ -1007,19 +1011,19 @@ public class AdminService {
         }
     }
 
-    private void validateFixturePlayer(Long fixtureId, Long playerId) {
+    private void validateFixturePlayer(Long fixtureId, Long teamId, Long playerId) {
         if (playerId == null) {
             return;
         }
-        Set<Long> playerIds = fixtureLineupRepository.findAllByFixtureId(fixtureId)
-                .stream()
-                .map(lineup -> lineup.getPlayer().getPlayerId())
-                .collect(Collectors.toSet());
-        playerFixtureStatRepository.findAllByFixtureFixtureId(fixtureId)
-                .stream()
-                .map(stat -> stat.getPlayer().getPlayerId())
-                .forEach(playerIds::add);
-        if (!playerIds.contains(playerId)) {
+        boolean lineupPlayer = fixtureLineupRepository.findAllByFixtureId(fixtureId).stream()
+                .anyMatch(lineup -> teamId != null
+                        && teamId.equals(lineup.getTeam().getTeamId())
+                        && playerId.equals(lineup.getPlayer().getPlayerId()));
+        boolean statsPlayer = playerFixtureStatRepository.findAllByFixtureFixtureId(fixtureId).stream()
+                .anyMatch(stat -> teamId != null
+                        && teamId.equals(stat.getTeam().getTeamId())
+                        && playerId.equals(stat.getPlayer().getPlayerId()));
+        if (!lineupPlayer && !statsPlayer) {
             throw new CustomException(ErrorCode.INVALID_ADMIN_EVENT_FIELD);
         }
     }
@@ -1053,6 +1057,7 @@ public class AdminService {
         addIfChanged(changes, "referee", fixture.getReferee(), request.getReferee());
         addIfChanged(changes, "venueId", fixture.getVenueId(), request.getVenueId());
         addIfChanged(changes, "venueName", fixture.getVenueName(), request.getVenueName());
+        addIfChanged(changes, "venueNameKo", fixture.getVenueNameKo(), request.getVenueNameKo());
         addIfChanged(changes, "venueCity", fixture.getVenueCity(), request.getVenueCity());
         addIfChanged(changes, "homeFormation", fixture.getHomeFormation(), request.getHomeFormation());
         addIfChanged(changes, "awayFormation", fixture.getAwayFormation(), request.getAwayFormation());
@@ -1099,6 +1104,7 @@ public class AdminService {
                 .adminLogo(hasText(team.getAdminLogoObjectKey()))
                 .venueId(venue != null ? venue.getVenueId() : null)
                 .venueName(venue != null ? venue.getVenueName() : null)
+                .venueNameKo(venue != null ? venue.getVenueNameKo() : null)
                 .venueAddress(venue != null ? venue.getVenueAddress() : null)
                 .venueCity(venue != null ? venue.getVenueCity() : null)
                 .capacity(venue != null ? venue.getCapacity() : null)
@@ -1191,6 +1197,7 @@ public class AdminService {
                 .season(fixture.getSeason())
                 .venueId(fixture.getVenueId())
                 .venueName(fixture.getVenueName())
+                .venueNameKo(fixture.getVenueNameKo())
                 .venueCity(fixture.getVenueCity())
                 .statusShort(fixture.getStatusShort())
                 .statusLong(fixture.getStatusLong())

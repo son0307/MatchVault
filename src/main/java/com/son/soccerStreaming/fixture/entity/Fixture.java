@@ -59,6 +59,7 @@ public class Fixture {
     // 경기장 정보
     private Long venueId;
     private String venueName;
+    private String venueNameKo;
     private String venueCity;
 
     // 상태 및 스코어
@@ -148,6 +149,10 @@ public class Fixture {
     public void updateTeamResult(Boolean homeWinner, Boolean awayWinner) {
         this.homeWinner = homeWinner;
         this.awayWinner = awayWinner;
+    }
+
+    public void updateVenueKoreanName(String venueNameKo) {
+        this.venueNameKo = venueNameKo;
     }
 
     public void updateScoreBreakdown(Integer halftimeHomeScore, Integer halftimeAwayScore,

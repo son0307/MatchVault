@@ -29,6 +29,7 @@ public class Venue {
     private Long venueId;
 
     private String venueName;
+    private String venueNameKo;
     private String venueAddress;
     private String venueCity;
     private Integer capacity;
@@ -48,6 +49,10 @@ public class Venue {
         this.capacity = capacity;
         this.surface = surface;
         updateVenueImageUrl(venueImageUrl);
+    }
+
+    public void updateKoreanName(String venueNameKo) {
+        this.venueNameKo = venueNameKo;
     }
 
     public void updateVenueImageUrl(String venueImageUrl) {

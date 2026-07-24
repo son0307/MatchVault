@@ -1,6 +1,6 @@
 import { FormEvent, useEffect, useRef, useState } from "react";
 import { ChevronDown, LoaderCircle, X } from "lucide-react";
-import { Navigate, useSearchParams } from "react-router-dom";
+import { Navigate, NavLink, useLocation, useSearchParams } from "react-router-dom";
 import {
   clearApiMemoryCache,
   fetchFixtures,
@@ -16,6 +16,7 @@ type AdminPageProps = {
 };
 
 type AdminTab = "team" | "player" | "fixture";
+type AdminSection = "editor" | "sync" | "logs";
 type AdminMediaTargetType = "PLAYER_PHOTO" | "TEAM_LOGO" | "VENUE_IMAGE";
 type AdminMediaToast = {
   message: string;
@@ -39,6 +40,14 @@ type AdminMediaResponse = {
 
 function adminTab(value: string | null): AdminTab | null {
   return value === "team" || value === "player" || value === "fixture" ? value : null;
+}
+
+function adminSection(pathname: string): AdminSection | null {
+  const normalizedPath = pathname.replace(/\/+$/, "") || "/";
+  if (normalizedPath === "/admin/editor") return "editor";
+  if (normalizedPath === "/admin/sync") return "sync";
+  if (normalizedPath === "/admin/logs") return "logs";
+  return null;
 }
 
 type FieldKind = "text" | "number" | "datetime" | "date" | "boolean" | "select";
@@ -163,6 +172,7 @@ type FixtureTeamStatAdmin = Record<string, unknown> & {
 
 type FixturePlayerStatAdmin = Record<string, unknown> & {
   playerId: number;
+  teamId: number;
   playerName: string | null;
   playerNameKo: string | null;
   teamName: string | null;
@@ -235,6 +245,14 @@ type SyncJob = {
   errors: SyncJobError[];
 };
 
+type AdminSyncResponse = {
+  jobId?: number;
+  task?: string;
+  success?: boolean;
+  queued?: boolean;
+  message: string;
+};
+
 type AuditLogPage = {
   logs: AuditLog[];
   page: number;
@@ -248,165 +266,223 @@ const SYNC_JOB_POLL_INTERVAL_MS = 2_000;
 const SYNC_JOB_RETRY_INTERVAL_MS = 5_000;
 const ADMIN_SEARCH_KEYWORD_MAX_LENGTH = 80;
 const MANUAL_SYNC_COOLDOWN_MS = 30_000;
+const MANUAL_SYNC_COOLDOWN_STORAGE_PREFIX = "admin-sync-cooldown";
 const ADMIN_IMAGE_MAX_BYTES = 2 * 1024 * 1024;
 const ADMIN_IMAGE_CONTENT_TYPES = new Set(["image/png", "image/jpeg", "image/webp"]);
 
+function syncCooldownStorageKey(cooldownKey: string) {
+  return `${MANUAL_SYNC_COOLDOWN_STORAGE_PREFIX}:${cooldownKey}`;
+}
+
+function readStoredSyncCooldowns(): Record<string, number> {
+  const cooldowns: Record<string, number> = {};
+  const now = Date.now();
+  const storagePrefix = `${MANUAL_SYNC_COOLDOWN_STORAGE_PREFIX}:`;
+  try {
+    for (let index = window.localStorage.length - 1; index >= 0; index -= 1) {
+      const storageKey = window.localStorage.key(index);
+      if (!storageKey?.startsWith(storagePrefix)) {
+        continue;
+      }
+      const cooldownUntil = Number(window.localStorage.getItem(storageKey));
+      if (Number.isFinite(cooldownUntil) && cooldownUntil > now) {
+        cooldowns[storageKey.slice(storagePrefix.length)] = cooldownUntil;
+      } else {
+        window.localStorage.removeItem(storageKey);
+      }
+    }
+  } catch {
+    // Keep the page usable when localStorage is unavailable.
+  }
+  return cooldowns;
+}
+
+function storeSyncCooldown(cooldownKey: string, cooldownUntil: number) {
+  try {
+    window.localStorage.setItem(syncCooldownStorageKey(cooldownKey), String(cooldownUntil));
+  } catch {
+    // The in-memory cooldown still applies while this page remains open.
+  }
+}
+
+function removeStoredSyncCooldown(cooldownKey: string) {
+  try {
+    window.localStorage.removeItem(syncCooldownStorageKey(cooldownKey));
+  } catch {
+    // Expired in-memory cooldowns can still be removed when storage is unavailable.
+  }
+}
+
 const teamFields: FieldConfig[] = [
-  { name: "name", label: "Name" },
-  { name: "koreanName", label: "Korean Name" },
-  { name: "code", label: "Code" },
-  { name: "country", label: "Country" },
-  { name: "founded", label: "Founded", kind: "number" },
-  { name: "logoUrl", label: "Logo URL" },
-  { name: "venueId", label: "Venue ID", kind: "number" },
-  { name: "venueName", label: "Venue Name" },
-  { name: "venueAddress", label: "Venue Address" },
-  { name: "venueCity", label: "Venue City" },
-  { name: "capacity", label: "Capacity", kind: "number" },
-  { name: "surface", label: "Surface" },
-  { name: "venueImageUrl", label: "Venue Image URL" },
+  { name: "name", label: "이름" },
+  { name: "koreanName", label: "한글 이름" },
+  { name: "code", label: "팀 코드" },
+  { name: "country", label: "국가" },
+  { name: "founded", label: "창단 연도", kind: "number" },
+  { name: "logoUrl", label: "로고 URL" },
+  { name: "venueName", label: "경기장 이름" },
+  { name: "venueNameKo", label: "경기장 한글 이름" },
+  { name: "venueAddress", label: "경기장 주소" },
+  { name: "venueCity", label: "경기장 도시" },
+  { name: "capacity", label: "수용 인원", kind: "number" },
+  { name: "surface", label: "경기장 표면" },
+  { name: "venueImageUrl", label: "경기장 이미지 URL" },
 ];
 
 const playerFields: FieldConfig[] = [
-  { name: "name", label: "Name" },
-  { name: "koreanName", label: "Korean Name" },
-  { name: "firstname", label: "Firstname" },
-  { name: "lastname", label: "Lastname" },
-  { name: "age", label: "Age", kind: "number" },
-  { name: "birthDate", label: "Birth Date", kind: "date" },
-  { name: "birthPlace", label: "Birth Place" },
-  { name: "birthCountry", label: "Birth Country" },
-  { name: "nationality", label: "Nationality" },
-  { name: "height", label: "Height", kind: "number" },
-  { name: "weight", label: "Weight", kind: "number" },
-  { name: "position", label: "Position" },
-  { name: "number", label: "Number", kind: "number" },
-  { name: "photoUrl", label: "Photo URL" },
+  { name: "name", label: "이름" },
+  { name: "koreanName", label: "한글 이름" },
+  { name: "firstname", label: "이름 부분" },
+  { name: "lastname", label: "성" },
+  { name: "age", label: "나이", kind: "number" },
+  { name: "birthDate", label: "생년월일", kind: "date" },
+  { name: "birthPlace", label: "출생지" },
+  { name: "birthCountry", label: "출생 국가" },
+  { name: "nationality", label: "국적" },
+  { name: "height", label: "키", kind: "number" },
+  { name: "weight", label: "몸무게", kind: "number" },
+  { name: "position", label: "포지션" },
+  { name: "number", label: "등번호", kind: "number" },
+  { name: "photoUrl", label: "사진 URL" },
 ];
 
 const fixtureFields: FieldConfig[] = [
-  { name: "fixtureDate", label: "경기 일시", kind: "datetime", help: "한국 시간(KST) 기준으로 입력됩니다." },
-  { name: "referee", label: "Referee" },
-  { name: "venueId", label: "Venue ID", kind: "number" },
-  { name: "venueName", label: "Venue Name" },
-  { name: "venueCity", label: "Venue City" },
-  { name: "homeFormation", label: "Home Formation" },
-  { name: "awayFormation", label: "Away Formation" },
-  { name: "homeCoachName", label: "Home Coach" },
-  { name: "awayCoachName", label: "Away Coach" },
-  { name: "homePlayerColorPrimary", label: "Home Player Primary", preview: "color" },
-  { name: "homePlayerColorNumber", label: "Home Player Number", preview: "color" },
-  { name: "homePlayerColorBorder", label: "Home Player Border", preview: "color" },
-  { name: "homeGoalkeeperColorPrimary", label: "Home GK Primary", preview: "color" },
-  { name: "homeGoalkeeperColorNumber", label: "Home GK Number", preview: "color" },
-  { name: "homeGoalkeeperColorBorder", label: "Home GK Border", preview: "color" },
-  { name: "awayPlayerColorPrimary", label: "Away Player Primary", preview: "color" },
-  { name: "awayPlayerColorNumber", label: "Away Player Number", preview: "color" },
-  { name: "awayPlayerColorBorder", label: "Away Player Border", preview: "color" },
-  { name: "awayGoalkeeperColorPrimary", label: "Away GK Primary", preview: "color" },
-  { name: "awayGoalkeeperColorNumber", label: "Away GK Number", preview: "color" },
-  { name: "awayGoalkeeperColorBorder", label: "Away GK Border", preview: "color" },
+  { name: "fixtureDate", label: "경기 일시", kind: "datetime", help: "한국 표준시 기준으로 입력됩니다." },
+  { name: "referee", label: "주심" },
+  { name: "venueId", label: "경기장 ID", kind: "number" },
+  { name: "venueName", label: "경기장 이름" },
+  { name: "venueNameKo", label: "경기장 한글 이름" },
+  { name: "venueCity", label: "경기장 도시" },
+  { name: "homeFormation", label: "홈팀 포메이션" },
+  { name: "awayFormation", label: "원정팀 포메이션" },
+  { name: "homeCoachName", label: "홈팀 감독" },
+  { name: "awayCoachName", label: "원정팀 감독" },
+  { name: "homePlayerColorPrimary", label: "홈팀 선수 유니폼", preview: "color" },
+  { name: "homePlayerColorNumber", label: "홈팀 선수 등번호", preview: "color" },
+  { name: "homePlayerColorBorder", label: "홈팀 선수 테두리", preview: "color" },
+  { name: "homeGoalkeeperColorPrimary", label: "홈팀 골키퍼 유니폼", preview: "color" },
+  { name: "homeGoalkeeperColorNumber", label: "홈팀 골키퍼 등번호", preview: "color" },
+  { name: "homeGoalkeeperColorBorder", label: "홈팀 골키퍼 테두리", preview: "color" },
+  { name: "awayPlayerColorPrimary", label: "원정팀 선수 유니폼", preview: "color" },
+  { name: "awayPlayerColorNumber", label: "원정팀 선수 등번호", preview: "color" },
+  { name: "awayPlayerColorBorder", label: "원정팀 선수 테두리", preview: "color" },
+  { name: "awayGoalkeeperColorPrimary", label: "원정팀 골키퍼 유니폼", preview: "color" },
+  { name: "awayGoalkeeperColorNumber", label: "원정팀 골키퍼 등번호", preview: "color" },
+  { name: "awayGoalkeeperColorBorder", label: "원정팀 골키퍼 테두리", preview: "color" },
 ];
 
 const eventFields: FieldConfig[] = [
-  { name: "teamId", label: "Team", kind: "select" },
-  { name: "playerId", label: "Player", kind: "select" },
-  { name: "assistPlayerId", label: "Assist Player", kind: "select" },
-  { name: "elapsed", label: "Elapsed", kind: "number", min: 0, max: 90 },
-  { name: "extra", label: "Extra", kind: "number", min: 0, max: 20 },
-  { name: "eventType", label: "Type", kind: "select" },
-  { name: "eventDetail", label: "Detail", kind: "select" },
-  { name: "comments", label: "Comments" },
+  { name: "teamId", label: "팀", kind: "select" },
+  { name: "playerId", label: "선수", kind: "select" },
+  { name: "assistPlayerId", label: "도움 선수", kind: "select" },
+  { name: "elapsed", label: "경기 시간", kind: "number", min: 0, max: 90 },
+  { name: "extra", label: "추가 시간", kind: "number", min: 0, max: 20 },
+  { name: "eventType", label: "유형", kind: "select" },
+  { name: "eventDetail", label: "상세 유형", kind: "select" },
+  { name: "comments", label: "설명" },
 ];
 
-const eventTypeOptions: FieldOption[] = ["Goal", "Card", "Subst", "Var"].map((value) => ({ value, label: value }));
+const eventTypeOptions: FieldOption[] = [
+  { value: "Goal", label: "득점" },
+  { value: "Card", label: "카드" },
+  { value: "Subst", label: "교체" },
+  { value: "Var", label: "VAR" },
+];
 
 const eventDetailOptionsByType: Record<string, FieldOption[]> = {
-  Goal: ["Normal Goal", "Own Goal", "Penalty", "Missed Penalty"].map((value) => ({ value, label: value })),
-  Card: ["Yellow Card", "Red card"].map((value) => ({ value, label: value })),
+  Goal: [
+    { value: "Normal Goal", label: "일반 득점" },
+    { value: "Own Goal", label: "자책골" },
+    { value: "Penalty", label: "페널티골" },
+    { value: "Missed Penalty", label: "페널티 실축" },
+  ],
+  Card: [
+    { value: "Yellow Card", label: "옐로카드" },
+    { value: "Red card", label: "레드카드" },
+  ],
   Subst: Array.from({ length: 10 }, (_, index) => {
     const value = `Substitution ${index + 1}`;
-    return { value, label: value };
+    return { value, label: `${index + 1}번째 교체` };
   }),
-  Var: ["Goal cancelled", "Penalty confirmed"].map((value) => ({ value, label: value })),
+  Var: [
+    { value: "Goal cancelled", label: "득점 취소" },
+    { value: "Penalty confirmed", label: "페널티 확정" },
+  ],
 };
 
 const lineupFields: FieldConfig[] = [
-  { name: "position", label: "Position" },
-  { name: "grid", label: "Grid" },
-  { name: "starter", label: "Starter", kind: "boolean" },
+  { name: "position", label: "포지션" },
+  { name: "grid", label: "배치 위치" },
+  { name: "starter", label: "선발 여부", kind: "boolean" },
 ];
 
 const teamStatFields: FieldConfig[] = [
-  "shotsOnGoal",
-  "shotsOffGoal",
-  "totalShots",
-  "blockedShots",
-  "shotsInsideBox",
-  "shotsOutsideBox",
-  "fouls",
-  "cornerKicks",
-  "offsides",
-  "ballPossession",
-  "yellowCards",
-  "redCards",
-  "goalkeeperSaves",
-  "totalPasses",
-  "passesAccurate",
-].map((name) => ({ name, label: labelize(name), kind: "number" as const })).concat({
-  name: "expectedGoals",
-  label: "Expected Goals",
-  kind: "number",
-});
+  { name: "shotsOnGoal", label: "유효 슈팅", kind: "number" },
+  { name: "shotsOffGoal", label: "빗나간 슈팅", kind: "number" },
+  { name: "totalShots", label: "전체 슈팅", kind: "number" },
+  { name: "blockedShots", label: "막힌 슈팅", kind: "number" },
+  { name: "shotsInsideBox", label: "박스 안 슈팅", kind: "number" },
+  { name: "shotsOutsideBox", label: "박스 밖 슈팅", kind: "number" },
+  { name: "fouls", label: "파울", kind: "number" },
+  { name: "cornerKicks", label: "코너킥", kind: "number" },
+  { name: "offsides", label: "오프사이드", kind: "number" },
+  { name: "ballPossession", label: "점유율", kind: "number" },
+  { name: "yellowCards", label: "옐로카드", kind: "number" },
+  { name: "redCards", label: "레드카드", kind: "number" },
+  { name: "goalkeeperSaves", label: "골키퍼 선방", kind: "number" },
+  { name: "totalPasses", label: "전체 패스", kind: "number" },
+  { name: "passesAccurate", label: "정확한 패스", kind: "number" },
+  { name: "expectedGoals", label: "기대 득점(xG)", kind: "number" },
+];
 
 const playerStatFields: FieldConfig[] = [
-  { name: "minutesPlayed", label: "Minutes", kind: "number" },
-  { name: "rating", label: "Rating", kind: "number" },
-  { name: "captain", label: "Captain", kind: "boolean" },
-  { name: "substitute", label: "Substitute", kind: "boolean" },
-  ...[
-    "goals",
-    "assists",
-    "conceded",
-    "saves",
-    "shotsTotal",
-    "shotsOnTarget",
-    "passesTotal",
-    "passesKey",
-    "passesAccurate",
-    "tacklesTotal",
-    "blocks",
-    "interceptions",
-    "duelsTotal",
-    "duelsWon",
-    "dribblesAttempts",
-    "dribblesSuccess",
-    "dribblesPast",
-    "foulsDrawn",
-    "foulsCommitted",
-    "yellowCards",
-    "redCards",
-    "offsides",
-    "penaltyWon",
-    "penaltyCommitted",
-    "penaltyScored",
-    "penaltyMissed",
-    "penaltySaved",
-  ].map((name) => ({ name, label: labelize(name), kind: "number" as const })),
+  { name: "minutesPlayed", label: "출전 시간", kind: "number" },
+  { name: "rating", label: "평점", kind: "number" },
+  { name: "captain", label: "주장 여부", kind: "boolean" },
+  { name: "substitute", label: "교체 선수 여부", kind: "boolean" },
+  { name: "goals", label: "득점", kind: "number" },
+  { name: "assists", label: "도움", kind: "number" },
+  { name: "conceded", label: "실점", kind: "number" },
+  { name: "saves", label: "선방", kind: "number" },
+  { name: "shotsTotal", label: "전체 슈팅", kind: "number" },
+  { name: "shotsOnTarget", label: "유효 슈팅", kind: "number" },
+  { name: "passesTotal", label: "전체 패스", kind: "number" },
+  { name: "passesKey", label: "키 패스", kind: "number" },
+  { name: "passesAccurate", label: "정확한 패스", kind: "number" },
+  { name: "tacklesTotal", label: "태클", kind: "number" },
+  { name: "blocks", label: "블록", kind: "number" },
+  { name: "interceptions", label: "인터셉트", kind: "number" },
+  { name: "duelsTotal", label: "전체 경합", kind: "number" },
+  { name: "duelsWon", label: "경합 승리", kind: "number" },
+  { name: "dribblesAttempts", label: "드리블 시도", kind: "number" },
+  { name: "dribblesSuccess", label: "드리블 성공", kind: "number" },
+  { name: "dribblesPast", label: "드리블 돌파 허용", kind: "number" },
+  { name: "foulsDrawn", label: "얻은 파울", kind: "number" },
+  { name: "foulsCommitted", label: "범한 파울", kind: "number" },
+  { name: "yellowCards", label: "옐로카드", kind: "number" },
+  { name: "redCards", label: "레드카드", kind: "number" },
+  { name: "offsides", label: "오프사이드", kind: "number" },
+  { name: "penaltyWon", label: "페널티 획득", kind: "number" },
+  { name: "penaltyCommitted", label: "페널티 허용", kind: "number" },
+  { name: "penaltyScored", label: "페널티 성공", kind: "number" },
+  { name: "penaltyMissed", label: "페널티 실축", kind: "number" },
+  { name: "penaltySaved", label: "페널티 선방", kind: "number" },
 ];
 
 const syncTasks = [
-  { task: "seasons", label: "Seasons" },
-  { task: "teams", label: "Teams" },
-  { task: "standings", label: "Standings" },
-  { task: "fixtures", label: "Fixtures" },
-  { task: "fixture-details", label: "Season Details" },
-  { task: "players", label: "Players" },
-  { task: "injuries", label: "Injuries" },
+  { task: "seasons", label: "지원 시즌" },
+  { task: "teams", label: "팀" },
+  { task: "standings", label: "순위" },
+  { task: "fixtures", label: "경기" },
+  { task: "fixture-details", label: "시즌 경기 상세" },
+  { task: "players", label: "선수" },
+  { task: "injuries", label: "부상자" },
 ];
 
 export function AdminPage({ authState }: AdminPageProps) {
+  const location = useLocation();
   const [searchParams] = useSearchParams();
+  const activeSection = adminSection(location.pathname);
   const [activeTab, setActiveTab] = useState<AdminTab>("team");
   const [teamKeyword, setTeamKeyword] = useState("");
   const [teams, setTeams] = useState<TeamAdmin[]>([]);
@@ -436,10 +512,8 @@ export function AdminPage({ authState }: AdminPageProps) {
     detail: null,
   });
   const [savingKey, setSavingKey] = useState<string | null>(null);
-  const [syncFixtureId, setSyncFixtureId] = useState("");
-  const [syncMessage, setSyncMessage] = useState("");
   const [syncingTask, setSyncingTask] = useState<string | null>(null);
-  const [syncCooldownUntil, setSyncCooldownUntil] = useState<Record<string, number>>({});
+  const [syncCooldownUntil, setSyncCooldownUntil] = useState<Record<string, number>>(readStoredSyncCooldowns);
   const [syncClock, setSyncClock] = useState(Date.now());
   const [syncStatuses, setSyncStatuses] = useState<SyncStatus[]>([]);
   const [seasonCoverages, setSeasonCoverages] = useState<LeagueSeasonCoverage[]>([]);
@@ -478,12 +552,16 @@ export function AdminPage({ authState }: AdminPageProps) {
 
   useEffect(() => {
     if (authState.authStatus === "authenticated" && authState.currentUser?.role === "ADMIN") {
-      void reloadAuditLogs(0);
       void reloadSyncJobs(false);
-      void loadSyncStatuses(authState.season, setSyncStatuses);
-      void loadSeasonCoverages(setSeasonCoverages, setCoverageStatus);
+      if (activeSection === "sync") {
+        void loadSyncStatuses(authState.season, setSyncStatuses);
+        void loadSeasonCoverages(setSeasonCoverages, setCoverageStatus);
+      }
+      if (activeSection === "logs") {
+        void reloadAuditLogs(0);
+      }
     }
-  }, [authState.authStatus, authState.currentUser?.role, authState.season]);
+  }, [activeSection, authState.authStatus, authState.currentUser?.role, authState.season]);
 
   const hasActiveSyncJobs = syncJobs.some((job) => job.active);
 
@@ -515,6 +593,34 @@ export function AdminPage({ authState }: AdminPageProps) {
   }, [syncCooldownUntil, syncClock]);
 
   useEffect(() => {
+    const expiredKeys = Object.entries(syncCooldownUntil)
+      .filter(([, until]) => until <= syncClock)
+      .map(([key]) => key);
+    if (expiredKeys.length === 0) {
+      return;
+    }
+    setSyncCooldownUntil((current) => {
+      const next = { ...current };
+      expiredKeys.forEach((key) => delete next[key]);
+      return next;
+    });
+    expiredKeys.forEach(removeStoredSyncCooldown);
+  }, [syncCooldownUntil, syncClock]);
+
+  useEffect(() => {
+    function handleStorage(event: StorageEvent) {
+      if (event.key !== null && !event.key.startsWith(`${MANUAL_SYNC_COOLDOWN_STORAGE_PREFIX}:`)) {
+        return;
+      }
+      setSyncClock(Date.now());
+      setSyncCooldownUntil(readStoredSyncCooldowns());
+    }
+
+    window.addEventListener("storage", handleStorage);
+    return () => window.removeEventListener("storage", handleStorage);
+  }, []);
+
+  useEffect(() => {
     if (!mediaToast) {
       return;
     }
@@ -526,13 +632,18 @@ export function AdminPage({ authState }: AdminPageProps) {
     if (
       authState.authStatus === "authenticated"
       && authState.currentUser?.role === "ADMIN"
+      && activeSection === "editor"
     ) {
       void loadFixtureTeams(authState.season);
     }
-  }, [authState.authStatus, authState.currentUser?.role, authState.season]);
+  }, [activeSection, authState.authStatus, authState.currentUser?.role, authState.season]);
 
   useEffect(() => {
-    if (authState.authStatus !== "authenticated" || authState.currentUser?.role !== "ADMIN") {
+    if (
+      activeSection !== "editor"
+      || authState.authStatus !== "authenticated"
+      || authState.currentUser?.role !== "ADMIN"
+    ) {
       return;
     }
     const tab = adminTab(searchParams.get("tab"));
@@ -556,7 +667,7 @@ export function AdminPage({ authState }: AdminPageProps) {
       return;
     }
     void selectFixture(id);
-  }, [authState.authStatus, authState.currentUser?.role, searchParams]);
+  }, [activeSection, authState.authStatus, authState.currentUser?.role, searchParams]);
 
   useEffect(() => {
     const target = pendingAdminTargetRef.current;
@@ -611,6 +722,10 @@ export function AdminPage({ authState }: AdminPageProps) {
 
   if (authState.currentUser?.role !== "ADMIN") {
     return <Navigate to="/league/overview" replace />;
+  }
+
+  if (activeSection === null) {
+    return <Navigate to={`/admin/editor${location.search}`} replace />;
   }
 
   async function searchTeams(event: FormEvent<HTMLFormElement>) {
@@ -747,7 +862,7 @@ export function AdminPage({ authState }: AdminPageProps) {
     try {
       const response = await fetchFixtures({ season: authState.season, teamId, size: 100 });
       if (fixtureListRequestIdRef.current === requestId) {
-        setFixtures(response.content ?? []);
+        setFixtures(sortAdminFixturesByRound(response.content ?? []));
         setFixtureListStatus("ready");
       }
     } catch (nextError) {
@@ -876,14 +991,16 @@ export function AdminPage({ authState }: AdminPageProps) {
       return;
     }
     const teamId = selectedTeam.teamId;
-    const body = formBody(event.currentTarget, teamFields);
-    await runSave(`team:${teamId}`, async () => {
+    const body = {
+      ...formBody(event.currentTarget, teamFields),
+      venueId: selectedTeam.venueId,
+    };
+    await runToastSave(`team:${teamId}`, async () => {
       const updated = await adminJson<TeamAdmin>(`/api/v1/admin/teams/${teamId}`, "PUT", body);
       clearApiMemoryCache();
       setTeamSelection({ teamId, status: "ready", detail: updated });
-      setMessage("팀 정보를 저장했습니다.");
       await reloadAuditLogs();
-    });
+    }, "팀 정보를 수정했습니다.", "팀 정보를 수정하지 못했습니다.");
   }
 
   async function savePlayer(event: FormEvent<HTMLFormElement>) {
@@ -893,13 +1010,12 @@ export function AdminPage({ authState }: AdminPageProps) {
     }
     const playerId = selectedPlayer.playerId;
     const body = formBody(event.currentTarget, playerFields);
-    await runSave(`player:${playerId}`, async () => {
+    await runToastSave(`player:${playerId}`, async () => {
       const updated = await adminJson<PlayerAdmin>(`/api/v1/admin/players/${playerId}`, "PUT", body);
       clearApiMemoryCache();
       setPlayerSelection({ playerId, status: "ready", detail: updated });
-      setMessage("선수 정보를 저장했습니다.");
       await reloadAuditLogs();
-    });
+    }, "선수 정보를 수정했습니다.", "선수 정보를 수정하지 못했습니다.");
   }
 
   async function uploadAdminMedia(
@@ -1050,6 +1166,33 @@ export function AdminPage({ authState }: AdminPageProps) {
     }
   }
 
+  async function runToastSave(
+    key: string,
+    action: () => Promise<void>,
+    successMessage: string,
+    fallbackErrorMessage: string,
+  ): Promise<string | null> {
+    if (savingKey !== null) {
+      const busyMessage = "다른 관리자 요청을 처리하고 있습니다. 잠시 후 다시 시도해주세요.";
+      setMediaToast({ message: busyMessage, type: "error" });
+      return busyMessage;
+    }
+    setSavingKey(key);
+    setError("");
+    setMessage("");
+    try {
+      await action();
+      setMediaToast({ message: successMessage, type: "success" });
+      return null;
+    } catch (nextError) {
+      const requestError = nextError instanceof Error ? nextError.message : fallbackErrorMessage;
+      setMediaToast({ message: requestError, type: "error" });
+      return requestError;
+    } finally {
+      setSavingKey(null);
+    }
+  }
+
   async function runMediaSave(key: string, action: () => Promise<void>, successMessage: string): Promise<string | null> {
     if (savingKey !== null) {
       const busyMessage = "다른 관리자 요청을 처리하고 있습니다. 잠시 후 다시 시도해주세요.";
@@ -1077,33 +1220,32 @@ export function AdminPage({ authState }: AdminPageProps) {
     return `${task}:${authState.season}`;
   }
 
-  function fixtureDetailCooldownKey(fixtureId: string) {
-    return `fixture-detail:${fixtureId}`;
-  }
-
   function syncCooldownSeconds(key: string) {
     return Math.max(0, Math.ceil(((syncCooldownUntil[key] ?? 0) - syncClock) / 1000));
   }
 
   function markSyncCooldown(key: string) {
     const now = Date.now();
+    const cooldownUntil = now + MANUAL_SYNC_COOLDOWN_MS;
+    storeSyncCooldown(key, cooldownUntil);
     setSyncClock(now);
     setSyncCooldownUntil((current) => ({
       ...current,
-      [key]: now + MANUAL_SYNC_COOLDOWN_MS,
+      [key]: cooldownUntil,
     }));
   }
 
   async function runSync(task: string) {
     const availability = syncAvailability(task, authState.season, seasonCoverages, coverageStatus);
     if (!availability.enabled) {
-      setSyncMessage(availability.message);
+      setMediaToast({ message: availability.message, type: "error" });
       return;
     }
     const cooldownKey = manualSyncCooldownKey(task);
     const cooldownSeconds = syncCooldownSeconds(cooldownKey);
     if (cooldownSeconds > 0) {
-      setSyncMessage(`${cooldownSeconds}초 후 다시 요청할 수 있습니다.`);
+      const cooldownMessage = `${cooldownSeconds}초 후 다시 요청할 수 있습니다.`;
+      setMediaToast({ message: cooldownMessage, type: "error" });
       return;
     }
     const league = 39;
@@ -1119,54 +1261,46 @@ export function AdminPage({ authState }: AdminPageProps) {
     };
     const url = urls[task];
     if (!url) {
-      setSyncMessage("Fixture Detail 동기화는 먼저 경기를 선택해야 합니다.");
+      const missingTargetMessage = "경기 상세 동기화는 먼저 경기를 선택해야 합니다.";
+      setMediaToast({ message: missingTargetMessage, type: "error" });
       return;
     }
     markSyncCooldown(cooldownKey);
     setSyncingTask(task);
+    setError("");
+    setMessage("");
     try {
-      await runRequest(async () => {
-        const result = await adminJson<{ jobId?: number; message: string }>(url, "POST");
-        clearApiMemoryCache();
-        setSyncMessage(result.message);
-        if (task === "seasons") {
-          await loadSeasonCoverages(setSeasonCoverages, setCoverageStatus);
-        }
-        await loadSyncStatuses(authState.season, setSyncStatuses);
-        await reloadAuditLogs();
-        if (result.jobId) {
-          await reloadSyncJobs(true);
-        }
-      });
+      const result = await adminJson<AdminSyncResponse>(url, "POST");
+      if (result.success === false) {
+        throw new Error(result.message);
+      }
+      clearApiMemoryCache();
+      if (task === "seasons") {
+        await loadSeasonCoverages(setSeasonCoverages, setCoverageStatus);
+      }
+      await reloadAuditLogs();
+      if (result.jobId) {
+        await reloadSyncJobs(true);
+      }
+      if (result.jobId || result.queued) {
+        setMediaToast({ message: `${syncRequestDisplayKey(task, season)} 동기화 요청됨`, type: "success" });
+      } else {
+        setMediaToast({ message: `${syncRequestDisplayKey(task, season)} 동기화 완료`, type: "success" });
+      }
+    } catch (nextError) {
+      const requestError = requestErrorMessage(nextError);
+      setMediaToast({ message: requestError, type: "error" });
     } finally {
+      await reloadSyncStatusesSafely();
       setSyncingTask(null);
     }
   }
 
-  async function syncFixtureDetail(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const fixtureId = syncFixtureId.trim();
-    if (!fixtureId) {
-      setSyncMessage("Fixture ID를 입력해주세요.");
-      return;
-    }
-    const cooldownKey = fixtureDetailCooldownKey(fixtureId);
-    const cooldownSeconds = syncCooldownSeconds(cooldownKey);
-    if (cooldownSeconds > 0) {
-      setSyncMessage(`${cooldownSeconds}초 후 다시 요청할 수 있습니다.`);
-      return;
-    }
-    markSyncCooldown(cooldownKey);
-    setSyncingTask("fixture-detail");
+  async function reloadSyncStatusesSafely() {
     try {
-      await runRequest(async () => {
-        const result = await adminJson<{ message: string }>(`/api/v1/admin/sync/fixture-details/${encodeURIComponent(fixtureId)}`, "POST");
-        clearApiMemoryCache();
-        setSyncMessage(result.message);
-        await reloadAuditLogs();
-      });
-    } finally {
-      setSyncingTask(null);
+      await loadSyncStatuses(authState.season, setSyncStatuses);
+    } catch {
+      // 상태 조회 실패가 이미 완료된 동기화 요청의 성공·실패 결과를 바꾸지 않도록 분리한다.
     }
   }
 
@@ -1180,8 +1314,6 @@ export function AdminPage({ authState }: AdminPageProps) {
   const queuedSyncJobs = syncJobs.filter((job) => job.status === "QUEUED");
   const completedSyncJobs = syncJobs.filter((job) => !job.active);
   const selectedCoverage = seasonCoverages.find((coverage) => coverage.seasonYear === authState.season) ?? null;
-  const fixtureDetailCooldownSeconds = syncFixtureId.trim() ? syncCooldownSeconds(fixtureDetailCooldownKey(syncFixtureId.trim())) : 0;
-
   async function runRequest(action: () => Promise<void>): Promise<string | null> {
     setError("");
     setMessage("");
@@ -1211,16 +1343,36 @@ export function AdminPage({ authState }: AdminPageProps) {
       ) : null}
       <div className="admin-page-heading">
         <div>
-          <p className="eyebrow">Admin</p>
-          <h2>관리자 페이지</h2>
+          <p className="eyebrow">관리자</p>
+          <h2>
+            {activeSection === "editor"
+              ? "데이터 편집"
+              : activeSection === "sync"
+                ? "외부 API 동기화"
+                : "관리자 로그"}
+          </h2>
         </div>
         <span className="status-pill">{authState.currentUser.email}</span>
       </div>
 
+      <nav className="admin-tabs admin-section-tabs" aria-label="관리자 페이지">
+        <NavLink className={({ isActive }) => `admin-tab${isActive ? " active" : ""}`} to="/admin/editor">
+          데이터 편집
+        </NavLink>
+        <NavLink className={({ isActive }) => `admin-tab${isActive ? " active" : ""}`} to="/admin/sync">
+          외부 API 동기화
+        </NavLink>
+        <NavLink className={({ isActive }) => `admin-tab${isActive ? " active" : ""}`} to="/admin/logs">
+          관리자 로그
+        </NavLink>
+      </nav>
+
+      {activeSection === "editor" ? (
+        <>
       {message ? <div className="notice">{message}</div> : null}
       {error ? <div className="notice error">{error}</div> : null}
 
-      <nav className="admin-tabs" aria-label="관리 메뉴">
+      <nav className="admin-tabs admin-editor-tabs" aria-label="편집 대상">
         <button
           type="button"
           className={`admin-tab${activeTab === "team" ? " active" : ""}`}
@@ -1245,7 +1397,7 @@ export function AdminPage({ authState }: AdminPageProps) {
       </nav>
 
       {activeTab === "team" ? (
-        <EditorPanel title="Team Editor" eyebrow="Teams">
+        <EditorPanel title="팀 정보 편집" eyebrow="팀">
           <label className="admin-fixture-team-select">
             <span>{authState.season} 시즌 팀</span>
             <select
@@ -1265,7 +1417,7 @@ export function AdminPage({ authState }: AdminPageProps) {
             </select>
           </label>
           <p className="muted admin-sync-message">목록에 없는 팀은 아래 검색으로 찾을 수 있습니다.</p>
-          <SearchRow value={teamKeyword} placeholder="Search team" onChange={setTeamKeyword} onSubmit={searchTeams} />
+          <SearchRow value={teamKeyword} placeholder="팀 검색" onChange={setTeamKeyword} onSubmit={searchTeams} />
           <ResultList
             items={teams}
             getKey={(team) => team.teamId}
@@ -1300,11 +1452,11 @@ export function AdminPage({ authState }: AdminPageProps) {
                 />
               </div>
               <AdminForm
-                title={selectedTeam.name ?? "Team"}
+                title={selectedTeam.name ?? "팀"}
                 fields={teamFields}
                 value={selectedTeam}
                 overrides={selectedTeam.manualOverrides}
-                submitLabel="Save Team"
+                submitLabel="팀 정보 저장"
                 onSubmit={saveTeam}
                 disabled={savingKey !== null}
               />
@@ -1314,7 +1466,7 @@ export function AdminPage({ authState }: AdminPageProps) {
       ) : null}
 
       {activeTab === "player" ? (
-        <EditorPanel title="Player Editor" eyebrow="Players">
+        <EditorPanel title="선수 정보 편집" eyebrow="선수">
           <div className="admin-fixture-browser">
             <label className="admin-fixture-team-select">
               <span>{authState.season} 시즌 팀</span>
@@ -1348,7 +1500,7 @@ export function AdminPage({ authState }: AdminPageProps) {
             ) : null}
           </div>
           <p className="muted admin-sync-message">현재 시즌 팀 목록에 없는 선수는 아래 검색으로 찾을 수 있습니다.</p>
-          <SearchRow value={playerKeyword} placeholder="Search player" onChange={setPlayerKeyword} onSubmit={searchPlayers} />
+          <SearchRow value={playerKeyword} placeholder="선수 검색" onChange={setPlayerKeyword} onSubmit={searchPlayers} />
           <ResultList
             items={players}
             getKey={(player) => player.playerId}
@@ -1372,11 +1524,11 @@ export function AdminPage({ authState }: AdminPageProps) {
                 />
               </div>
               <AdminForm
-                title={selectedPlayer.name ?? "Player"}
+                title={selectedPlayer.name ?? "선수"}
                 fields={playerFields}
                 value={selectedPlayer}
                 overrides={selectedPlayer.manualOverrides}
-                submitLabel="Save Player"
+                submitLabel="선수 정보 저장"
                 onSubmit={savePlayer}
                 disabled={savingKey !== null}
               />
@@ -1386,7 +1538,7 @@ export function AdminPage({ authState }: AdminPageProps) {
       ) : null}
 
       {activeTab === "fixture" ? (
-      <EditorPanel title="Fixture Editor" eyebrow="Fixtures">
+      <EditorPanel title="경기 정보 편집" eyebrow="경기">
         <div className="admin-fixture-browser">
           <label className="admin-fixture-team-select">
             <span>{authState.season} 시즌 팀</span>
@@ -1421,11 +1573,11 @@ export function AdminPage({ authState }: AdminPageProps) {
                 >
                   <span className="admin-fixture-list-meta">
                     <time>{formatFixtureDate(fixture.fixtureDate)}</time>
-                    <span>{fixture.round ? `${fixture.round}R` : "라운드 미정"}</span>
+                    <span>{fixture.round ? `${fixture.round}라운드` : "라운드 미정"}</span>
                     <span>{fixture.fixtureStatus ?? "-"}</span>
                   </span>
                   <strong>{fixture.homeTeamName ?? "-"} <em>{formatFixtureScore(fixture)}</em> {fixture.awayTeamName ?? "-"}</strong>
-                  <small>Fixture #{fixture.fixtureId}</small>
+                  <small>경기 #{fixture.fixtureId}</small>
                 </button>
               ))}
             </div>
@@ -1446,16 +1598,19 @@ export function AdminPage({ authState }: AdminPageProps) {
         ) : null}
       </EditorPanel>
       ) : null}
+        </>
+      ) : null}
 
-      <details className="panel admin-page-panel admin-utility-section">
-        <summary>
+      {activeSection === "sync" ? (
+      <section className="panel admin-page-panel admin-utility-section">
+        <div className="admin-page-section-heading">
           <span>
-            <span className="eyebrow">External APIs</span>
-            <strong>Provider Status &amp; API-Football Sync</strong>
+            <span className="eyebrow">외부 API</span>
+            <strong>제공자 상태 및 API-Football 동기화</strong>
           </span>
-        </summary>
+        </div>
         <p className="muted admin-sync-message">
-          새로운 시즌은 Teams → Standings 순서로 동기화한 뒤 나머지 동기화를 진행해 주세요.
+          새로운 시즌은 팀 → 순위 순서로 동기화한 뒤 나머지 동기화를 진행해 주세요.
         </p>
         <div className={`admin-api-health admin-api-health-${(apiFootballStatus?.status ?? "NEVER_SYNCED").toLowerCase()}`}>
           <div className="admin-api-health-heading">
@@ -1469,11 +1624,10 @@ export function AdminPage({ authState }: AdminPageProps) {
             <span>마지막 시도: {formatDateTime(apiFootballStatus?.lastAttemptAt ?? null)}</span>
             {apiFootballStatus?.lastFailureAt ? <span>마지막 실패: {formatDateTime(apiFootballStatus.lastFailureAt)}</span> : null}
             {(apiFootballStatus?.failureCount ?? 0) > 0 ? <span>기록된 장애: {apiFootballStatus?.failureCount}회</span> : null}
-            {apiFootballStatus?.lastOperation ? <span>작업: {apiFootballStatus.lastOperation}</span> : null}
+            {apiFootballStatus?.lastOperation ? <span>작업: {externalApiOperationLabel(apiFootballStatus.lastOperation)}</span> : null}
             {apiFootballStatus?.lastAttemptCount ? <span>시도 횟수: {apiFootballStatus.lastAttemptCount}</span> : null}
-            {apiFootballStatus?.lastErrorCategory ? <span>오류: {apiFootballStatus.lastErrorCategory}{apiFootballStatus.lastHttpStatus ? ` (${apiFootballStatus.lastHttpStatus})` : ""}</span> : null}
+            {apiFootballStatus?.lastErrorCategory ? <span>오류: {externalApiErrorCategoryLabel(apiFootballStatus.lastErrorCategory)}{apiFootballStatus.lastHttpStatus ? ` (${apiFootballStatus.lastHttpStatus})` : ""}</span> : null}
           </div>
-          {apiFootballStatus?.lastErrorMessage ? <p className="admin-api-health-error">{apiFootballStatus.lastErrorMessage}</p> : null}
         </div>
         {newsProviderStatuses.map((status) => (
           <div className={`admin-api-health admin-api-health-${(status.status ?? "NEVER_SYNCED").toLowerCase()}`} key={status.task}>
@@ -1488,11 +1642,10 @@ export function AdminPage({ authState }: AdminPageProps) {
               <span>마지막 시도: {formatDateTime(status.lastAttemptAt)}</span>
               {status.lastFailureAt ? <span>마지막 실패: {formatDateTime(status.lastFailureAt)}</span> : null}
               <span>연속 실패: {status.failureCount ?? 0}회</span>
-              {status.lastOperation ? <span>작업: {status.lastOperation}</span> : null}
+              {status.lastOperation ? <span>작업: {externalApiOperationLabel(status.lastOperation)}</span> : null}
               {status.lastAttemptCount ? <span>시도 횟수: {status.lastAttemptCount}</span> : null}
-              {status.lastErrorCategory ? <span>오류: {status.lastErrorCategory}{status.lastHttpStatus ? ` (${status.lastHttpStatus})` : ""}</span> : null}
+              {status.lastErrorCategory ? <span>오류: {externalApiErrorCategoryLabel(status.lastErrorCategory)}{status.lastHttpStatus ? ` (${status.lastHttpStatus})` : ""}</span> : null}
             </div>
-            {status.lastErrorMessage ? <p className="admin-api-health-error">{status.lastErrorMessage}</p> : null}
           </div>
         ))}
         <div className="admin-sync-actions">
@@ -1503,18 +1656,22 @@ export function AdminPage({ authState }: AdminPageProps) {
             const cooldownSeconds = syncCooldownSeconds(manualSyncCooldownKey(item.task));
             return (
               <div className="admin-sync-action" key={item.task}>
-                <button type="button" onClick={() => void runSync(item.task)} disabled={syncingTask !== null || activeSyncTasks.has(item.task) || cooldownSeconds > 0 || !availability.enabled}>
+                <button
+                  type="button"
+                  onClick={() => void runSync(item.task)}
+                  disabled={syncingTask !== null || activeSyncTasks.has(item.task) || !availability.enabled}
+                  aria-disabled={cooldownSeconds > 0}
+                >
                   {isSyncing ? <LoaderCircle className="admin-loading-icon" aria-hidden="true" /> : null}
                   {item.label}
                 </button>
                 <span className={`status-pill sync-status-${(status?.status ?? "NEVER_SYNCED").toLowerCase()}`}>
                   {syncStatusLabel(status?.status)}
                 </span>
-                <span>Last success: {formatDateTime(lastSuccessfulSyncTime(status))}</span>
-                <span>Last attempt: {formatDateTime(status?.lastAttemptAt ?? null)}</span>
-                {status?.lastFailureAt ? <span>Last failure: {formatDateTime(status.lastFailureAt)}</span> : null}
-                {(status?.failureCount ?? 0) > 0 ? <span className="admin-sync-warning">Failures: {status?.failureCount}</span> : null}
-                {status?.lastErrorMessage ? <span className="admin-sync-warning">{status.lastErrorMessage}</span> : null}
+                <span>마지막 성공: {formatDateTime(lastSuccessfulSyncTime(status))}</span>
+                <span>마지막 시도: {formatDateTime(status?.lastAttemptAt ?? null)}</span>
+                {status?.lastFailureAt ? <span>마지막 실패: {formatDateTime(status.lastFailureAt)}</span> : null}
+                {(status?.failureCount ?? 0) > 0 ? <span className="admin-sync-warning">연속 실패 수: {status?.failureCount}</span> : null}
                 {cooldownSeconds > 0 ? <span className="admin-sync-warning">{cooldownSeconds}초 후 재요청 가능</span> : null}
                 {!availability.enabled ? <span className="admin-sync-warning">{availability.message}</span> : null}
               </div>
@@ -1523,10 +1680,10 @@ export function AdminPage({ authState }: AdminPageProps) {
         </div>
         <div className="admin-sync-jobs" aria-live="polite">
           <div className="admin-sync-jobs-heading">
-            <strong>Background Sync Jobs</strong>
+            <strong>백그라운드 동기화 작업</strong>
             <button type="button" className="section-retry-button" disabled={syncJobsStatus === "loading"} onClick={() => void reloadSyncJobs(false)}>
               {syncJobsStatus === "loading" ? <LoaderCircle className="admin-loading-icon" aria-hidden="true" /> : null}
-              Refresh
+              새로고침
             </button>
           </div>
           {syncJobsStatus === "loading" && syncJobs.length === 0 ? <p className="muted admin-sync-message">작업 내역을 불러오는 중입니다.</p> : null}
@@ -1556,77 +1713,61 @@ export function AdminPage({ authState }: AdminPageProps) {
           />
         </div>
         {coverageStatus === "error" ? (
-          <p className="muted admin-sync-message">시즌 지원 범위를 불러오지 못해 수동 싱크 요청을 잠시 막았습니다.</p>
+          <p className="muted admin-sync-message">시즌 지원 범위를 불러오지 못해 수동 동기화 요청을 잠시 막았습니다.</p>
         ) : null}
         {coverageStatus === "ready" && !selectedCoverage ? (
-          <p className="muted admin-sync-message">선택한 시즌은 API-Football coverage 정보가 없어 수동 싱크를 요청할 수 없습니다.</p>
+          <p className="muted admin-sync-message">선택한 시즌은 API-Football 지원 범위 정보가 없어 수동 동기화를 요청할 수 없습니다.</p>
         ) : null}
-        <form className="admin-fixture-sync-form" onSubmit={syncFixtureDetail}>
-          <label>
-            <span>Fixture ID</span>
-            <input
-              type="number"
-              min={1}
-              inputMode="numeric"
-              value={syncFixtureId}
-              onChange={(event) => setSyncFixtureId(event.currentTarget.value)}
-              placeholder="Fixture ID"
-            />
-          </label>
-          <button type="submit" disabled={syncingTask !== null || fixtureDetailCooldownSeconds > 0}>
-            {syncingTask === "fixture-detail" ? <LoaderCircle className="admin-loading-icon" aria-hidden="true" /> : null}
-            Update Fixture Detail
-          </button>
-        </form>
-        {fixtureDetailCooldownSeconds > 0 ? <p className="muted admin-sync-message">{fixtureDetailCooldownSeconds}초 후 Fixture Detail을 다시 요청할 수 있습니다.</p> : null}
-        {syncMessage ? <p className="muted admin-sync-message">{syncMessage}</p> : null}
-      </details>
+      </section>
+      ) : null}
 
-      <details className="panel admin-page-panel admin-utility-section">
-        <summary>
+      {activeSection === "logs" ? (
+      <section className="panel admin-page-panel admin-utility-section">
+        <div className="admin-page-section-heading">
           <span>
-            <span className="eyebrow">Audit</span>
-            <strong>Recent Admin Logs</strong>
+            <span className="eyebrow">감사 기록</span>
+            <strong>최근 관리자 로그</strong>
           </span>
           <button type="button" className="section-retry-button" disabled={auditStatus === "loading"} onClick={() => void reloadAuditLogs()}>
             {auditStatus === "loading" ? <LoaderCircle className="admin-loading-icon" aria-hidden="true" /> : null}
-            {auditStatus === "loading" ? "Refreshing" : "Refresh"}
+            {auditStatus === "loading" ? "새로고침 중" : "새로고침"}
           </button>
-        </summary>
+        </div>
         {auditStatus === "loading" && logs.length === 0 ? <p className="muted admin-sync-message">관리자 로그를 불러오는 중입니다.</p> : null}
         {auditStatus === "loading" && logs.length > 0 ? <p className="muted admin-sync-message" role="status">기존 로그를 표시한 채 새 내역을 확인하고 있습니다.</p> : null}
         {auditStatus === "error" ? <p className="admin-inline-error" role="alert">{auditError}</p> : null}
         <div className="admin-log-list">
           {logs.map((log) => (
-            <article className="admin-log-item" key={log.id}>
+            <article className={`admin-log-item ${log.success ? "success" : "failed"}`} key={log.id}>
               <div className="admin-log-badges">
-                <span className="status-pill">{log.type}</span>
+                <span className="status-pill">{adminAuditTypeLabel(log.type)}</span>
                 {log.provider ? <span className="status-pill admin-log-category">{externalApiProviderLabel(log.provider)}</span> : null}
-                {log.syncCategory ? <span className="status-pill admin-log-category">{log.syncCategory}</span> : null}
+                {log.syncCategory ? <span className="status-pill admin-log-category">{syncCategoryLabel(log.syncCategory)}</span> : null}
               </div>
               <div>
                 <strong>{log.message}</strong>
-                {log.details ? <p className="muted">{log.details}</p> : null}
+                {log.details ? <p className="muted">{adminAuditDetailsLabel(log.details)}</p> : null}
                 <p className="muted">
                   {log.adminEmail ?? "-"} · {formatDateTime(log.createdAt)}
                 </p>
               </div>
-              <span className="status-pill">{log.success ? "OK" : "FAIL"}</span>
+              <span className="status-pill admin-log-result">{log.success ? "성공" : "실패"}</span>
             </article>
           ))}
         </div>
         <div className="admin-pagination">
           <button type="button" disabled={auditStatus === "loading" || auditPage <= 0} onClick={() => void reloadAuditLogs(auditPage - 1)}>
-            Previous
+            이전
           </button>
           <span>
-            Page {auditTotalPages === 0 ? 0 : auditPage + 1} / {auditTotalPages} · {auditTotalElements} logs
+            {auditTotalPages === 0 ? 0 : auditPage + 1} / {auditTotalPages} 페이지 · 총 {auditTotalElements}건
           </span>
           <button type="button" disabled={auditStatus === "loading" || auditPage + 1 >= auditTotalPages} onClick={() => void reloadAuditLogs(auditPage + 1)}>
-            Next
+            다음
           </button>
         </div>
-      </details>
+      </section>
+      ) : null}
     </section>
   );
 }
@@ -1646,6 +1787,19 @@ function SyncJobSection({
   onCancel: (job: SyncJob) => Promise<void>;
   collapsible?: boolean;
 }) {
+  const completedCounts = jobs.reduce(
+    (counts, job) => {
+      if (job.status === "SUCCEEDED") {
+        counts.succeeded += 1;
+      } else if (job.status === "FAILED" || job.status === "PARTIAL_FAILED") {
+        counts.failed += 1;
+      } else if (job.status === "CANCELLED") {
+        counts.cancelled += 1;
+      }
+      return counts;
+    },
+    { succeeded: 0, failed: 0, cancelled: 0 },
+  );
   const content = (
     <>
       {jobs.length === 0 ? <p className="muted admin-sync-job-empty">{emptyMessage}</p> : null}
@@ -1664,7 +1818,16 @@ function SyncJobSection({
     return (
       <details className="admin-sync-job-section admin-sync-job-section-collapsible">
         <summary>
-          <h4>{title} <span>{jobs.length}</span></h4>
+          <div className="admin-sync-job-summary-heading">
+            <h4>{title} <span>{jobs.length}</span></h4>
+            <div className="admin-sync-job-summary-counts" aria-label={`성공 ${completedCounts.succeeded}, 실패 ${completedCounts.failed}, 취소 ${completedCounts.cancelled}`}>
+              <span className="succeeded">성공 {completedCounts.succeeded}</span>
+              <i aria-hidden="true">/</i>
+              <span className="failed">실패 {completedCounts.failed}</span>
+              <i aria-hidden="true">/</i>
+              <span className="cancelled">취소 {completedCounts.cancelled}</span>
+            </div>
+          </div>
           <ChevronDown size={18} aria-hidden="true" />
         </summary>
         {content}
@@ -1698,7 +1861,7 @@ function SyncJobCard({
       <div className="admin-sync-job-heading">
         <div>
           <strong>{syncTaskLabel(job.task)}</strong>
-          <span>{job.details ?? `Job #${job.id}`}</span>
+          <span>{job.details ? adminAuditDetailsLabel(job.details) : `작업 #${job.id}`}</span>
         </div>
         <span className="status-pill">{syncJobStatusLabel(job.status)}</span>
       </div>
@@ -1713,7 +1876,7 @@ function SyncJobCard({
       ) : null}
       <p className="admin-sync-phase">{syncJobPhaseLabel(job.phase, job.status)}</p>
       <p className="muted admin-sync-job-counts">
-        처리 {job.processedUnits}/{job.totalUnits || "?"} {job.unitLabel ?? "units"} · 성공 {job.successfulUnits} · 실패 {job.failedUnits} · 저장 {job.savedCount}
+        처리 {job.processedUnits}/{job.totalUnits || "?"} {syncUnitLabel(job.unitLabel)} · 성공 {job.successfulUnits} · 실패 {job.failedUnits} · 저장 {job.savedCount}
       </p>
       <p className="muted">{job.adminEmail ?? "-"} · 요청 {formatDateTime(job.createdAt)}{job.startedAt ? ` · 시작 ${formatDateTime(job.startedAt)}` : ""}{job.completedAt ? ` · 완료 ${formatDateTime(job.completedAt)}` : ""}</p>
       {cancellable || job.status === "CANCEL_REQUESTED" ? (
@@ -1733,7 +1896,7 @@ function SyncJobCard({
           <ul>
             {job.errors.map((jobError, index) => (
               <li key={`${jobError.unitType}:${jobError.unitId ?? index}`}>
-                <strong>{jobError.unitType}{jobError.unitId ? ` ${jobError.unitId}` : ""}</strong>
+                <strong>{syncUnitLabel(jobError.unitType)}{jobError.unitId ? ` ${jobError.unitId}` : ""}</strong>
                 <span>{jobError.message}</span>
               </li>
             ))}
@@ -1786,7 +1949,7 @@ function SearchRow({
         maxLength={ADMIN_SEARCH_KEYWORD_MAX_LENGTH}
         onChange={(event) => onChange(event.target.value)}
       />
-      <button type="submit">Search</button>
+      <button type="submit">검색</button>
     </form>
   );
 }
@@ -1986,28 +2149,28 @@ function FixtureEditor({
 
   return (
     <div className="fixture-admin-editor">
-      <NestedAdminSection title="Fixture Info" count={1}>
+      <NestedAdminSection title="경기 기본 정보" count={1}>
         <AdminForm
-          title={`${detail.fixture.homeTeamName ?? "-"} vs ${detail.fixture.awayTeamName ?? "-"}`}
+          title={`${detail.fixture.homeTeamName ?? "-"} 대 ${detail.fixture.awayTeamName ?? "-"}`}
           fields={fixtureFields}
           value={detail.fixture}
-          submitLabel="Save Fixture"
+          submitLabel="경기 정보 저장"
           onSubmit={onSaveFixture}
           disabled={disabled}
         />
       </NestedAdminSection>
-      <NestedAdminSection title="Events" count={detail.events.length}>
+      <NestedAdminSection title="경기 이벤트" count={detail.events.length}>
         <button type="button" className="admin-add-button" onClick={() => setAddingEvent((current) => !current)} disabled={disabled}>
-          {addingEvent ? "Cancel New Event" : "Add Event"}
+          {addingEvent ? "이벤트 추가 취소" : "이벤트 추가"}
         </button>
         {addingEvent ? (
           <details className="nested-admin-item" open>
-            <summary>New Event</summary>
+            <summary>새 이벤트</summary>
             <EventAdminForm
-              title="New Event"
+              title="새 이벤트"
               detail={detail}
               value={newEventValue}
-              submitLabel="Create Event"
+              submitLabel="이벤트 생성"
               onSubmit={(body) => {
                 void onSavePayload(
                   fixtureId,
@@ -2023,12 +2186,12 @@ function FixtureEditor({
         ) : null}
         {detail.events.map((event) => (
           <details className="nested-admin-item" key={event.eventSequence}>
-            <summary>#{event.eventSequence} {event.eventType ?? ""} {adminName(event.playerNameKo, event.playerName)}</summary>
+            <summary>#{event.eventSequence} {eventTypeLabel(event.eventType)} {adminName(event.playerNameKo, event.playerName)}</summary>
             <EventAdminForm
-              title={`#${event.eventSequence} ${event.eventType ?? ""} ${adminName(event.playerNameKo, event.playerName)}`}
+              title={`#${event.eventSequence} ${eventTypeLabel(event.eventType)} ${adminName(event.playerNameKo, event.playerName)}`}
               detail={detail}
               value={event}
-              submitLabel="Save Event"
+              submitLabel="이벤트 저장"
               onSubmit={(body) => {
                 void onSavePayload(
                   fixtureId,
@@ -2042,7 +2205,7 @@ function FixtureEditor({
           </details>
         ))}
       </NestedAdminSection>
-      <NestedAdminSection title="Lineups" count={detail.lineups.length}>
+      <NestedAdminSection title="라인업" count={detail.lineups.length}>
         {detail.lineups.map((lineup) => (
           <details className="nested-admin-item" key={`${lineup.teamId}-${lineup.playerId}`}>
             <summary>{adminName(lineup.teamNameKo, lineup.teamName)} · {adminName(lineup.playerNameKo, lineup.playerName)}</summary>
@@ -2050,7 +2213,7 @@ function FixtureEditor({
             title={`${adminName(lineup.teamNameKo, lineup.teamName)} · ${adminName(lineup.playerNameKo, lineup.playerName)}`}
             fields={lineupFields}
             value={lineup}
-            submitLabel="Save Lineup"
+            submitLabel="라인업 저장"
             onSubmit={(submitEvent) => {
               submitEvent.preventDefault();
               void onSaveSection(
@@ -2066,15 +2229,15 @@ function FixtureEditor({
           </details>
         ))}
       </NestedAdminSection>
-      <NestedAdminSection title="Team Stats" count={detail.teamStats.length}>
+      <NestedAdminSection title="팀 경기 통계" count={detail.teamStats.length}>
         {detail.teamStats.map((stat) => (
           <details className="nested-admin-item" key={stat.teamId}>
-            <summary>{stat.teamName ?? "Team"}</summary>
+            <summary>{stat.teamName ?? "팀"}</summary>
             <AdminForm
-            title={stat.teamName ?? "Team"}
+            title={stat.teamName ?? "팀"}
             fields={teamStatFields}
             value={stat}
-            submitLabel="Save Team Stat"
+            submitLabel="팀 통계 저장"
             onSubmit={(submitEvent) => {
               submitEvent.preventDefault();
               void onSaveSection(
@@ -2090,7 +2253,7 @@ function FixtureEditor({
           </details>
         ))}
       </NestedAdminSection>
-      <NestedAdminSection title="Player Stats" count={detail.playerStats.length}>
+      <NestedAdminSection title="선수 경기 통계" count={detail.playerStats.length}>
         {detail.playerStats.map((stat) => (
           <details className="nested-admin-item" key={stat.playerId}>
             <summary>{adminName(stat.playerNameKo, stat.playerName)} · {adminName(stat.teamNameKo, stat.teamName)}</summary>
@@ -2098,7 +2261,7 @@ function FixtureEditor({
             title={`${adminName(stat.playerNameKo, stat.playerName)} · ${adminName(stat.teamNameKo, stat.teamName)}`}
             fields={playerStatFields}
             value={stat}
-            submitLabel="Save Player Stat"
+            submitLabel="선수 통계 저장"
             onSubmit={(submitEvent) => {
               submitEvent.preventDefault();
               void onSaveSection(
@@ -2165,7 +2328,8 @@ function EventAdminForm({
   }, [value]);
 
   const selectedType = normalizeEventType(draft.eventType);
-  const fields = eventFieldsWithOptions(detail, selectedType);
+  const selectedTeamId = numericId(draft.teamId);
+  const fields = eventFieldsWithOptions(detail, selectedType, selectedTeamId);
   const formValue: Record<string, unknown> = {
     ...draft,
     eventType: selectedType,
@@ -2175,6 +2339,13 @@ function EventAdminForm({
   function updateDraft(field: FieldConfig, nextValue: string) {
     setDraft((current) => {
       const next = { ...current, [field.name]: nextValue };
+      if (field.name === "teamId") {
+        return {
+          ...next,
+          playerId: null,
+          assistPlayerId: null,
+        };
+      }
       if (field.name !== "eventType") {
         return next;
       }
@@ -2232,25 +2403,33 @@ function payloadFromDraft(draft: Record<string, unknown>, fields: FieldConfig[])
   return body;
 }
 
-function eventFieldsWithOptions(detail: FixtureDetailAdmin, selectedType: string): FieldConfig[] {
+function eventFieldsWithOptions(
+  detail: FixtureDetailAdmin,
+  selectedType: string,
+  selectedTeamId: number | null,
+): FieldConfig[] {
   const teamOptions: FieldOption[] = [
     {
       value: Number(detail.fixture.homeTeamId),
-      label: detail.fixture.homeTeamName ?? "Home",
+      label: detail.fixture.homeTeamName ?? "홈팀",
     },
     {
       value: Number(detail.fixture.awayTeamId),
-      label: detail.fixture.awayTeamName ?? "Away",
+      label: detail.fixture.awayTeamName ?? "원정팀",
     },
   ].filter((option) => Number.isFinite(option.value));
-  const playerOptions = fixturePlayerOptions(detail);
+  const playerOptions = fixturePlayerOptions(detail, selectedTeamId);
+  const substitution = selectedType === "Subst";
 
   return eventFields.map((field) => {
     if (field.name === "teamId") {
       return { ...field, options: teamOptions };
     }
     if (field.name === "playerId" || field.name === "assistPlayerId") {
-      return { ...field, options: playerOptions };
+      const label = substitution
+        ? field.name === "playerId" ? "교체 아웃" : "교체 인"
+        : field.label;
+      return { ...field, label, options: playerOptions };
     }
     if (field.name === "eventType") {
       return { ...field, options: eventTypeOptions };
@@ -2286,15 +2465,18 @@ function normalizeEventType(value: unknown) {
   return "Goal";
 }
 
-function fixturePlayerOptions(detail: FixtureDetailAdmin): FieldOption[] {
+function fixturePlayerOptions(detail: FixtureDetailAdmin, selectedTeamId: number | null): FieldOption[] {
+  if (selectedTeamId === null) {
+    return [];
+  }
   const players = new Map<number, string>();
   detail.lineups.forEach((lineup) => {
-    if (Number.isFinite(lineup.playerId)) {
+    if (lineup.teamId === selectedTeamId && Number.isFinite(lineup.playerId)) {
       players.set(lineup.playerId, `${adminName(lineup.playerNameKo, lineup.playerName)} · ${adminName(lineup.teamNameKo, lineup.teamName)}`);
     }
   });
   detail.playerStats.forEach((stat) => {
-    if (Number.isFinite(stat.playerId) && !players.has(stat.playerId)) {
+    if (stat.teamId === selectedTeamId && Number.isFinite(stat.playerId) && !players.has(stat.playerId)) {
       players.set(stat.playerId, `${adminName(stat.playerNameKo, stat.playerName)} · ${adminName(stat.teamNameKo, stat.teamName)}`);
     }
   });
@@ -2302,6 +2484,14 @@ function fixturePlayerOptions(detail: FixtureDetailAdmin): FieldOption[] {
   return Array.from(players.entries())
     .sort((left, right) => left[1].localeCompare(right[1]))
     .map(([value, label]) => ({ value, label }));
+}
+
+function numericId(value: unknown): number | null {
+  if (value === null || value === undefined || value === "") {
+    return null;
+  }
+  const parsed = typeof value === "number" ? value : Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
 }
 
 function AdminField({
@@ -2319,7 +2509,7 @@ function AdminField({
     const selectValue = value === null || value === undefined ? "" : String(value);
     return (
       <label>
-        <span>{field.label}{overridden ? " · manual" : ""}</span>
+        <span>{field.label}{overridden ? " · 수동 수정" : ""}</span>
         <select
           name={field.name}
           value={onChange ? selectValue : undefined}
@@ -2342,7 +2532,7 @@ function AdminField({
     const booleanValue = value === null || value === undefined ? "" : String(value);
     return (
       <label>
-        <span>{field.label}{overridden ? " · manual" : ""}</span>
+        <span>{field.label}{overridden ? " · 수동 수정" : ""}</span>
         <select
           name={field.name}
           value={onChange ? booleanValue : undefined}
@@ -2350,8 +2540,8 @@ function AdminField({
           onChange={(event) => onChange?.(event.currentTarget.value)}
         >
           <option value="">-</option>
-          <option value="true">true</option>
-          <option value="false">false</option>
+          <option value="true">예</option>
+          <option value="false">아니요</option>
         </select>
         {field.help ? <small className="admin-field-help">{field.help}</small> : null}
       </label>
@@ -2365,7 +2555,7 @@ function AdminField({
   const textValue = inputValue(value, field.kind);
   return (
     <label>
-      <span>{field.label}{overridden ? " · manual" : ""}</span>
+      <span>{field.label}{overridden ? " · 수동 수정" : ""}</span>
       <input
         name={field.name}
         type={field.kind === "number" ? "number" : field.kind === "date" ? "date" : field.kind === "datetime" ? "datetime-local" : "text"}
@@ -2391,7 +2581,7 @@ function ColorPreviewField({ field, value, overridden }: { field: FieldConfig; v
 
   return (
     <label>
-      <span>{field.label}{overridden ? " · manual" : ""}</span>
+      <span>{field.label}{overridden ? " · 수동 수정" : ""}</span>
       <div className="admin-color-field">
         <input
           name={field.name}
@@ -2406,7 +2596,7 @@ function ColorPreviewField({ field, value, overridden }: { field: FieldConfig; v
           type="color"
           value={pickerColor || "#ffffff"}
           onChange={(event) => setColorCode(event.target.value.replace("#", "").toUpperCase())}
-          aria-label={`${field.label} preview`}
+          aria-label={`${field.label} 미리보기`}
         />
       </div>
       {field.help ? <small className="admin-field-help">{field.help}</small> : null}
@@ -2482,7 +2672,141 @@ async function loadSyncStatuses(season: number, setSyncStatuses: (statuses: Sync
 }
 
 function syncTaskLabel(task: string) {
+  if (task === "fixture-detail") {
+    return "경기 상세";
+  }
   return syncTasks.find((item) => item.task === task)?.label ?? task;
+}
+
+function syncRequestDisplayKey(task: string, season: number | null) {
+  const label = syncTaskLabel(task);
+  return season === null || task === "seasons" ? label : `${label}:${season}`;
+}
+
+function syncUnitLabel(unitLabel: string | null) {
+  const labels: Record<string, string> = {
+    request: "요청",
+    injuries: "부상 정보",
+    teams: "팀",
+    images: "이미지",
+    season: "시즌",
+    fixtures: "경기",
+  };
+  return unitLabel ? labels[unitLabel] ?? unitLabel : "단위";
+}
+
+function adminAuditTypeLabel(type: string) {
+  const labels: Record<string, string> = {
+    TEAM_UPDATE: "팀 수정",
+    PLAYER_UPDATE: "선수 수정",
+    FIXTURE_UPDATE: "경기 수정",
+    MEDIA_UPLOAD: "이미지 등록",
+    MEDIA_RESTORE: "이미지 복원",
+    OVERRIDE_CLEAR: "수동 수정 해제",
+    SYNC: "동기화",
+    EXTERNAL_API_CALL: "외부 API 호출",
+  };
+  return labels[type] ?? type;
+}
+
+function syncCategoryLabel(category: string) {
+  const labels: Record<string, string> = {
+    Seasons: "지원 시즌",
+    Teams: "팀",
+    Standings: "순위",
+    Fixtures: "경기",
+    "Season Details": "시즌 경기 상세",
+    "Fixture Detail": "경기 상세",
+    Players: "선수",
+    Injuries: "부상자",
+  };
+  return labels[category] ?? category;
+}
+
+function adminAuditDetailsLabel(details: string) {
+  const labels: Record<string, string> = {
+    leagueId: "리그 ID",
+    teamId: "팀 ID",
+    playerId: "선수 ID",
+    fixtureId: "경기 ID",
+    articleId: "기사 ID",
+    season: "시즌",
+    delayMs: "지연 시간(ms)",
+    field: "필드",
+    batchSize: "묶음 크기",
+    resultCount: "결과 수",
+    attempts: "시도 횟수",
+    durationMs: "소요 시간(ms)",
+    httpStatus: "HTTP 상태",
+    errorCategory: "오류 분류",
+    operation: "작업",
+  };
+  return details
+    .split(";")
+    .map((part) => {
+      const [key, ...valueParts] = part.trim().split("=");
+      if (valueParts.length === 0) {
+        return part.trim();
+      }
+      const value = valueParts.join("=");
+      const displayValue = key === "operation"
+        ? externalApiOperationLabel(value)
+        : key === "errorCategory"
+          ? externalApiErrorCategoryLabel(value)
+          : value;
+      return `${labels[key] ?? key}=${displayValue}`;
+    })
+    .join("; ");
+}
+
+function eventTypeLabel(eventType: string | null) {
+  if (!eventType?.trim()) {
+    return "";
+  }
+  const normalizedType = normalizeEventType(eventType);
+  return eventTypeOptions.find((option) => option.value === normalizedType)?.label ?? eventType;
+}
+
+function externalApiOperationLabel(operation: string) {
+  const labels: Record<string, string> = {
+    getFixture: "경기 조회",
+    getFixturesByIds: "경기 일괄 조회",
+    getFixtures: "시즌 경기 조회",
+    getLeagueSeasons: "지원 시즌 조회",
+    getLiveFixtures: "실시간 경기 조회",
+    getEvents: "경기 이벤트 조회",
+    getLineups: "라인업 조회",
+    getPlayerProfiles: "선수 프로필 조회",
+    getRegisteredPlayers: "등록 선수 조회",
+    getRegisteredPlayersByTeam: "팀별 등록 선수 조회",
+    getInjuries: "부상자 조회",
+    getPlayerStats: "선수 경기 통계 조회",
+    getFixtureStatistics: "팀 경기 통계 조회",
+    getTeams: "팀 조회",
+    getStandings: "순위 조회",
+    searchTeamNews: "팀 뉴스 검색",
+    translateNewsTitles: "뉴스 제목 번역",
+  };
+  return labels[operation] ?? operation;
+}
+
+function externalApiErrorCategoryLabel(category: string) {
+  const labels: Record<string, string> = {
+    CONFIGURATION: "설정 오류",
+    BAD_REQUEST: "잘못된 요청",
+    AUTHENTICATION: "인증 오류",
+    PERMISSION: "권한 오류",
+    NOT_FOUND: "대상 없음",
+    RATE_LIMITED: "호출 제한",
+    QUOTA_EXHAUSTED: "사용량 소진",
+    TIMEOUT: "시간 초과",
+    NETWORK: "네트워크 오류",
+    UPSTREAM_SERVER: "외부 서버 오류",
+    INVALID_RESPONSE: "잘못된 응답",
+    CIRCUIT_OPEN: "호출 차단",
+    UNKNOWN: "알 수 없는 오류",
+  };
+  return labels[category] ?? category;
 }
 
 function syncStatusLabel(status?: string | null) {
@@ -2546,17 +2870,20 @@ function syncJobPhaseLabel(phase: string | null, status: SyncJobStatus) {
 }
 
 function syncJobCompletionMessage(job: SyncJob) {
-  const label = syncTaskLabel(job.task);
+  const syncKey = syncRequestDisplayKey(job.task, job.season);
   if (job.status === "SUCCEEDED") {
-    return `${label} 동기화가 완료되었습니다. 저장 ${job.savedCount}건`;
+    return `${syncKey} 동기화 완료`;
   }
+  const errorMessage = job.errors.find((error) => error.message.trim())?.message.trim()
+    || job.message.trim()
+    || "오류 내역을 확인해 주세요.";
   if (job.status === "PARTIAL_FAILED") {
-    return `${label} 동기화가 일부 실패했습니다. 오류 ${job.failedUnits}건을 확인해 주세요.`;
+    return `${syncKey} 동기화 일부 실패: ${errorMessage}`;
   }
   if (job.status === "CANCELLED") {
-    return `${label} 동기화가 취소되었습니다.`;
+    return `${syncKey} 동기화 취소`;
   }
-  return `${label} 동기화에 실패했습니다. 오류 내역을 확인해 주세요.`;
+  return `${syncKey} 동기화 실패: ${errorMessage}`;
 }
 
 async function loadSeasonCoverages(
@@ -2637,7 +2964,7 @@ async function adminRequest<T>(url: string, init: RequestInit): Promise<T> {
     },
   });
   if (!response.ok) {
-    throw new Error(await errorMessage(response, `${url} failed (${response.status})`));
+    throw new Error(await errorMessage(response, `요청을 처리하지 못했습니다. (${response.status})`));
   }
   return response.status === 204 ? (null as T) : response.json();
 }
@@ -2669,6 +2996,22 @@ function formatDateTime(value: string | null) {
   }).format(date);
 }
 
+function sortAdminFixturesByRound(fixtures: FixtureSummaryAdmin[]) {
+  return [...fixtures].sort((left, right) => {
+    const roundDifference = (left.round ?? Number.MAX_SAFE_INTEGER) - (right.round ?? Number.MAX_SAFE_INTEGER);
+    if (roundDifference !== 0) {
+      return roundDifference;
+    }
+    const leftTime = left.fixtureDate ? new Date(left.fixtureDate).getTime() : Number.MAX_SAFE_INTEGER;
+    const rightTime = right.fixtureDate ? new Date(right.fixtureDate).getTime() : Number.MAX_SAFE_INTEGER;
+    const dateDifference = leftTime - rightTime;
+    if (Number.isFinite(dateDifference) && dateDifference !== 0) {
+      return dateDifference;
+    }
+    return left.fixtureId - right.fixtureId;
+  });
+}
+
 function formatFixtureDate(value: string | null) {
   if (!value) {
     return "일시 미정";
@@ -2689,13 +3032,9 @@ function formatFixtureDate(value: string | null) {
 
 function formatFixtureScore(fixture: FixtureSummaryAdmin) {
   if (fixture.homeScore === null || fixture.awayScore === null) {
-    return "vs";
+    return "대";
   }
   return `${fixture.homeScore} : ${fixture.awayScore}`;
-}
-
-function labelize(value: string) {
-  return value.replace(/[A-Z]/g, (letter) => ` ${letter}`).replace(/^./, (letter) => letter.toUpperCase());
 }
 
 function externalApiProviderLabel(provider: string) {

@@ -77,7 +77,7 @@ export function App() {
           <Route path="/league/team-stats" element={<LeagueTeamStatsRoute />} />
           <Route path="/fixtures/:fixtureId" element={<FixtureDetailRoute />} />
           <Route path="/mypage" element={<MyPageRoute />} />
-          <Route path="/admin" element={<AdminRoute />} />
+          <Route path="/admin/*" element={<AdminRoute />} />
           <Route path="/players/:playerId" element={<PlayerDetailRoute />} />
           <Route path="/teams/:teamId" element={<TeamDetailRoute />} />
           <Route path="/league/*" element={<Navigate to="/league/overview" replace />} />

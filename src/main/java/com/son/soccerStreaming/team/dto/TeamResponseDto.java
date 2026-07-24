@@ -37,6 +37,7 @@ public class TeamResponseDto {
     public static class VenueInfo {
         private Long venueId;
         private String venueName;
+        private String venueNameKo;
         private String venueAddress;
         private String venueCity;
         private Integer capacity;

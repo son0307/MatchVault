@@ -156,6 +156,7 @@ public class TeamService {
         return TeamResponseDto.VenueInfo.builder()
                 .venueId(venue.getVenueId())
                 .venueName(venue.getVenueName())
+                .venueNameKo(venue.getVenueNameKo())
                 .venueAddress(venue.getVenueAddress())
                 .venueCity(venue.getVenueCity())
                 .capacity(venue.getCapacity())

@@ -17,6 +17,7 @@ public class FixtureResponseDto {
         private Integer round;
         private String referee;
         private String venueName;
+        private String venueNameKo;
         private Long homeTeamId;
         private Long awayTeamId;
         private String homeTeamName;

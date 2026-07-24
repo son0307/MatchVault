@@ -24,6 +24,7 @@ public class AdminDto {
         private String logoUrl;
         private Long venueId;
         private String venueName;
+        private String venueNameKo;
         private String venueAddress;
         private String venueCity;
         private Integer capacity;
@@ -65,6 +66,7 @@ public class AdminDto {
         private Integer season;
         private Long venueId;
         private String venueName;
+        private String venueNameKo;
         private String venueCity;
         private String statusShort;
         private String statusLong;
@@ -199,6 +201,7 @@ public class AdminDto {
         private boolean adminLogo;
         private Long venueId;
         private String venueName;
+        private String venueNameKo;
         private String venueAddress;
         private String venueCity;
         private Integer capacity;
@@ -282,6 +285,7 @@ public class AdminDto {
         private Integer season;
         private Long venueId;
         private String venueName;
+        private String venueNameKo;
         private String venueCity;
         private String statusShort;
         private String statusLong;
