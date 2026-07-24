@@ -29,4 +29,17 @@ class FixtureTest {
 
         assertThat(fixture.getRound()).isEqualTo(38);
     }
+
+    @Test
+    void normalizesVenueKoreanName() {
+        Fixture fixture = Fixture.builder()
+                .fixtureId(1L)
+                .build();
+
+        fixture.updateVenueKoreanName("  에미레이츠 스타디움  ");
+        assertThat(fixture.getVenueNameKo()).isEqualTo("에미레이츠 스타디움");
+
+        fixture.updateVenueKoreanName("");
+        assertThat(fixture.getVenueNameKo()).isNull();
+    }
 }

@@ -218,6 +218,7 @@ class AdminServiceTest {
                 null,
                 null,
                 null,
+                null,
                 null
         );
 
@@ -233,6 +234,17 @@ class AdminServiceTest {
         ArgumentCaptor<AdminAuditLog> logCaptor = ArgumentCaptor.forClass(AdminAuditLog.class);
         verify(adminAuditLogRepository).save(logCaptor.capture());
         assertThat(logCaptor.getValue().getDetails()).isEqualTo("name: Old -> New Team");
+    }
+
+    @Test
+    void updateTeamRejectsBlankRequiredName() {
+        AdminDto.TeamUpdateRequest request = new AdminDto.TeamUpdateRequest();
+        ReflectionTestUtils.setField(request, "name", "   ");
+
+        assertThatThrownBy(() -> adminService.updateTeam(1L, 47L, request))
+                .isInstanceOfSatisfying(CustomException.class, exception ->
+                        assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.INVALID_ADMIN_EDIT_FIELD));
+        verifyNoInteractions(teamRepository);
     }
 
     @Test

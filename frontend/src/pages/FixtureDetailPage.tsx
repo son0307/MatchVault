@@ -388,7 +388,7 @@ function FixtureDetailHero({
         </p>
         <strong>{scoreText(fixture)}</strong>
         {false && isAdmin ? (
-          <Link aria-label="관리자 수정" className="admin-edit-link icon" title="관리자 수정" to={`/admin?tab=fixture&id=${fixture.fixtureId}`}>
+          <Link aria-label="관리자 수정" className="admin-edit-link icon" title="관리자 수정" to={`/admin/editor?tab=fixture&id=${fixture.fixtureId}`}>
             <Pencil size={16} aria-hidden="true" />
             관리자 수정
           </Link>
@@ -396,7 +396,7 @@ function FixtureDetailHero({
         <span className="status-pill">{fixture.fixtureStatus ?? "예정"}</span>
       </div>
         {isAdmin ? (
-          <Link aria-label="관리자 수정" className="admin-edit-link icon fixture-admin-edit-link" title="관리자 수정" to={`/admin?tab=fixture&id=${fixture.fixtureId}`}>
+          <Link aria-label="관리자 수정" className="admin-edit-link icon fixture-admin-edit-link" title="관리자 수정" to={`/admin/editor?tab=fixture&id=${fixture.fixtureId}`}>
             <Pencil size={16} aria-hidden="true" />
             관리자 수정
           </Link>
@@ -424,7 +424,7 @@ function FixtureDetailHero({
         </div>
         <div>
           <dt>경기장</dt>
-          <dd>{fixtureInfo(fixture.venueName, "미정")}</dd>
+          <dd>{fixtureInfo(fixture.venueNameKo?.trim() || fixture.venueName, "미정")}</dd>
         </div>
       </dl>
     </article>

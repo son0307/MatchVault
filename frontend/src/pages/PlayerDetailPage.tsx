@@ -310,7 +310,7 @@ function PlayerHero({
             />
           ) : null}
           {isAdmin ? (
-            <Link aria-label="관리자 수정" className="admin-edit-link icon" title="관리자 수정" to={`/admin?tab=player&id=${profile.playerId}`}>
+            <Link aria-label="관리자 수정" className="admin-edit-link icon" title="관리자 수정" to={`/admin/editor?tab=player&id=${profile.playerId}`}>
               <Pencil size={16} aria-hidden="true" />
             </Link>
           ) : null}

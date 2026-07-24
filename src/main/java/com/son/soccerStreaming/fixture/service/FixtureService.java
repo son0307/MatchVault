@@ -144,6 +144,7 @@ public class FixtureService {
                 .round(fixture.getRound())
                 .referee(fixture.getReferee())
                 .venueName(fixture.getVenueName())
+                .venueNameKo(fixture.getVenueNameKo())
                 .homeTeamId(fixture.getHomeTeam().getTeamId())
                 .awayTeamId(fixture.getAwayTeam().getTeamId())
                 .homeTeamName(fixture.getHomeTeam().getName())

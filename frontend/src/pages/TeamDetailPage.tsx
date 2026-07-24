@@ -732,6 +732,7 @@ function TeamVenueCard({ venue }: { venue: TeamDetails["venue"] }) {
 
   const fullAddress = [venue.venueCity, venue.venueAddress].filter(Boolean).join(" · ");
   const addressPopoverId = `team-venue-address-${venue.venueId ?? "current"}`;
+  const displayVenueName = venue.venueNameKo?.trim() || venue.venueName;
 
   return (
     <article className="panel team-venue-card">
@@ -739,7 +740,7 @@ function TeamVenueCard({ venue }: { venue: TeamDetails["venue"] }) {
         {venue.venueImageUrl && !imageFailed ? (
           <img
             src={venue.venueImageUrl}
-            alt={venue.venueName ? `${venue.venueName} 경기장` : "팀 경기장"}
+            alt={displayVenueName ? `${displayVenueName} 경기장` : "팀 경기장"}
             onError={() => setImageFailed(true)}
           />
         ) : (
@@ -748,7 +749,7 @@ function TeamVenueCard({ venue }: { venue: TeamDetails["venue"] }) {
       </div>
       <div className="team-venue-info">
         <p className="eyebrow">Stadium</p>
-        <h3>{venue.venueName ?? "경기장 이름 정보 없음"}</h3>
+        <h3>{displayVenueName ?? "경기장 이름 정보 없음"}</h3>
         <dl>
           {fullAddress ? (
             <div className="team-venue-location">
@@ -773,7 +774,7 @@ function TeamVenueCard({ venue }: { venue: TeamDetails["venue"] }) {
                       role="dialog"
                       aria-label="경기장 전체 주소"
                     >
-                      <strong>{venue.venueName ?? "경기장 주소"}</strong>
+                      <strong>{displayVenueName ?? "경기장 주소"}</strong>
                       <span>{fullAddress}</span>
                     </div>
                   </>
@@ -834,7 +835,7 @@ function TeamHero({
             />
           ) : null}
           {isAdmin ? (
-            <Link aria-label="관리자 수정" className="admin-edit-link icon" title="관리자 수정" to={`/admin?tab=team&id=${team.teamId}`}>
+            <Link aria-label="관리자 수정" className="admin-edit-link icon" title="관리자 수정" to={`/admin/editor?tab=team&id=${team.teamId}`}>
               <Pencil size={16} aria-hidden="true" />
             </Link>
           ) : null}

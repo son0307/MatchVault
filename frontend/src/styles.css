@@ -4497,6 +4497,9 @@ h2 {
 
 .admin-tab {
   flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   border: 0;
   border-radius: 999px;
   padding: 9px 18px;
@@ -4505,6 +4508,7 @@ h2 {
   cursor: pointer;
   font-size: 0.92rem;
   font-weight: 900;
+  text-decoration: none;
 }
 
 .admin-tab.active {
@@ -4553,7 +4557,6 @@ h2 {
 .admin-search-row button,
 .admin-edit-form > button,
 .admin-sync-actions button,
-.admin-fixture-sync-form button,
 .admin-pagination button,
 .admin-add-button,
 .admin-media-actions button,
@@ -4575,7 +4578,6 @@ h2 {
 .admin-search-row button:hover,
 .admin-edit-form > button:hover,
 .admin-sync-actions button:hover,
-.admin-fixture-sync-form button:hover,
 .admin-pagination button:hover,
 .admin-add-button:hover,
 .admin-media-actions button:hover,
@@ -4587,12 +4589,16 @@ h2 {
 .admin-search-row button:disabled,
 .admin-edit-form > button:disabled,
 .admin-sync-actions button:disabled,
-.admin-fixture-sync-form button:disabled,
 .admin-pagination button:disabled,
 .admin-add-button:disabled,
 .admin-media-actions button:disabled,
 .admin-result-list button:disabled {
   cursor: wait;
+  opacity: 0.65;
+}
+
+.admin-sync-actions button[aria-disabled="true"] {
+  cursor: not-allowed;
   opacity: 0.65;
 }
 
@@ -5090,35 +5096,6 @@ h2 {
   font-weight: 800;
 }
 
-.admin-fixture-sync-form {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: 8px;
-  padding: 0 14px 14px;
-}
-
-.admin-fixture-sync-form button {
-  width: 100%;
-}
-
-.admin-fixture-sync-form label {
-  display: grid;
-  gap: 5px;
-  color: #263a2a;
-  font-size: 0.78rem;
-  font-weight: 900;
-}
-
-.admin-fixture-sync-form input {
-  width: 100%;
-  min-height: 38px;
-  border: 1px solid #c8d5c8;
-  border-radius: 6px;
-  padding: 0 10px;
-  background: #ffffff;
-  color: #162018;
-}
-
 .admin-sync-message {
   padding: 0 14px 14px;
 }
@@ -5202,8 +5179,51 @@ h2 {
   transition: transform 160ms ease;
 }
 
+.admin-sync-job-summary-heading {
+  display: grid;
+  gap: 8px;
+}
+
+.admin-sync-job-summary-counts {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 5px;
+  color: #7b857e;
+  font-size: 0.72rem;
+  font-weight: 900;
+}
+
+.admin-sync-job-summary-counts span {
+  border-radius: 999px;
+  padding: 4px 8px;
+}
+
+.admin-sync-job-summary-counts .succeeded {
+  background: #e8efe9;
+  color: #315c3b;
+}
+
+.admin-sync-job-summary-counts .failed {
+  background: #f9deda;
+  color: #992f24;
+}
+
+.admin-sync-job-summary-counts .cancelled {
+  background: #e5e7e6;
+  color: #59605b;
+}
+
+.admin-sync-job-summary-counts i {
+  font-style: normal;
+}
+
 .admin-sync-job-section-collapsible[open] > summary svg {
   transform: rotate(180deg);
+}
+
+.admin-sync-job-section-collapsible .admin-sync-job + .admin-sync-job {
+  margin-top: 12px;
 }
 
 .admin-sync-job-empty {
@@ -5214,8 +5234,24 @@ h2 {
 
 .admin-sync-job.partial_failed,
 .admin-sync-job.failed {
-  border-color: #e3c8bb;
-  background: #fffaf7;
+  border-color: #efc4bd;
+  background: #fff0ee;
+}
+
+.admin-sync-job.cancelled {
+  border-color: #c7ccca;
+  background: #f1f3f2;
+}
+
+.admin-sync-job.partial_failed .status-pill,
+.admin-sync-job.failed .status-pill {
+  background: #f9deda;
+  color: #992f24;
+}
+
+.admin-sync-job.cancelled .status-pill {
+  background: #dde0de;
+  color: #59605b;
 }
 
 .admin-sync-job-heading > div {
@@ -5317,6 +5353,17 @@ h2 {
   background: #fbfdfb;
 }
 
+.admin-log-item.failed {
+  border-color: #efc4bd;
+  background: #fff0ee;
+}
+
+.admin-log-item.failed .admin-log-result,
+.admin-log-item.failed .admin-log-badges .status-pill {
+  background: #f9deda;
+  color: #992f24;
+}
+
 .admin-log-item strong,
 .admin-log-item p {
   overflow-wrap: anywhere;
@@ -5333,21 +5380,27 @@ h2 {
   color: #28553a;
 }
 
-.admin-utility-section > summary {
+.admin-utility-section > summary,
+.admin-page-section-heading {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  cursor: pointer;
   padding: 14px;
 }
 
-.admin-utility-section > summary span {
+.admin-utility-section > summary {
+  cursor: pointer;
+}
+
+.admin-utility-section > summary span,
+.admin-page-section-heading > span {
   display: grid;
   gap: 4px;
 }
 
-.admin-utility-section > summary strong {
+.admin-utility-section > summary strong,
+.admin-page-section-heading strong {
   color: #213826;
 }
 
@@ -5530,7 +5583,6 @@ h2 {
   .admin-search-row,
   .admin-form-grid,
   .admin-media-grid,
-  .admin-fixture-sync-form,
   .admin-log-item {
     grid-template-columns: 1fr;
   }
