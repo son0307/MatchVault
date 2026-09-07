@@ -9,6 +9,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.NullSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
@@ -120,17 +121,24 @@ class ApiFootballStandingLocalUpdateServiceTest {
         verify(redisTemplate, never()).delete(key);
     }
 
-    @Test
-    void removesFinishedImpactWhenBothTeamsPlayedCountsIncrease() throws Exception {
+    @ParameterizedTest
+    @NullSource
+    @ValueSource(strings = {"2026-08-27T00:00", "2026-08-28T00:00", "2026-08-29T00:00"})
+    void removesFinishedImpactWhenResultMetricsMatchRegardlessOfApiUpdatedAt(String update) throws Exception {
         LiveStandingImpact impact = finishedImpact();
+        LocalDateTime apiUpdatedAt = update != null ? LocalDateTime.parse(update) : null;
+        TeamStanding homeStanding = standingAfterHomeWin(team(42L), 11);
+        TeamStanding awayStanding = standingAfterAwayLoss(team(50L), 13);
+        ReflectionTestUtils.setField(homeStanding, "apiUpdatedAt", apiUpdatedAt);
+        ReflectionTestUtils.setField(awayStanding, "apiUpdatedAt", apiUpdatedAt);
         String key = "standing:live-impact:2025:100";
         when(redisTemplate.keys("standing:live-impact:2025:*")).thenReturn(Set.of(key));
         when(valueOperations.get(key)).thenReturn("{}");
         when(objectMapper.readValue("{}", LiveStandingImpact.class)).thenReturn(impact);
         when(teamStandingRepository.findByTeamTeamIdAndLeagueIdAndSeason(42L, 39, 2025))
-                .thenReturn(Optional.of(standingAfterHomeWin(team(42L), 11)));
+                .thenReturn(Optional.of(homeStanding));
         when(teamStandingRepository.findByTeamTeamIdAndLeagueIdAndSeason(50L, 39, 2025))
-                .thenReturn(Optional.of(standingAfterAwayLoss(team(50L), 13)));
+                .thenReturn(Optional.of(awayStanding));
 
         service.reconcileFinishedImpacts(39, 2025);
 

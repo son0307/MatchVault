@@ -269,11 +269,7 @@ public class ApiFootballStandingLocalUpdateService {
             return;
         }
 
-        if (!isUpdatedAfterBaseline(current, baseline)) {
-            mismatches.add("%s.apiUpdatedAt expected>%s actual=%s".formatted(
-                    side, baseline.getApiUpdatedAt(), current.getApiUpdatedAt()));
-        }
-
+        // API 갱신 시각은 수치 변경 후에도 유지될 수 있으므로 경기 결과 수치만 비교한다.
         boolean win = goalsFor > goalsAgainst;
         boolean draw = goalsFor == goalsAgainst;
         boolean lose = goalsFor < goalsAgainst;
@@ -306,12 +302,6 @@ public class ApiFootballStandingLocalUpdateService {
             Integer expected = baseline != null ? baseline + delta : null;
             mismatches.add("%s expected>=%s actual=%s".formatted(field, expected, current));
         }
-    }
-
-    private boolean isUpdatedAfterBaseline(StandingBaseline current, StandingBaseline baseline) {
-        return baseline.getApiUpdatedAt() == null
-                || (current.getApiUpdatedAt() != null
-                && current.getApiUpdatedAt().isAfter(baseline.getApiUpdatedAt()));
     }
 
     private boolean hasDetailedBaseline(LiveStandingImpact impact) {
