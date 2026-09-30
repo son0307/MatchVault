@@ -24,6 +24,13 @@ public class LiveFixtureSnapshotService {
 
     @Transactional(readOnly = true)
     public LiveFixtureSnapshotDto rebuildAndCacheSnapshot(Long fixtureId, FixtureEventDto latestEvent) {
+        var snapshot = readSnapshot(fixtureId, latestEvent);
+        fixtureRedisService.saveLiveSnapshot(snapshot);
+        return snapshot;
+    }
+
+    @Transactional(readOnly = true)
+    public LiveFixtureSnapshotDto readSnapshot(Long fixtureId, FixtureEventDto latestEvent) {
         Fixture fixture = fixtureRepository.findByFixtureId(fixtureId)
                 .orElseThrow(() -> new CustomException(ErrorCode.FIXTURE_NOT_FOUND));
 
@@ -57,7 +64,6 @@ public class LiveFixtureSnapshotService {
                 .latestEvent(latestEvent)
                 .build();
 
-        fixtureRedisService.saveLiveSnapshot(snapshot);
         return snapshot;
     }
 

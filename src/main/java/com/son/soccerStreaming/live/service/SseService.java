@@ -1,6 +1,7 @@
 package com.son.soccerStreaming.live.service;
 
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
@@ -20,7 +21,12 @@ public class SseService {
     @Value("${live.sse.timeout-ms:1800000}")
     private long emitterTimeoutMs = 1_800_000L;
 
+    @Autowired(required = false)
+    private RedisSsePublisher redisPublisher;
+
     public SseEmitter subscribe(Long fixtureId) {
+        if (redisPublisher != null) throw new org.springframework.web.server.ResponseStatusException(
+                org.springframework.http.HttpStatus.SERVICE_UNAVAILABLE, "SSE subscriptions are served by the SSE gateway");
         SseEmitter emitter = new SseEmitter(emitterTimeoutMs);
 
         // 해당 fixtureId의 방이 있으면 합류, 없으면 새로 생성
@@ -64,6 +70,10 @@ public class SseService {
     }
 
     public void broadcastToFixture(Long fixtureId, String eventName, String jsonMessage) {
+        if (redisPublisher != null) {
+            redisPublisher.publish(fixtureId, eventName, jsonMessage);
+            return;
+        }
         Set<SseEmitter> room = fixtureEmitters.get(fixtureId);
 
         if (room == null || room.isEmpty()) {

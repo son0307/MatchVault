@@ -2,6 +2,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties, Dispatch, SetStateAction } from "react";
 import { Pencil } from "lucide-react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
+import { reconnectingSse } from "../reconnectingSse";
+import { liveFallback } from "../liveFallback";
 import {
   fetchFixture,
   fetchFixtureEvents,
@@ -234,24 +236,32 @@ export function FixtureDetailPage({ currentUser }: { currentUser: CurrentUser | 
 
   useEffect(() => {
     const fixture = fixtureState.data;
-    if (!fixture || !isLiveFixture(fixture) || !Number.isFinite(numericFixtureId) || numericFixtureId <= 0) {
+    if (!fixture || !isLiveFixture(fixture) || isFullTimeFixture(fixture) || !Number.isFinite(numericFixtureId) || numericFixtureId <= 0) {
       setLiveConnectionStatus(null);
       return;
     }
 
     let isCurrent = true;
-    let fallbackTimerId: number | null = null;
-    const eventSource = new EventSource(`/api/v1/live/stream/fixtures/${numericFixtureId}`);
+    let dataGeneration = 0;
+    let refreshGeneration = 0;
+    let refreshing = false;
+    let finishing = false;
     setLiveConnectionStatus("connecting");
 
     const refreshLiveState = async (finalRefresh = false) => {
+      if ((refreshing || finishing) && !finalRefresh) return;
+      refreshing = true;
+      const requestGeneration = ++refreshGeneration;
+      const startedGeneration = dataGeneration;
       const [fixtureResult, eventsResult, statsResult, playerStatsResult] = await Promise.allSettled([
         fetchFixture(numericFixtureId, { fresh: true }),
         fetchFixtureEvents(numericFixtureId),
         fetchFixtureStats(numericFixtureId, { fresh: true }),
         fetchFixturePlayerStats(numericFixtureId),
       ]);
-      if ((!isCurrent && !finalRefresh) || activeFixtureIdRef.current !== numericFixtureId) {
+      if (requestGeneration === refreshGeneration) refreshing = false;
+      if ((!isCurrent && !finalRefresh) || activeFixtureIdRef.current !== numericFixtureId ||
+          requestGeneration !== refreshGeneration || (!finalRefresh && startedGeneration !== dataGeneration)) {
         return;
       }
       if (fixtureResult.status === "fulfilled") {
@@ -266,88 +276,97 @@ export function FixtureDetailPage({ currentUser }: { currentUser: CurrentUser | 
       if (playerStatsResult.status === "fulfilled") {
         setPlayerStatsState({ data: playerStatsResult.value, error: "", isLoading: false });
       }
-    };
-
-    const stopFallbackPolling = () => {
-      if (fallbackTimerId !== null) {
-        window.clearInterval(fallbackTimerId);
-        fallbackTimerId = null;
-      }
-    };
-
-    eventSource.onopen = () => {
-      if (!isCurrent) {
-        return;
-      }
-      setLiveConnectionStatus("connected");
-      stopFallbackPolling();
-      void refreshLiveState();
-    };
-
-    eventSource.onerror = () => {
-      if (!isCurrent) {
-        return;
-      }
-      setLiveConnectionStatus("reconnecting");
-      if (fallbackTimerId === null) {
-        void refreshLiveState();
-        fallbackTimerId = window.setInterval(() => void refreshLiveState(), 60_000);
-      }
-    };
-
-    eventSource.addEventListener("LIVE_SNAPSHOT", (rawEvent) => {
-      const snapshot = parseSseData<LiveFixtureSnapshot>(rawEvent);
-      if (!snapshot || snapshot.fixtureId !== numericFixtureId || !isCurrent) {
-        return;
-      }
-      setFixtureState((current) => current.data ? {
-        data: {
-          ...current.data,
-          fixtureStatus: snapshot.fixtureStatus,
-          statusShort: snapshot.statusShort,
-          statusLong: snapshot.statusLong,
-          elapsed: snapshot.elapsed,
-          extra: snapshot.extra,
-          homeScore: snapshot.homeTeamStat?.score ?? current.data.homeScore,
-          awayScore: snapshot.awayTeamStat?.score ?? current.data.awayScore,
-        },
-        error: "",
-        isLoading: false,
-      } : current);
-      setStatsState({
-        data: {
-          fixtureId: snapshot.fixtureId,
-          homeTeamStat: snapshot.homeTeamStat,
-          awayTeamStat: snapshot.awayTeamStat,
-        },
-        error: "",
-        isLoading: false,
-      });
-      if (snapshot.fixtureStatus?.toUpperCase() !== "LIVE") {
+      if (fixtureResult.status === "fulfilled" && isFullTimeFixture(fixtureResult.value)) {
+        finishing = true;
+        fallback.close();
         eventSource.close();
-        stopFallbackPolling();
         setLiveConnectionStatus(null);
-        void refreshLiveState(true);
       }
-    });
+    };
 
-    eventSource.addEventListener("FIXTURE_EVENTS", (rawEvent) => {
-      const response = parseSseData<FixtureEventResponse>(rawEvent);
-      if (response?.fixtureId === numericFixtureId && isCurrent) {
-        setEventsState({ data: response, error: "", isLoading: false });
-      }
-    });
+    const fallback = liveFallback(() => void refreshLiveState());
+    const dataReceived = () => {
+      dataGeneration++;
+      fallback.dataReceived();
+    };
 
-    eventSource.addEventListener("PLAYER_STATS", (rawEvent) => {
-      const response = parseSseData<FixturePlayerStatResponse>(rawEvent);
-      if (response?.fixtureId === numericFixtureId && isCurrent) {
-        setPlayerStatsState({ data: response, error: "", isLoading: false });
-      }
+    const eventSource = reconnectingSse(`/api/v1/live/stream/fixtures/${numericFixtureId}`, {
+      onOpen: () => {
+        if (!isCurrent) {
+          return;
+        }
+        setLiveConnectionStatus("connected");
+        void refreshLiveState();
+      },
+
+      onError: () => {
+        if (!isCurrent) {
+          return;
+        }
+        setLiveConnectionStatus("reconnecting");
+        fallback.disconnected();
+      },
+
+      events: {
+        LIVE_SNAPSHOT: (rawEvent) => {
+          const snapshot = parseSseData<LiveFixtureSnapshot>(rawEvent);
+          if (!snapshot || snapshot.fixtureId !== numericFixtureId || !isCurrent) {
+            return;
+          }
+          dataReceived();
+          setFixtureState((current) => current.data ? {
+            data: {
+              ...current.data,
+              fixtureStatus: snapshot.fixtureStatus,
+              statusShort: snapshot.statusShort,
+              statusLong: snapshot.statusLong,
+              elapsed: snapshot.elapsed,
+              extra: snapshot.extra,
+              homeScore: snapshot.homeTeamStat?.score ?? current.data.homeScore,
+              awayScore: snapshot.awayTeamStat?.score ?? current.data.awayScore,
+            },
+            error: "",
+            isLoading: false,
+          } : current);
+          setStatsState({
+            data: {
+              fixtureId: snapshot.fixtureId,
+              homeTeamStat: snapshot.homeTeamStat,
+              awayTeamStat: snapshot.awayTeamStat,
+            },
+            error: "",
+            isLoading: false,
+          });
+          if (isFullTimeFixture(snapshot) || snapshot.fixtureStatus?.toUpperCase() !== "LIVE") {
+            finishing = true;
+            eventSource.close();
+            fallback.close();
+            setLiveConnectionStatus(null);
+            void refreshLiveState(true);
+          }
+        },
+
+        FIXTURE_EVENTS: (rawEvent) => {
+          const response = parseSseData<FixtureEventResponse>(rawEvent);
+          if (response?.fixtureId === numericFixtureId && isCurrent) {
+            dataReceived();
+            setEventsState({ data: response, error: "", isLoading: false });
+          }
+        },
+
+        PLAYER_STATS: (rawEvent) => {
+          const response = parseSseData<FixturePlayerStatResponse>(rawEvent);
+          if (response?.fixtureId === numericFixtureId && isCurrent) {
+            dataReceived();
+            setPlayerStatsState({ data: response, error: "", isLoading: false });
+          }
+        },
+      },
     });
 
     return () => {
       isCurrent = false;
-      stopFallbackPolling();
+      fallback.close();
       eventSource.close();
     };
   }, [fixtureState.data?.fixtureStatus, numericFixtureId]);
@@ -2128,8 +2147,9 @@ function eventSide(event: FixtureEvent, fixture: FixtureSummary): EventSide {
   return "neutral";
 }
 
-function isFullTimeFixture(fixture: FixtureSummary) {
-  return ["FINISHED", "FT", "AET", "PEN"].includes(fixture.fixtureStatus?.toUpperCase() ?? "");
+function isFullTimeFixture(fixture: Pick<FixtureSummary, "fixtureStatus" | "statusShort">) {
+  return ["FINISHED", "FT", "AET", "PEN"].includes(fixture.fixtureStatus?.toUpperCase() ?? "") ||
+    ["FT", "AET", "PEN"].includes(fixture.statusShort?.toUpperCase() ?? "");
 }
 
 function eventCategory(event: FixtureEvent): EventCategory {

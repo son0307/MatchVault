@@ -32,6 +32,7 @@ clean {
 }
 
 dependencies {
+	implementation project(':sse-identity')
 	implementation platform('software.amazon.awssdk:bom:2.25.69')
 	implementation 'org.springframework.boot:spring-boot-starter-actuator'
 	implementation 'org.springframework.boot:spring-boot-starter-data-jpa'

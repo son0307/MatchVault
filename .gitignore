@@ -47,3 +47,21 @@ src/main/generated
 /docs
 /logs
 /deploy/observability/.env
+/src/test/java/com/son/soccerStreaming/apifootball/service/ApiFootballFixtureDetailExperimentTest.java
+/experiment-snapshots/baseline-after-fixture-sync.sql
+/src/main/java/com/son/soccerStreaming/dev/FixtureSyncExperimentController.java
+/src/main/java/com/son/soccerStreaming/apifootball/service/FixtureSyncExperimentService.java
+/src/test/java/com/son/soccerStreaming/apifootball/service/FixtureSyncExperimentServiceTest.java
+
+# Local SSE experiments, load tests, and generated diagnostics
+/load-tests/
+/manual-releases/
+/src/main/java/com/son/soccerStreaming/dev/sse/
+/src/test/java/com/son/soccerStreaming/dev/
+/src/test/java/com/son/soccerStreaming/live/controller/SseIdentityControllerTest.java
+/src/test/java/com/son/soccerStreaming/live/service/RedisSsePublisherTest.java
+/sse-gateway/src/test/
+/frontend/src/components/LocalSseExperimentPanel.tsx
+/frontend/src/components/LocalSseRecoveryMonitor.tsx
+/sse-thread-dump*.txt
+/ubuntu@*
