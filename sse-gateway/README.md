@@ -97,7 +97,6 @@ retainedBytes, 종료 사유별 누적 수를 저장하며 timeline.jsonl에도 
 | gateway | sse.mailbox-bytes | 1048576 |
 | gateway | sse.stall-ms | 15000 |
 
-`GET /api/local/sse-gateway`는 local & !prod에서만 제공한다.
 재접속 백오프와 전체/IP/익명 쿠키 연결 제한은 적용되어 있다. 상세 설정은 CONNECTION-LIMITS.md를 따른다.
 Gateway는 loopback에 기본 바인딩하며 운영 프록시와 배포 drain 정책은 환경에 맞게 구성해야 한다.
 

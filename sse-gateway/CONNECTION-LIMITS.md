@@ -24,10 +24,6 @@ X-SSE-Rejection 헤더는 각각 rate_limit / connection_limit이다.
 브라우저별 한도를 3개로 두어 HTTP/1.1 환경의 브라우저 연결 한도보다 먼저 SSE 접속을 제한한다.
 공유 Wi-Fi·학교·회사에서는 여러 이용자가 같은 IP 한도를 공유한다.
 
-local 프로파일 GET /api/local/sse-gateway 응답의 admission:
-active, maxConnections, ratePerSecond, burst, rateRejected, capacityRejected.
-추가 지표: maxPerIp, maxPerBrowser, ipRejected, browserRejected, activeIps, activeBrowsers.
-active는 응답 수명 동안 예약한 슬롯이라 등록된 subscribers 수와 순간적으로 다를 수 있다.
 거절 카운터는 프로세스 시작 이후 누적이며 요청마다 로그를 출력하지 않는다.
 
 프론트엔드는 오류 후 자체 백오프로 재접속한다. EventSource에서는 HTTP 응답 헤더를 읽을 수 없어

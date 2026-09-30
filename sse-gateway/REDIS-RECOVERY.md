@@ -32,11 +32,6 @@ Gateway는 조회 시작 시 경기 방의 수신 횟수를 기록한다.
 최종 상태 보충은 FIXTURE_EVENTS/PLAYER_STATS 후 LIVE_SNAPSHOT 순으로 제안해
 브라우저가 종료 상태를 받아 연결을 닫기 전에 다른 데이터를 적용할 수 있게 한다.
 
-local 관찰 API의 recovery:
-- epoch: Redis 구독 확인 횟수
-- recoveredFixtures: 상태 보충을 적용한 경기 횟수
-- failedReads: 실패한 조회/응답 검증 횟수
-
 복구 endpoint는 공개 경기 데이터만 반환하지만 DB를 직접 조회한다.
 운영 프록시에서는 gateway 내부 통신용으로 접근 범위를 제한하는 배치를 권장한다.
 이번 변경은 자동 테스트로 검증하고 1,000개 부하 테스트는 수행하지 않는다.

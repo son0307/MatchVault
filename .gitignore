@@ -61,6 +61,7 @@ src/main/generated
 /src/test/java/com/son/soccerStreaming/live/controller/SseIdentityControllerTest.java
 /src/test/java/com/son/soccerStreaming/live/service/RedisSsePublisherTest.java
 /sse-gateway/src/test/
+/sse-gateway/src/main/java/com/son/ssegateway/LocalStatsController.java
 /frontend/src/components/LocalSseExperimentPanel.tsx
 /frontend/src/components/LocalSseRecoveryMonitor.tsx
 /sse-thread-dump*.txt
