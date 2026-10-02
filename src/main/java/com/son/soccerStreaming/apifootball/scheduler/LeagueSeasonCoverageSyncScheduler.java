@@ -2,6 +2,9 @@ package com.son.soccerStreaming.apifootball.scheduler;
 
 import com.son.soccerStreaming.apifootball.service.LeagueSeasonCoverageSyncService;
 import com.son.soccerStreaming.apifootball.service.ApiFootballSyncExecutionGuard;
+import com.son.soccerStreaming.apifootball.service.SyncJobPayload;
+import com.son.soccerStreaming.apifootball.service.SyncJobPublisher;
+import java.time.temporal.ChronoUnit;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -18,6 +21,7 @@ public class LeagueSeasonCoverageSyncScheduler {
     private final LeagueSeasonCoverageSyncService leagueSeasonCoverageSyncService;
     private final ApiFootballSyncFailureRetryScheduler failureRetryScheduler;
     private final ApiFootballSyncExecutionGuard executionGuard;
+    private final SyncJobPublisher syncJobPublisher;
 
     @Value("${api-football.sync.league-seasons.league:39}")
     private Integer league;
@@ -25,6 +29,11 @@ public class LeagueSeasonCoverageSyncScheduler {
     @Scheduled(cron = "${api-football.sync.league-seasons.daily-cron:0 0 3 * * *}")
     public void syncLeagueSeasons() {
         String syncKey = ApiFootballSyncExecutionGuard.key("seasons", "league=" + league);
+        if (syncJobPublisher != null && syncJobPublisher.enabled()) {
+            syncJobPublisher.publishScheduled("seasons", syncKey,
+                    new SyncJobPayload(league, null), ChronoUnit.DAYS);
+            return;
+        }
         if (!executionGuard.executeIfAvailable(syncKey, () -> syncLeagueSeasonsNow(syncKey))) {
             log.info("API-Football league season sync skipped because the same job is active. syncKey={}", syncKey);
         }

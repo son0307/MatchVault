@@ -3,6 +3,9 @@ package com.son.soccerStreaming.apifootball.scheduler;
 import com.son.soccerStreaming.apifootball.service.ApiFootballFixtureDetailSyncException;
 import com.son.soccerStreaming.apifootball.service.ApiFootballFixtureDetailSyncService;
 import com.son.soccerStreaming.apifootball.service.ApiFootballSyncExecutionGuard;
+import com.son.soccerStreaming.apifootball.service.SyncJobPayload;
+import com.son.soccerStreaming.apifootball.service.SyncJobPublisher;
+import java.time.temporal.ChronoUnit;
 import com.son.soccerStreaming.fixture.entity.Fixture;
 import com.son.soccerStreaming.live.service.LiveFixtureBroadcastService;
 import com.son.soccerStreaming.fixture.repository.FixtureRepository;
@@ -26,6 +29,7 @@ public class ApiFootballFixtureDetailSyncScheduler {
     private final FixtureRepository fixtureRepository;
     private final ApiFootballSyncFailureRetryScheduler failureRetryScheduler;
     private final ApiFootballSyncExecutionGuard executionGuard;
+    private final SyncJobPublisher syncJobPublisher;
 
     @Value("${api-football.sync.fixtures.season:2025}")
     private Integer season;
@@ -33,6 +37,11 @@ public class ApiFootballFixtureDetailSyncScheduler {
     @Scheduled(cron = "${api-football.sync.fixture-details.live-cron:15 * * * * *}")
     public void syncLiveFixtureDetails() {
         String syncKey = ApiFootballSyncExecutionGuard.key("fixture-details-live", "live");
+        if (syncJobPublisher != null && syncJobPublisher.enabled()) {
+            syncJobPublisher.publishScheduled("fixture-details-live", syncKey,
+                    new SyncJobPayload(null, null), ChronoUnit.MINUTES);
+            return;
+        }
         if (!executionGuard.executeIfAvailable(syncKey, () -> syncLiveFixtureDetailsSafely(syncKey))) {
             log.info("API-Football live fixture detail sync skipped because the same job is active. syncKey={}", syncKey);
         }
@@ -52,6 +61,11 @@ public class ApiFootballFixtureDetailSyncScheduler {
     @Scheduled(cron = "${api-football.sync.fixture-details.daily-cron:0 55 4 * * *}")
     public void syncFixtureDetailsDaily() {
         String syncKey = ApiFootballSyncExecutionGuard.key("fixture-details", "season=" + season);
+        if (syncJobPublisher != null && syncJobPublisher.enabled()) {
+            syncJobPublisher.publishScheduled("fixture-details", syncKey,
+                    new SyncJobPayload(null, season), ChronoUnit.DAYS);
+            return;
+        }
         if (!executionGuard.executeIfAvailable(syncKey, () -> syncFixtureDetailsDailyNow(syncKey))) {
             log.info("API-Football daily fixture detail sync skipped because the same job is active. syncKey={}", syncKey);
         }

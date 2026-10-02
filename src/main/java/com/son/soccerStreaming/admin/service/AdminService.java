@@ -8,6 +8,8 @@ import com.son.soccerStreaming.apifootball.service.ApiFootballStandingSyncServic
 import com.son.soccerStreaming.apifootball.service.ApiFootballTeamSyncService;
 import com.son.soccerStreaming.apifootball.service.ApiFootballSyncAlreadyRunningException;
 import com.son.soccerStreaming.apifootball.service.ApiFootballSyncExecutionGuard;
+import com.son.soccerStreaming.apifootball.service.SyncJobPayload;
+import com.son.soccerStreaming.apifootball.service.SyncJobPublisher;
 import com.son.soccerStreaming.apifootball.scheduler.ApiFootballSyncFailureRetryScheduler;
 import com.son.soccerStreaming.apifootball.service.LeagueSeasonCoverageSyncService;
 import com.son.soccerStreaming.admin.dto.AdminDto;
@@ -45,6 +47,7 @@ import com.son.soccerStreaming.team.repository.TeamStandingRepository;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.LockModeType;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.data.domain.PageRequest;
@@ -70,6 +73,7 @@ import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 @Service
+@Slf4j
 @RequiredArgsConstructor
 public class AdminService {
 
@@ -197,6 +201,7 @@ public class AdminService {
     private final AdminSyncJobService adminSyncJobService;
     private final ApiFootballSyncExecutionGuard apiFootballSyncExecutionGuard;
     private final ApiFootballSyncFailureRetryScheduler apiFootballSyncFailureRetryScheduler;
+    private final SyncJobPublisher syncJobPublisher;
     private final MediaUrlService mediaUrlService;
     private final EntityManager entityManager;
     private final ConcurrentMap<String, ManualSyncState> manualSyncStates = new ConcurrentHashMap<>();
@@ -932,7 +937,8 @@ public class AdminService {
     public AdminDto.SyncResponse syncSeasonFixtureDetails(Long adminUserId, Integer season) {
         validateSeasonCoverage(39, season, this::supportsFixtureDetails);
         return queueSync(adminUserId, "fixture-details", "FIXTURE", null, syncDetails(null, season),
-                season, progress -> apiFootballFixtureDetailSyncService.syncSeasonFixtureDetails(season, false, progress));
+                season, new SyncJobPayload(null, season),
+                progress -> apiFootballFixtureDetailSyncService.syncSeasonFixtureDetails(season, false, progress));
     }
 
     public AdminDto.SyncResponse syncFixtureDetail(Long adminUserId, Long fixtureId) {
@@ -941,19 +947,21 @@ public class AdminService {
                 () -> apiFootballFixtureDetailSyncService.syncFixtureDetail(fixtureId, false).fixtureId() != null ? 1 : 0);
     }
 
-    public AdminDto.SyncResponse syncPlayers(Long adminUserId, Integer league, Integer season, Long delayMs) {
+    public AdminDto.SyncResponse syncPlayers(Long adminUserId, Integer league, Integer season) {
         validateSeasonCoverage(league, season, coverage -> Boolean.TRUE.equals(coverage.getPlayers()));
         if (!teamStandingRepository.existsByLeagueIdAndSeason(league, season)) {
             throw new CustomException(ErrorCode.ADMIN_SYNC_STANDINGS_REQUIRED);
         }
         return queueSync(adminUserId, "players", "PLAYER", null, syncDetails(league, season),
-                season, progress -> apiFootballPlayerSyncService.syncRegisteredPlayers(league, season, delayMs, progress));
+                season, new SyncJobPayload(league, season),
+                progress -> apiFootballPlayerSyncService.syncRegisteredPlayers(league, season, progress));
     }
 
     public AdminDto.SyncResponse syncInjuries(Long adminUserId, Integer league, Integer season) {
         validateSeasonCoverage(league, season, coverage -> Boolean.TRUE.equals(coverage.getInjuries()));
         return queueSync(adminUserId, "injuries", "INJURY", null, syncDetails(league, season),
-                season, progress -> apiFootballInjurySyncService.syncInjuries(league, season, progress));
+                season, new SyncJobPayload(league, season),
+                progress -> apiFootballInjurySyncService.syncInjuries(league, season, progress));
     }
 
     @Transactional(readOnly = true)
@@ -986,7 +994,7 @@ public class AdminService {
         String syncKey = manualSyncKey(task, details);
         ApiFootballSyncExecutionGuard.Lease reservation = acquireManualSync(syncKey);
         try {
-            int count = syncTask.run();
+            int count = apiFootballSyncExecutionGuard.withLease(reservation, syncTask::run);
             apiFootballSyncFailureRetryScheduler.cancelPendingByExecutionKey(syncKey);
             String message = task + " sync completed. " + details + "; count=" + count;
             adminAuditLogRepository.save(AdminAuditLog.of(admin, AdminAuditType.SYNC, targetType, targetId, message, details, true));
@@ -1036,7 +1044,8 @@ public class AdminService {
     }
 
     private AdminDto.SyncResponse queueSync(Long adminUserId, String task, String targetType, Long targetId,
-                                            String details, Integer season, AdminSyncTaskRunner.SyncTask syncTask) {
+                                            String details, Integer season, SyncJobPayload payload,
+                                            AdminSyncTaskRunner.SyncTask syncTask) {
         // Keep the admin request short; the runner writes start/completion audit logs from a worker thread.
         findUser(adminUserId);
         String syncKey = manualSyncKey(task, details);
@@ -1049,14 +1058,31 @@ public class AdminService {
             if (adminSyncJobService.hasActiveJob(task, details)) {
                 throw new CustomException(ErrorCode.ADMIN_SYNC_ALREADY_RUNNING);
             }
-            job = adminSyncJobService.create(adminUserId, task, targetType, targetId, season, details);
+            job = syncJobPublisher != null && syncJobPublisher.enabled()
+                    ? adminSyncJobService.createQueued(adminUserId, task, targetType, targetId, season,
+                            details, syncJobPublisher.payload(payload))
+                    : adminSyncJobService.create(adminUserId, task, targetType, targetId, season, details);
         } catch (RuntimeException exception) {
             releaseManualSync(syncKey, reservation);
             throw exception;
         }
+        if (syncJobPublisher != null && syncJobPublisher.enabled()) {
+            try {
+                syncJobPublisher.publishAdmin(job.getId(), task, syncKey, job.getQueuePayload());
+            } catch (RuntimeException exception) {
+                // The DB row is the durable outbox; the worker republishes it when Redis recovers.
+                log.warn("Admin sync job will be republished. jobId={}", job.getId(), exception);
+            } finally {
+                releaseManualSync(syncKey, reservation);
+            }
+            return AdminDto.SyncResponse.builder()
+                    .jobId(job.getId()).task(task).success(true).queued(true).count(0)
+                    .message(task + " sync queued. Check audit logs for completion.")
+                    .build();
+        }
         AdminSyncTaskRunner.SyncTask trackedSyncTask = progress -> {
             try {
-                int count = syncTask.run(progress);
+                int count = apiFootballSyncExecutionGuard.withLease(reservation, () -> syncTask.run(progress));
                 apiFootballSyncFailureRetryScheduler.cancelPendingByExecutionKey(syncKey);
                 return count;
             } catch (Exception exception) {

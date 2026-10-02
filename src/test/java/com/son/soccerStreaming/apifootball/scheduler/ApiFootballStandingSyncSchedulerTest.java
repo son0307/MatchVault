@@ -35,7 +35,7 @@ class ApiFootballStandingSyncSchedulerTest {
                 localUpdateService,
                 fixtureRepository,
                 failureRetryScheduler,
-                executionGuard
+                executionGuard, null
         );
         ReflectionTestUtils.setField(scheduler, "league", 39);
         ReflectionTestUtils.setField(scheduler, "season", 2025);

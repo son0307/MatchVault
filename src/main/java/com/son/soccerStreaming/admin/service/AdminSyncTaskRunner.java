@@ -9,6 +9,7 @@ import com.son.soccerStreaming.admin.repository.AdminAuditLogRepository;
 import com.son.soccerStreaming.auth.repository.AppUserRepository;
 import com.son.soccerStreaming.apifootball.service.SyncProgressReporter;
 import com.son.soccerStreaming.apifootball.service.SyncCancelledException;
+import com.son.soccerStreaming.apifootball.service.SyncLockLostException;
 import com.son.soccerStreaming.admin.entity.AdminSyncJobStatus;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -27,10 +28,21 @@ public class AdminSyncTaskRunner {
     @Async("adminSyncTaskExecutor")
     public void run(Long jobId, Long adminUserId, String task, String targetType, Long targetId,
                     String details, SyncTask syncTask, Runnable afterCompletion) {
+        execute(jobId, adminUserId, task, targetType, targetId, details, syncTask, afterCompletion, false);
+    }
+
+    public void runFromQueue(Long jobId, Long adminUserId, String task, String targetType, Long targetId,
+                             String details, SyncTask syncTask) {
+        execute(jobId, adminUserId, task, targetType, targetId, details, syncTask, null, true);
+    }
+
+    private void execute(Long jobId, Long adminUserId, String task, String targetType, Long targetId,
+                         String details, SyncTask syncTask, Runnable afterCompletion, boolean recovered) {
         AppUser admin = null;
         try {
             admin = findUser(adminUserId);
-            if (!adminSyncJobService.markRunning(jobId)) {
+            if (!(recovered ? adminSyncJobService.markRunningRecovered(jobId)
+                    : adminSyncJobService.markRunning(jobId))) {
                 return;
             }
             SyncProgressReporter progressReporter = new AdminSyncJobProgressReporter(jobId, adminSyncJobService);
@@ -64,7 +76,20 @@ public class AdminSyncTaskRunner {
                 adminAuditLogRepository.save(AdminAuditLog.of(
                         admin, AdminAuditType.SYNC, targetType, targetId, message, details, true));
             }
+        } catch (SyncLockLostException exception) {
+            if (recovered) {
+                throw exception;
+            }
+            adminSyncJobService.markFailed(jobId, task + " sync stopped after losing its lock. " + details);
+            log.error("Admin background sync lost its lock. task={}, targetType={}, targetId={}",
+                    task, targetType, targetId, exception);
         } catch (Exception exception) {
+            if (recovered) {
+                log.error("Queued admin sync failed and will be retried. task={}, targetType={}, targetId={}",
+                        task, targetType, targetId, exception);
+                throw exception instanceof RuntimeException runtimeException
+                        ? runtimeException : new IllegalStateException("Queued admin sync failed", exception);
+            }
             String message = task + " sync failed. " + details + ": " + exception.getMessage();
             try {
                 adminSyncJobService.markFailed(jobId, message);

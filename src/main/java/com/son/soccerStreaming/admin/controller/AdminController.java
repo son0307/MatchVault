@@ -384,10 +384,9 @@ public class AdminController {
     public ResponseEntity<AdminDto.SyncResponse> syncPlayers(
             @AuthenticationPrincipal AuthUserDetails userDetails,
             @RequestParam(defaultValue = "39") Integer league,
-            @RequestParam(defaultValue = "2025") Integer season,
-            @RequestParam(defaultValue = "7000") Long delayMs
+            @RequestParam(defaultValue = "2025") Integer season
     ) {
-        return ResponseEntity.ok(adminService.syncPlayers(userDetails.getId(), league, season, delayMs));
+        return ResponseEntity.ok(adminService.syncPlayers(userDetails.getId(), league, season));
     }
 
     @PostMapping("/sync/injuries")

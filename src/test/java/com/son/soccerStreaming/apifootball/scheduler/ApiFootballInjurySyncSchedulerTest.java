@@ -39,7 +39,7 @@ class ApiFootballInjurySyncSchedulerTest {
         ApiFootballInjurySyncScheduler scheduler = new ApiFootballInjurySyncScheduler(
                 syncService,
                 retryScheduler,
-                new ApiFootballSyncExecutionGuard()
+                new ApiFootballSyncExecutionGuard(), null
         );
         ReflectionTestUtils.setField(scheduler, "league", 39);
         ReflectionTestUtils.setField(scheduler, "season", 2025);

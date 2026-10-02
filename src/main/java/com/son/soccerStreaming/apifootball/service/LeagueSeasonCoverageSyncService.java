@@ -25,6 +25,7 @@ public class LeagueSeasonCoverageSyncService {
     public int syncLeagueSeasons(Integer leagueId) {
         apiFootballSyncStatusService.recordAttempt("league-seasons:%s".formatted(leagueId), "League Seasons");
         List<ApiFootballLeagueDto.LeagueResponse> responses = apiFootballClient.getLeagueSeasons(leagueId);
+        ApiFootballSyncExecutionGuard.checkCurrentLease();
         LocalDateTime syncedAt = LocalDateTime.now();
         int syncedCount = 0;
 
@@ -36,6 +37,7 @@ public class LeagueSeasonCoverageSyncService {
             Integer responseLeagueId = response.getLeague().getId();
             String leagueName = response.getLeague().getName();
             for (ApiFootballLeagueDto.SeasonInfo season : response.getSeasons()) {
+                ApiFootballSyncExecutionGuard.checkCurrentLease();
                 if (season.getYear() == null) {
                     continue;
                 }

@@ -17,6 +17,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.beans.factory.annotation.Value;
 
 import java.util.List;
 import java.util.ArrayList;
@@ -38,12 +39,34 @@ public class AdminSyncJobService {
     private final AdminSyncJobErrorRepository errorRepository;
     private final AppUserRepository appUserRepository;
 
+    @Value("${api-football.sync.redis-queue.enabled:false}")
+    private boolean redisQueueEnabled;
+
     @Transactional
     public AdminSyncJob create(Long adminUserId, String task, String targetType, Long targetId,
                                Integer season, String details) {
         AppUser admin = appUserRepository.findById(adminUserId)
                 .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
         return jobRepository.save(AdminSyncJob.queued(admin, task, targetType, targetId, season, details));
+    }
+
+    @Transactional
+    public AdminSyncJob createQueued(Long adminUserId, String task, String targetType, Long targetId,
+                                     Integer season, String details, String payload) {
+        AdminSyncJob job = create(adminUserId, task, targetType, targetId, season, details);
+        job.setQueuePayload(payload);
+        return job;
+    }
+
+    @Transactional(readOnly = true)
+    public List<AdminSyncJob> recoverableQueueJobs() {
+        return jobRepository.findAllByStatusIn(List.of(AdminSyncJobStatus.QUEUED, AdminSyncJobStatus.RUNNING));
+    }
+
+    @Transactional(readOnly = true)
+    public AdminSyncJob queueJob(Long jobId) {
+        return jobRepository.findById(jobId)
+                .orElseThrow(() -> new CustomException(ErrorCode.ADMIN_SYNC_JOB_NOT_FOUND));
     }
 
     @Transactional(readOnly = true)
@@ -54,6 +77,11 @@ public class AdminSyncJobService {
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public boolean markRunning(Long jobId) {
         return job(jobId).markRunning();
+    }
+
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public boolean markRunningRecovered(Long jobId) {
+        return job(jobId).restartRunning();
     }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
@@ -128,6 +156,10 @@ public class AdminSyncJobService {
         jobRepository.findAllByStatusIn(List.of(
                         AdminSyncJobStatus.QUEUED, AdminSyncJobStatus.RUNNING, AdminSyncJobStatus.CANCEL_REQUESTED))
                 .forEach(job -> {
+                    if (redisQueueEnabled && job.getQueuePayload() != null
+                            && job.getStatus() != AdminSyncJobStatus.CANCEL_REQUESTED) {
+                        return;
+                    }
                     if (job.getStatus() == AdminSyncJobStatus.CANCEL_REQUESTED) {
                         job.markCancelled();
                     } else {

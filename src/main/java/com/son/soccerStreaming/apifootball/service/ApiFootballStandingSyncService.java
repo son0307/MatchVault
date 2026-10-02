@@ -60,6 +60,7 @@ public class ApiFootballStandingSyncService {
             Integer responseLeagueId = leagueInfo.getId() != null ? Math.toIntExact(leagueInfo.getId()) : league;
             for (List<ApiFootballStandingDto.Standing> groupStandings : leagueInfo.getStandings()) {
                 for (ApiFootballStandingDto.Standing standingInfo : groupStandings) {
+                    ApiFootballSyncExecutionGuard.checkCurrentLease();
                     if (upsertStanding(responseLeagueId, responseSeason, standingInfo)) {
                         syncedCount++;
                     }

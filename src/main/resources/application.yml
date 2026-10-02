@@ -1,6 +1,8 @@
 spring:
   profiles:
     default: local
+  lifecycle:
+    timeout-per-shutdown-phase: 31m
   jpa:
     hibernate:
       ddl-auto: update
@@ -96,6 +98,10 @@ media:
 
 api-football:
   sync:
+    redis-queue:
+      enabled: ${API_FOOTBALL_SYNC_REDIS_QUEUE_ENABLED:true}
+    distributed-lock:
+      enabled: ${API_FOOTBALL_SYNC_DISTRIBUTED_LOCK_ENABLED:true}
     optimistic-lock:
       max-retries: ${API_FOOTBALL_SYNC_OPTIMISTIC_LOCK_MAX_RETRIES:2}
     failure-retry:
@@ -149,11 +155,12 @@ api-football:
         league: ${API_FOOTBALL_PLAYERS_REGISTERED_LEAGUE:39}
         season: ${API_FOOTBALL_PLAYERS_REGISTERED_SEASON:2025}
         daily-cron: ${API_FOOTBALL_PLAYERS_REGISTERED_DAILY_CRON:0 10 5 * * *}
-        delay-ms: ${API_FOOTBALL_PLAYERS_REGISTERED_SYNC_DELAY_MS:7000}
-        startup-delay-ms: ${API_FOOTBALL_PLAYERS_REGISTERED_STARTUP_DELAY_MS:7000}
     injuries:
       enabled: ${API_FOOTBALL_INJURIES_SYNC_ENABLED:false}
       run-on-startup: ${API_FOOTBALL_INJURIES_SYNC_RUN_ON_STARTUP:false}
       league: ${API_FOOTBALL_INJURIES_LEAGUE:39}
       season: ${API_FOOTBALL_INJURIES_SEASON:2025}
       daily-cron: ${API_FOOTBALL_INJURIES_DAILY_CRON:0 45 5 * * *}
+
+server:
+  port: ${PORT_ENV:8080}

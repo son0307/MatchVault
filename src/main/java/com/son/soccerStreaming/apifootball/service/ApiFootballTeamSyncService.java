@@ -48,6 +48,7 @@ public class ApiFootballTeamSyncService {
         int syncedCount = 0;
 
         for (ApiFootballTeamDto.TeamResponse response : responses) {
+            ApiFootballSyncExecutionGuard.checkCurrentLease();
             ApiFootballTeamDto.TeamInfo teamInfo = response.getTeam();
             if (teamInfo == null || teamInfo.getId() == null) {
                 continue;

@@ -8,6 +8,7 @@ import com.son.soccerStreaming.apifootball.service.ApiFootballStandingSyncServic
 import com.son.soccerStreaming.apifootball.service.ApiFootballTeamSyncService;
 import com.son.soccerStreaming.apifootball.service.ApiFootballSyncExecutionGuard;
 import com.son.soccerStreaming.apifootball.service.ApiFootballSyncStatusService;
+import com.son.soccerStreaming.apifootball.service.SyncJobPublisher;
 import com.son.soccerStreaming.apifootball.scheduler.ApiFootballSyncFailureRetryScheduler;
 import com.son.soccerStreaming.apifootball.service.SyncProgressReporter;
 import com.son.soccerStreaming.apifootball.service.LeagueSeasonCoverageSyncService;
@@ -49,6 +50,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
@@ -122,10 +124,12 @@ class AdminServiceTest {
     private AdminSyncTaskRunner adminSyncTaskRunner;
     @Mock
     private AdminSyncJobService adminSyncJobService;
-    @Mock
-    private ApiFootballSyncExecutionGuard apiFootballSyncExecutionGuard;
+    @Spy
+    private ApiFootballSyncExecutionGuard apiFootballSyncExecutionGuard = new ApiFootballSyncExecutionGuard();
     @Mock
     private ApiFootballSyncFailureRetryScheduler apiFootballSyncFailureRetryScheduler;
+    @Mock
+    private SyncJobPublisher syncJobPublisher;
     @Mock
     private MediaUrlService mediaUrlService;
 
@@ -320,7 +324,7 @@ class AdminServiceTest {
         ));
         when(teamStandingRepository.existsByLeagueIdAndSeason(39, 2025)).thenReturn(true);
 
-        AdminDto.SyncResponse response = adminService.syncPlayers(1L, 39, 2025, 7000L);
+        AdminDto.SyncResponse response = adminService.syncPlayers(1L, 39, 2025);
 
         assertThat(response.isSuccess()).isTrue();
         assertThat(response.isQueued()).isTrue();
@@ -335,6 +339,26 @@ class AdminServiceTest {
                 any(AdminSyncTaskRunner.SyncTask.class),
                 any(Runnable.class)
         );
+    }
+
+    @Test
+    void redisQueueModePublishesAdminJobWithoutStartingLocalRunner() {
+        when(syncJobPublisher.enabled()).thenReturn(true);
+        when(syncJobPublisher.payload(any())).thenReturn("{\"league\":39,\"season\":2025}");
+        when(appUserRepository.findById(1L)).thenReturn(Optional.of(adminUser()));
+        when(leagueSeasonCoverageRepository.findByLeagueIdAndSeasonYear(39, 2025)).thenReturn(Optional.of(
+                LeagueSeasonCoverage.builder().leagueId(39).seasonYear(2025).players(true).build()));
+        when(teamStandingRepository.existsByLeagueIdAndSeason(39, 2025)).thenReturn(true);
+        when(adminSyncJobService.createQueued(eq(1L), eq("players"), eq("PLAYER"), eq(null),
+                eq(2025), eq("league=39; season=2025"), any())).thenReturn(
+                AdminSyncJob.builder().id(99L).queuePayload("{\"league\":39,\"season\":2025}").build());
+
+        AdminDto.SyncResponse response = adminService.syncPlayers(1L, 39, 2025);
+
+        assertThat(response.isQueued()).isTrue();
+        verify(syncJobPublisher).publishAdmin(eq(99L), eq("players"),
+                eq("players:league=39; season=2025"), any());
+        verifyNoInteractions(adminSyncTaskRunner);
     }
 
     @Test
@@ -376,10 +400,10 @@ class AdminServiceTest {
         ));
         when(teamStandingRepository.existsByLeagueIdAndSeason(39, 2025)).thenReturn(true);
         when(apiFootballPlayerSyncService.syncRegisteredPlayers(
-                eq(39), eq(2025), eq(7000L), any(SyncProgressReporter.class)))
+                eq(39), eq(2025), any(SyncProgressReporter.class)))
                 .thenReturn(20);
 
-        adminService.syncPlayers(1L, 39, 2025, 7000L);
+        adminService.syncPlayers(1L, 39, 2025);
 
         verify(apiFootballSyncFailureRetryScheduler, org.mockito.Mockito.never())
                 .cancelPendingByExecutionKey(any());
@@ -408,7 +432,7 @@ class AdminServiceTest {
         when(appUserRepository.findById(1L)).thenReturn(Optional.of(adminUser()));
         when(adminSyncJobService.hasActiveJob("players", "league=39; season=2025")).thenReturn(true);
 
-        assertThatThrownBy(() -> adminService.syncPlayers(1L, 39, 2025, 7000L))
+        assertThatThrownBy(() -> adminService.syncPlayers(1L, 39, 2025))
                 .isInstanceOfSatisfying(CustomException.class,
                         exception -> assertThat(exception.getErrorCode())
                                 .isEqualTo(ErrorCode.ADMIN_SYNC_ALREADY_RUNNING));
@@ -430,7 +454,7 @@ class AdminServiceTest {
         ));
         when(teamStandingRepository.existsByLeagueIdAndSeason(39, 2025)).thenReturn(false);
 
-        assertThatThrownBy(() -> adminService.syncPlayers(1L, 39, 2025, 7000L))
+        assertThatThrownBy(() -> adminService.syncPlayers(1L, 39, 2025))
                 .isInstanceOf(CustomException.class)
                 .hasMessage("선수 동기화 전에 해당 시즌의 팀과 순위를 먼저 동기화해 주세요.");
 

@@ -6,6 +6,9 @@ import com.son.soccerStreaming.apifootball.scheduler.ApiFootballRetryUnit;
 import com.son.soccerStreaming.apifootball.service.ApiFootballPlayerSyncService;
 import com.son.soccerStreaming.apifootball.service.ApiFootballRegisteredPlayerSyncException;
 import com.son.soccerStreaming.apifootball.service.ApiFootballSyncExecutionGuard;
+import com.son.soccerStreaming.apifootball.service.SyncJobPayload;
+import com.son.soccerStreaming.apifootball.service.SyncJobPublisher;
+import java.time.temporal.ChronoUnit;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -27,6 +30,7 @@ public class ApiFootballRegisteredPlayerStartupSyncRunner implements CommandLine
 
     private final ApiFootballPlayerSyncService apiFootballPlayerSyncService;
     private final ApiFootballSyncFailureRetryScheduler failureRetryScheduler;
+    private final SyncJobPublisher syncJobPublisher;
 
     @Value("${api-football.sync.players.registered.league:39}")
     private Integer league;
@@ -34,16 +38,18 @@ public class ApiFootballRegisteredPlayerStartupSyncRunner implements CommandLine
     @Value("${api-football.sync.players.registered.season:2025}")
     private Integer season;
 
-    @Value("${api-football.sync.players.registered.startup-delay-ms:7000}")
-    private Long delayMs;
-
     @Override
     public void run(String... args) {
         String syncKey = ApiFootballSyncExecutionGuard.key(
                 "players", "league=%s; season=%s".formatted(league, season));
+        if (syncJobPublisher.enabled()) {
+            syncJobPublisher.publishScheduled("players", syncKey,
+                    new SyncJobPayload(league, season), ChronoUnit.DAYS);
+            return;
+        }
         log.info("API-Football startup registered player sync started. league={}, season={}", league, season);
         try {
-            apiFootballPlayerSyncService.syncRegisteredPlayers(league, season, delayMs);
+            apiFootballPlayerSyncService.syncRegisteredPlayers(league, season);
             failureRetryScheduler.cancelPendingByExecutionKey(syncKey);
         } catch (Exception e) {
             log.error("API-Football startup registered player sync failed. league={}, season={}", league, season, e);
@@ -59,7 +65,7 @@ public class ApiFootballRegisteredPlayerStartupSyncRunner implements CommandLine
                             "startup registered player sync league=%s season=%s teamId=%s"
                                     .formatted(league, season, teamId),
                             () -> apiFootballPlayerSyncService
-                                    .syncRegisteredPlayersByTeamId(teamId, league, season, delayMs)
+                                    .syncRegisteredPlayersByTeamId(teamId, league, season)
                     ))
                     .toList();
             failureRetryScheduler.scheduleBatch(ApiFootballRetryBatchRequest.partialUnits(
@@ -76,7 +82,7 @@ public class ApiFootballRegisteredPlayerStartupSyncRunner implements CommandLine
                 syncKey,
                 "startup registered player sync league=%s season=%s".formatted(league, season),
                 exception,
-                () -> apiFootballPlayerSyncService.syncRegisteredPlayers(league, season, delayMs)
+                () -> apiFootballPlayerSyncService.syncRegisteredPlayers(league, season)
         );
     }
 }

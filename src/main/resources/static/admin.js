@@ -19,7 +19,6 @@ const adminElements = {
     playerForm: document.querySelector("#playerForm"),
     syncLeague: document.querySelector("#syncLeague"),
     syncSeason: document.querySelector("#syncSeason"),
-    syncDelayMs: document.querySelector("#syncDelayMs"),
     syncFixtureId: document.querySelector("#syncFixtureId"),
     syncResult: document.querySelector("#syncResult"),
     syncStatusLabels: document.querySelectorAll("[data-sync-status]"),
@@ -189,7 +188,6 @@ async function runSync(task) {
     adminElements.syncResult.textContent = "Running...";
     const league = encodeURIComponent(adminElements.syncLeague.value || "39");
     const season = encodeURIComponent(adminElements.syncSeason.value || "2025");
-    const delayMs = encodeURIComponent(adminElements.syncDelayMs.value || "7000");
     const fixtureId = adminElements.syncFixtureId.value;
 
     const urls = {
@@ -198,7 +196,7 @@ async function runSync(task) {
         fixtures: `/api/v1/admin/sync/fixtures?league=${league}&season=${season}`,
         "fixture-details": `/api/v1/admin/sync/fixture-details?season=${season}`,
         "fixture-detail": fixtureId ? `/api/v1/admin/sync/fixture-details/${encodeURIComponent(fixtureId)}` : null,
-        players: `/api/v1/admin/sync/players?league=${league}&season=${season}&delayMs=${delayMs}`,
+        players: `/api/v1/admin/sync/players?league=${league}&season=${season}`,
         injuries: `/api/v1/admin/sync/injuries?league=${league}&season=${season}`,
     };
 

@@ -6,6 +6,7 @@ import com.son.soccerStreaming.admin.entity.AdminSyncJobStatus;
 import com.son.soccerStreaming.auth.entity.AppUser;
 import com.son.soccerStreaming.auth.repository.AppUserRepository;
 import com.son.soccerStreaming.apifootball.service.SyncCancelledException;
+import com.son.soccerStreaming.apifootball.service.SyncLockLostException;
 import org.junit.jupiter.api.Test;
 
 import java.util.Optional;
@@ -18,6 +19,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.never;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class AdminSyncTaskRunnerTest {
 
@@ -95,6 +97,41 @@ class AdminSyncTaskRunnerTest {
 
         assertThat(syncStarted.get()).isFalse();
         verify(jobService).markCancelled(13L);
+        verify(jobService, never()).markSucceeded(any(), anyInt());
+        verify(jobService, never()).markFailed(any(), any());
+    }
+
+    @Test
+    void queuedTaskLosingItsLockRemainsAvailableForQueueRetry() {
+        AppUserRepository userRepository = mock(AppUserRepository.class);
+        AdminAuditLogRepository auditRepository = mock(AdminAuditLogRepository.class);
+        AdminSyncJobService jobService = mock(AdminSyncJobService.class);
+        when(userRepository.findById(1L)).thenReturn(Optional.of(AppUser.builder().email("admin@example.com").build()));
+        when(jobService.markRunningRecovered(14L)).thenReturn(true);
+        AdminSyncTaskRunner runner = new AdminSyncTaskRunner(userRepository, auditRepository, jobService);
+
+        assertThatThrownBy(() -> runner.runFromQueue(14L, 1L, "players", "PLAYER", null,
+                "season=2025", progress -> { throw new SyncLockLostException("players:2025"); }))
+                .isInstanceOf(SyncLockLostException.class);
+
+        verify(jobService, never()).markSucceeded(any(), anyInt());
+        verify(jobService, never()).markFailed(any(), any());
+    }
+
+    @Test
+    void queuedTaskFailureReachesTheWorkerWithoutFinalizingTheJob() {
+        AppUserRepository userRepository = mock(AppUserRepository.class);
+        AdminAuditLogRepository auditRepository = mock(AdminAuditLogRepository.class);
+        AdminSyncJobService jobService = mock(AdminSyncJobService.class);
+        when(userRepository.findById(1L)).thenReturn(Optional.of(AppUser.builder().email("admin@example.com").build()));
+        when(jobService.markRunningRecovered(15L)).thenReturn(true);
+        AdminSyncTaskRunner runner = new AdminSyncTaskRunner(userRepository, auditRepository, jobService);
+
+        assertThatThrownBy(() -> runner.runFromQueue(15L, 1L, "fixture-details", "FIXTURE", null,
+                "season=2025", progress -> { throw new IllegalStateException("upstream failed"); }))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("upstream failed");
+
         verify(jobService, never()).markSucceeded(any(), anyInt());
         verify(jobService, never()).markFailed(any(), any());
     }

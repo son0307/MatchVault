@@ -1385,7 +1385,7 @@ export function AdminPage({ authState }: AdminPageProps) {
       standings: `/api/v1/admin/sync/standings?league=${league}&season=${season}`,
       fixtures: `/api/v1/admin/sync/fixtures?league=${league}&season=${season}`,
       "fixture-details": `/api/v1/admin/sync/fixture-details?season=${season}`,
-      players: `/api/v1/admin/sync/players?league=${league}&season=${season}&delayMs=7000`,
+      players: `/api/v1/admin/sync/players?league=${league}&season=${season}`,
       injuries: `/api/v1/admin/sync/injuries?league=${league}&season=${season}`,
     };
     const url = urls[task];
@@ -3081,7 +3081,6 @@ function adminAuditDetailsLabel(details: string) {
     fixtureId: "경기 ID",
     articleId: "기사 ID",
     season: "시즌",
-    delayMs: "지연 시간(ms)",
     field: "필드",
     batchSize: "묶음 크기",
     resultCount: "결과 수",

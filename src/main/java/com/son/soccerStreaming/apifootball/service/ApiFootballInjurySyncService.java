@@ -49,6 +49,7 @@ public class ApiFootballInjurySyncService {
         progressReporter.checkCancelled();
         List<ApiFootballInjuryDto.InjuryResponse> injuries = Optional.ofNullable(apiFootballClient.getInjuries(league, season))
                 .orElse(List.of());
+        progressReporter.checkCancelled();
         int syncedCount = 0;
 
         List<List<ApiFootballInjuryDto.InjuryResponse>> chunks = chunks(injuries);
@@ -84,7 +85,7 @@ public class ApiFootballInjurySyncService {
                             .log("Some injury records were skipped.");
                 }
                 progressReporter.update(processedUnits, processedUnits - failedUnits, failedUnits, syncedCount);
-            } catch (SyncCancelledException exception) {
+            } catch (SyncCancelledException | SyncLockLostException exception) {
                 throw exception;
             } catch (RuntimeException exception) {
                 processedUnits += chunk.size();
@@ -119,6 +120,7 @@ public class ApiFootballInjurySyncService {
         InjurySyncSummary result = transactionTemplate.execute(status -> {
             InjurySyncSummary summary = InjurySyncSummary.empty();
             for (ApiFootballInjuryDto.InjuryResponse injury : injuries) {
+                ApiFootballSyncExecutionGuard.checkCurrentLease();
                 summary.add(upsertInjury(injury));
             }
             // Clear each injury chunk so bulk admin sync does not keep every absence managed until completion.

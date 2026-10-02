@@ -53,6 +53,9 @@ public class AdminSyncJob {
     @Column(length = 500)
     private String details;
 
+    @Column(length = 500)
+    private String queuePayload;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 30)
     private AdminSyncJobStatus status;
@@ -93,6 +96,10 @@ public class AdminSyncJob {
                 .build();
     }
 
+    public void setQueuePayload(String queuePayload) {
+        this.queuePayload = queuePayload;
+    }
+
     public boolean markRunning() {
         if (status != AdminSyncJobStatus.QUEUED) {
             return false;
@@ -101,6 +108,16 @@ public class AdminSyncJob {
         startedAt = LocalDateTime.now();
         message = task + " sync is running.";
         return true;
+    }
+
+    /** Called only by a worker holding the shared sync lock after reclaiming an interrupted job. */
+    public boolean restartRunning() {
+        if (status == AdminSyncJobStatus.RUNNING) {
+            startedAt = LocalDateTime.now();
+            message = task + " sync restarted after worker interruption.";
+            return true;
+        }
+        return markRunning();
     }
 
     public void beginPhase(String phase, int totalUnits, String unitLabel, int savedCount) {

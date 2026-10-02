@@ -19,5 +19,6 @@ public interface SyncProgressReporter {
     }
 
     default void checkCancelled() {
+        ApiFootballSyncExecutionGuard.checkCurrentLease();
     }
 }

@@ -3,6 +3,9 @@ package com.son.soccerStreaming.apifootball.scheduler;
 import com.son.soccerStreaming.apifootball.service.ApiFootballStandingSyncService;
 import com.son.soccerStreaming.apifootball.service.ApiFootballStandingLocalUpdateService;
 import com.son.soccerStreaming.apifootball.service.ApiFootballSyncExecutionGuard;
+import com.son.soccerStreaming.apifootball.service.SyncJobPayload;
+import com.son.soccerStreaming.apifootball.service.SyncJobPublisher;
+import java.time.temporal.ChronoUnit;
 import com.son.soccerStreaming.fixture.repository.FixtureRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -22,6 +25,7 @@ public class ApiFootballStandingSyncScheduler {
     private final FixtureRepository fixtureRepository;
     private final ApiFootballSyncFailureRetryScheduler failureRetryScheduler;
     private final ApiFootballSyncExecutionGuard executionGuard;
+    private final SyncJobPublisher syncJobPublisher;
 
     @Value("${api-football.sync.standings.league:39}")
     private Integer league;
@@ -47,6 +51,12 @@ public class ApiFootballStandingSyncScheduler {
     private void syncStandings(String reason) {
         String syncKey = ApiFootballSyncExecutionGuard.key(
                 "standings", "league=%s; season=%s".formatted(league, season));
+        if (syncJobPublisher != null && syncJobPublisher.enabled()) {
+            syncJobPublisher.publishScheduled("standings", syncKey,
+                    new SyncJobPayload(league, season),
+                    "daily".equals(reason) ? ChronoUnit.DAYS : ChronoUnit.HOURS);
+            return;
+        }
         if (!executionGuard.executeIfAvailable(syncKey, () -> syncStandingsNow(reason, syncKey))) {
             log.info("API-Football standing sync skipped because the same job is active. syncKey={}, reason={}",
                     syncKey, reason);

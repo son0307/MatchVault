@@ -71,8 +71,8 @@ public class ApiFootballPlayerSyncService {
                     allEntries = true
             )
     })
-    public int syncRegisteredPlayers(Integer league, Integer season, Long delayMs) {
-        return syncRegisteredPlayers(league, season, delayMs, SyncProgressReporter.NO_OP);
+    public int syncRegisteredPlayers(Integer league, Integer season) {
+        return syncRegisteredPlayers(league, season, SyncProgressReporter.NO_OP);
     }
 
     @Caching(evict = {
@@ -88,8 +88,7 @@ public class ApiFootballPlayerSyncService {
                     allEntries = true
             )
     })
-    public int syncRegisteredPlayers(Integer league, Integer season, Long delayMs,
-                                     SyncProgressReporter progressReporter) {
+    public int syncRegisteredPlayers(Integer league, Integer season, SyncProgressReporter progressReporter) {
         apiFootballSyncStatusService.recordAttempt("players", "Players", season);
         int syncedCount = 0;
         List<Long> failedTeamIds = new java.util.ArrayList<>();
@@ -103,11 +102,11 @@ public class ApiFootballPlayerSyncService {
             progressReporter.checkCancelled();
             try {
                 RegisteredPlayerSyncResult result = syncRegisteredPlayersByTeamInternal(
-                        team, league, season, delayMs, progressReporter);
+                        team, league, season, progressReporter);
                 syncedCount += result.syncedCount();
                 syncedPlayerIds.addAll(result.playerIds());
                 successfulTeams++;
-            } catch (SyncCancelledException exception) {
+            } catch (SyncCancelledException | SyncLockLostException exception) {
                 throw exception;
             } catch (Exception e) {
                 if (firstFailure == null) {
@@ -141,10 +140,10 @@ public class ApiFootballPlayerSyncService {
         return syncedCount;
     }
 
-    public int syncRegisteredPlayersByTeamId(Long teamId, Integer league, Integer season, Long delayMs) {
+    public int syncRegisteredPlayersByTeamId(Long teamId, Integer league, Integer season) {
         Team team = teamRepository.findByTeamId(teamId)
                 .orElseThrow(() -> new IllegalArgumentException("Team not found. teamId=" + teamId));
-        return syncRegisteredPlayersByTeam(team, league, season, delayMs);
+        return syncRegisteredPlayersByTeam(team, league, season);
     }
 
     @Caching(evict = {
@@ -160,15 +159,15 @@ public class ApiFootballPlayerSyncService {
                     allEntries = true
             )
     })
-    public int syncRegisteredPlayersByTeam(Team team, Integer league, Integer season, Long delayMs) {
+    public int syncRegisteredPlayersByTeam(Team team, Integer league, Integer season) {
         RegisteredPlayerSyncResult result = syncRegisteredPlayersByTeamInternal(
-                team, league, season, delayMs, SyncProgressReporter.NO_OP);
+                team, league, season, SyncProgressReporter.NO_OP);
         imageCacheService.cachePlayerPhotos(result.playerIds());
         return result.syncedCount();
     }
 
     private RegisteredPlayerSyncResult syncRegisteredPlayersByTeamInternal(
-            Team team, Integer league, Integer season, Long delayMs, SyncProgressReporter progressReporter) {
+            Team team, Integer league, Integer season, SyncProgressReporter progressReporter) {
         int page = 1;
         int totalPages = 1;
         int syncedCount = 0;
@@ -178,6 +177,7 @@ public class ApiFootballPlayerSyncService {
             progressReporter.checkCancelled();
             ApiFootballPlayerDto.ApiResponse<ApiFootballPlayerDto.RegisteredPlayerResponse> response =
                     apiFootballClient.getRegisteredPlayersByTeam(team.getTeamId(), league, season, page == 1 ? null : page);
+            progressReporter.checkCancelled();
 
             List<ApiFootballPlayerDto.RegisteredPlayerResponse> players = response.getResponse() != null
                     ? response.getResponse()
@@ -229,6 +229,7 @@ public class ApiFootballPlayerSyncService {
                     int syncedCount = 0;
                     Set<Long> playerIds = new LinkedHashSet<>();
                     for (ApiFootballPlayerDto.RegisteredPlayerResponse playerResponse : players) {
+                        ApiFootballSyncExecutionGuard.checkCurrentLease();
                         Optional<Long> playerId = upsertRegisteredPlayer(
                                 playerResponse, managedTeam, league, season);
                         if (playerId.isPresent()) {
@@ -451,14 +452,4 @@ public class ApiFootballPlayerSyncService {
         }
     }
 
-    private void sleepBetweenPages(Long delayMs, int nextPage, int totalPages) {
-        if (nextPage > totalPages || delayMs == null || delayMs <= 0) {
-            return;
-        }
-        try {
-            Thread.sleep(delayMs);
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-        }
-    }
 }

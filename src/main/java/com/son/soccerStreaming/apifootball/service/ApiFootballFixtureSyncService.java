@@ -100,6 +100,7 @@ public class ApiFootballFixtureSyncService {
         int syncedCount = 0;
 
         for (ApiFootballLiveDto.FixtureResponse response : responses) {
+            ApiFootballSyncExecutionGuard.checkCurrentLease();
             Optional<Fixture> fixture = upsertFixture(response);
             if (fixture.isEmpty()) {
                 continue;

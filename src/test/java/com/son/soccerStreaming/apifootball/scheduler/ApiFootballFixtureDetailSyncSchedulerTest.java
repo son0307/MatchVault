@@ -27,7 +27,7 @@ class ApiFootballFixtureDetailSyncSchedulerTest {
                 broadcastService,
                 fixtureRepository,
                 retryScheduler,
-                new ApiFootballSyncExecutionGuard()
+                new ApiFootballSyncExecutionGuard(), null
         );
         Fixture fixture = Fixture.builder().fixtureId(100L).fixtureStatus("LIVE").build();
         var result = new ApiFootballFixtureDetailSyncService.FixtureDetailSyncResult(100L, null, 0, 0, 0);
@@ -51,7 +51,7 @@ class ApiFootballFixtureDetailSyncSchedulerTest {
                 broadcastService,
                 fixtureRepository,
                 retryScheduler,
-                new ApiFootballSyncExecutionGuard()
+                new ApiFootballSyncExecutionGuard(), null
         );
         when(fixtureRepository.findAllByFixtureStatus("LIVE")).thenReturn(List.of());
 
@@ -73,7 +73,7 @@ class ApiFootballFixtureDetailSyncSchedulerTest {
                 broadcastService,
                 fixtureRepository,
                 retryScheduler,
-                guard
+                guard, null
         );
 
         scheduler.syncLiveFixtureDetails();

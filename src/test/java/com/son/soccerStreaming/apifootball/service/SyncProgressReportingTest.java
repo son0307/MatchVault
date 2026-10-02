@@ -43,7 +43,7 @@ class SyncProgressReportingTest {
                 mock(ImageCacheService.class), mock(PlayerTeamSeasonStatAggregationService.class)
         );
 
-        assertThatThrownBy(() -> service.syncRegisteredPlayers(39, 2025, 0L, reporter))
+        assertThatThrownBy(() -> service.syncRegisteredPlayers(39, 2025, reporter))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("Team standings must be synchronized before player sync");
 
@@ -85,7 +85,7 @@ class SyncProgressReportingTest {
                 mock(PlayerTeamSeasonStatAggregationService.class)
         );
 
-        assertThatThrownBy(() -> service.syncRegisteredPlayers(39, 2025, 0L, reporter))
+        assertThatThrownBy(() -> service.syncRegisteredPlayers(39, 2025, reporter))
                 .isInstanceOf(SyncCancelledException.class);
 
         verify(reporter).beginPhase("SYNCING_PLAYERS", 1, "teams", 0);

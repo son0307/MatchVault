@@ -6,6 +6,9 @@ import com.son.soccerStreaming.apifootball.scheduler.ApiFootballRetryUnit;
 import com.son.soccerStreaming.apifootball.service.ApiFootballFixtureDetailSyncException;
 import com.son.soccerStreaming.apifootball.service.ApiFootballFixtureDetailSyncService;
 import com.son.soccerStreaming.apifootball.service.ApiFootballSyncExecutionGuard;
+import com.son.soccerStreaming.apifootball.service.SyncJobPayload;
+import com.son.soccerStreaming.apifootball.service.SyncJobPublisher;
+import java.time.temporal.ChronoUnit;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -27,6 +30,7 @@ public class ApiFootballFixtureDetailStartupSyncRunner implements CommandLineRun
 
     private final ApiFootballFixtureDetailSyncService apiFootballFixtureDetailSyncService;
     private final ApiFootballSyncFailureRetryScheduler failureRetryScheduler;
+    private final SyncJobPublisher syncJobPublisher;
 
     @Value("${api-football.sync.fixtures.season:2025}")
     private Integer season;
@@ -34,6 +38,11 @@ public class ApiFootballFixtureDetailStartupSyncRunner implements CommandLineRun
     @Override
     public void run(String... args) {
         String syncKey = ApiFootballSyncExecutionGuard.key("fixture-details", "season=" + season);
+        if (syncJobPublisher.enabled()) {
+            syncJobPublisher.publishScheduled("fixture-details", syncKey,
+                    new SyncJobPayload(null, season), ChronoUnit.DAYS);
+            return;
+        }
         log.info("API-Football startup fixture detail sync started. season={}", season);
         try {
             int syncedCount = apiFootballFixtureDetailSyncService.syncSeasonFixtureDetails(season, false);

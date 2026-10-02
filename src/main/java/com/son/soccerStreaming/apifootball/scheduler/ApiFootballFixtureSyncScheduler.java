@@ -2,6 +2,9 @@ package com.son.soccerStreaming.apifootball.scheduler;
 
 import com.son.soccerStreaming.apifootball.service.ApiFootballFixtureSyncService;
 import com.son.soccerStreaming.apifootball.service.ApiFootballSyncExecutionGuard;
+import com.son.soccerStreaming.apifootball.service.SyncJobPayload;
+import com.son.soccerStreaming.apifootball.service.SyncJobPublisher;
+import java.time.temporal.ChronoUnit;
 import com.son.soccerStreaming.fixture.repository.FixtureRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -26,6 +29,7 @@ public class ApiFootballFixtureSyncScheduler {
     private final FixtureRepository fixtureRepository;
     private final ApiFootballSyncFailureRetryScheduler failureRetryScheduler;
     private final ApiFootballSyncExecutionGuard executionGuard;
+    private final SyncJobPublisher syncJobPublisher;
 
     @Value("${api-football.sync.fixtures.league:39}")
     private Integer league;
@@ -52,6 +56,11 @@ public class ApiFootballFixtureSyncScheduler {
 
         String syncKey = ApiFootballSyncExecutionGuard.key(
                 "fixtures-live", "league=%s; season=%s".formatted(league, season));
+        if (syncJobPublisher != null && syncJobPublisher.enabled()) {
+            syncJobPublisher.publishScheduled("fixtures-live", syncKey,
+                    new SyncJobPayload(league, season), ChronoUnit.MINUTES);
+            return;
+        }
         if (!executionGuard.executeIfAvailable(syncKey, () -> syncLiveFixturesNow(syncKey))) {
             log.info("API-Football live fixture sync skipped because the same job is active. syncKey={}", syncKey);
         }
@@ -76,6 +85,11 @@ public class ApiFootballFixtureSyncScheduler {
     private void syncSeasonFixtures(String reason) {
         String syncKey = ApiFootballSyncExecutionGuard.key(
                 "fixtures", "league=%s; season=%s".formatted(league, season));
+        if (syncJobPublisher != null && syncJobPublisher.enabled()) {
+            syncJobPublisher.publishScheduled("fixtures", syncKey,
+                    new SyncJobPayload(league, season), ChronoUnit.DAYS);
+            return;
+        }
         if (!executionGuard.executeIfAvailable(syncKey, () -> syncSeasonFixturesNow(reason, syncKey))) {
             log.info("API-Football season fixture sync skipped because the same job is active. syncKey={}, reason={}",
                     syncKey, reason);

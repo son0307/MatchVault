@@ -67,6 +67,7 @@ public class ApiFootballFixtureDetailSyncService {
             boolean applyLiveStandingImpact,
             boolean rebuildSeasonStats
     ) {
+        ApiFootballSyncExecutionGuard.checkCurrentLease();
         StopWatch stopWatch = new StopWatch("fixture-detail-" + fixtureIdOf(response));
         stopWatch.start("fixture");
         Optional<Fixture> fixture = apiFootballFixtureSyncService.syncFixtureResponse(response, applyLiveStandingImpact);
@@ -76,18 +77,22 @@ public class ApiFootballFixtureDetailSyncService {
             return FixtureDetailSyncResult.empty(fixtureId);
         }
 
+        ApiFootballSyncExecutionGuard.checkCurrentLease();
         stopWatch.start("events");
         FixtureEventDto latestEvent = apiFootballFixtureEventSyncService.syncEvents(fixture.get(), response.getEvents());
         stopWatch.stop();
 
+        ApiFootballSyncExecutionGuard.checkCurrentLease();
         stopWatch.start("lineups");
         int lineups = apiFootballFixtureLineupSyncService.syncLineups(fixture.get(), response.getLineups());
         stopWatch.stop();
 
+        ApiFootballSyncExecutionGuard.checkCurrentLease();
         stopWatch.start("teamStats");
         int teamStats = apiFootballFixtureStatSyncService.syncFixtureStats(fixture.get(), response.getStatistics());
         stopWatch.stop();
 
+        ApiFootballSyncExecutionGuard.checkCurrentLease();
         stopWatch.start("playerStats");
         int playerStats = apiFootballFixturePlayerStatSyncService.syncPlayerStats(fixture.get(), response.getPlayers());
         stopWatch.stop();
@@ -159,6 +164,7 @@ public class ApiFootballFixtureDetailSyncService {
                 chunkWatch.start("api");
                 List<ApiFootballLiveDto.FixtureResponse> responses = apiFootballClient.getFixturesByIds(chunk);
                 chunkWatch.stop();
+                progressReporter.checkCancelled();
 
                 chunkWatch.start("upsert");
                 List<FixtureDetailSyncResult> chunkResults = optimisticLockRetryExecutor.execute(
@@ -166,6 +172,7 @@ public class ApiFootballFixtureDetailSyncService {
                         () -> {
                             List<FixtureDetailSyncResult> processed = new ArrayList<>();
                             for (ApiFootballLiveDto.FixtureResponse response : responses) {
+                                progressReporter.checkCancelled();
                                 FixtureDetailSyncResult result = syncFixtureDetail(
                                         response, applyLiveStandingImpact, false);
                                 if (result.fixtureId() != null) {
@@ -203,7 +210,7 @@ public class ApiFootballFixtureDetailSyncService {
 
                 log.info("API-Football fixture detail chunk completed. chunk={}/{}, responseCount={}, totalMs={}, {}",
                         i + 1, chunks.size(), responses.size(), chunkWatch.getTotalTimeMillis(), shortSummary(chunkWatch));
-            } catch (SyncCancelledException exception) {
+            } catch (SyncCancelledException | SyncLockLostException exception) {
                 throw exception;
             } catch (Exception e) {
                 if (firstFailure == null) {

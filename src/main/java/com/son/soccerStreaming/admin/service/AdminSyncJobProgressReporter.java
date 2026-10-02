@@ -1,6 +1,7 @@
 package com.son.soccerStreaming.admin.service;
 
 import com.son.soccerStreaming.apifootball.service.SyncProgressReporter;
+import com.son.soccerStreaming.apifootball.service.ApiFootballSyncExecutionGuard;
 
 public class AdminSyncJobProgressReporter implements SyncProgressReporter {
 
@@ -40,6 +41,7 @@ public class AdminSyncJobProgressReporter implements SyncProgressReporter {
 
     @Override
     public void checkCancelled() {
+        ApiFootballSyncExecutionGuard.checkCurrentLease();
         if (jobService.isCancellationRequested(jobId)) {
             throw new com.son.soccerStreaming.apifootball.service.SyncCancelledException();
         }

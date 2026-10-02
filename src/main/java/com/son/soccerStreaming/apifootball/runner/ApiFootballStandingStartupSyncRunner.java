@@ -2,6 +2,9 @@ package com.son.soccerStreaming.apifootball.runner;
 
 import com.son.soccerStreaming.apifootball.scheduler.ApiFootballSyncFailureRetryScheduler;
 import com.son.soccerStreaming.apifootball.service.ApiFootballSyncExecutionGuard;
+import com.son.soccerStreaming.apifootball.service.SyncJobPayload;
+import com.son.soccerStreaming.apifootball.service.SyncJobPublisher;
+import java.time.temporal.ChronoUnit;
 import com.son.soccerStreaming.apifootball.service.ApiFootballStandingSyncService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -22,6 +25,7 @@ public class ApiFootballStandingStartupSyncRunner implements CommandLineRunner {
 
     private final ApiFootballStandingSyncService apiFootballStandingSyncService;
     private final ApiFootballSyncFailureRetryScheduler failureRetryScheduler;
+    private final SyncJobPublisher syncJobPublisher;
 
     @Value("${api-football.sync.standings.league:39}")
     private Integer league;
@@ -33,6 +37,11 @@ public class ApiFootballStandingStartupSyncRunner implements CommandLineRunner {
     public void run(String... args) {
         String syncKey = ApiFootballSyncExecutionGuard.key(
                 "standings", "league=%s; season=%s".formatted(league, season));
+        if (syncJobPublisher.enabled()) {
+            syncJobPublisher.publishScheduled("standings", syncKey,
+                    new SyncJobPayload(league, season), ChronoUnit.DAYS);
+            return;
+        }
         log.info("API-Football startup standing sync started.");
         try {
             apiFootballStandingSyncService.syncStandings(league, season);

@@ -2,6 +2,9 @@ package com.son.soccerStreaming.apifootball.runner;
 
 import com.son.soccerStreaming.apifootball.scheduler.ApiFootballSyncFailureRetryScheduler;
 import com.son.soccerStreaming.apifootball.service.ApiFootballSyncExecutionGuard;
+import com.son.soccerStreaming.apifootball.service.SyncJobPayload;
+import com.son.soccerStreaming.apifootball.service.SyncJobPublisher;
+import java.time.temporal.ChronoUnit;
 import com.son.soccerStreaming.apifootball.service.LeagueSeasonCoverageSyncService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -20,6 +23,7 @@ public class LeagueSeasonCoverageStartupSyncRunner implements CommandLineRunner 
 
     private final LeagueSeasonCoverageSyncService leagueSeasonCoverageSyncService;
     private final ApiFootballSyncFailureRetryScheduler failureRetryScheduler;
+    private final SyncJobPublisher syncJobPublisher;
 
     @Value("${api-football.sync.league-seasons.league:39}")
     private Integer league;
@@ -27,6 +31,11 @@ public class LeagueSeasonCoverageStartupSyncRunner implements CommandLineRunner 
     @Override
     public void run(String... args) {
         String syncKey = ApiFootballSyncExecutionGuard.key("seasons", "league=" + league);
+        if (syncJobPublisher.enabled()) {
+            syncJobPublisher.publishScheduled("seasons", syncKey,
+                    new SyncJobPayload(league, null), ChronoUnit.DAYS);
+            return;
+        }
         log.info("API-Football startup league season coverage sync started. league={}", league);
         try {
             leagueSeasonCoverageSyncService.syncLeagueSeasons(league);
