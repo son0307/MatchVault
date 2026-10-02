@@ -2,6 +2,8 @@
 
 GitHub Actions가 Spring Boot jar와 React 프론트엔드를 빌드해 릴리즈로 업로드합니다. 배포 스크립트는 비활성 Blue/Green 서비스를 시작하고 해당 포트를 직접 헬스체크한 뒤 Nginx를 전환합니다. 이전 서비스는 진행 중인 작업이 끝나기를 기다린 후 종료합니다.
 
+기존 방식의 문제, Redis Streams 작업 처리, 공유 잠금과 배포 흐름도는 [Blue/Green 배포 설계](BLUE_GREEN_DEPLOYMENT.md)에 정리했습니다.
+
 ## GitHub Secrets
 
 배포를 활성화하기 전에 repository secret 또는 production environment secret으로 아래 값을 등록합니다.
