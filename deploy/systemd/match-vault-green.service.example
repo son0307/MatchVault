@@ -1,0 +1,17 @@
+[Unit]
+Description=Match Vault Spring Boot application (Green)
+After=network.target
+
+[Service]
+User=match-vault
+Group=match-vault
+WorkingDirectory=/opt/match-vault/green
+EnvironmentFile=/etc/match-vault/match-vault.env
+ExecStart=/usr/bin/java -jar /opt/match-vault/green/backend/app.jar --server.port=8083 --server.address=127.0.0.1
+SuccessExitStatus=143
+Restart=always
+RestartSec=5
+TimeoutStopSec=32min
+
+[Install]
+WantedBy=multi-user.target

@@ -1,3 +1,7 @@
+upstream match_vault_backend {
+    include /etc/nginx/match-vault-active-backend.conf;
+}
+
 server {
     listen 80;
     server_name example.com;
@@ -6,7 +10,7 @@ server {
     index index.html;
 
     location /api/v1/live/stream/ {
-        proxy_pass http://127.0.0.1:8080;
+        proxy_pass http://127.0.0.1:8081;
         proxy_http_version 1.1;
         proxy_buffering off;
         proxy_read_timeout 10m;
@@ -17,7 +21,7 @@ server {
     }
 
     location /api/ {
-        proxy_pass http://127.0.0.1:8080;
+        proxy_pass http://match_vault_backend;
         proxy_http_version 1.1;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
@@ -26,7 +30,7 @@ server {
     }
 
     location /actuator/health {
-        proxy_pass http://127.0.0.1:8080;
+        proxy_pass http://match_vault_backend;
         proxy_http_version 1.1;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
