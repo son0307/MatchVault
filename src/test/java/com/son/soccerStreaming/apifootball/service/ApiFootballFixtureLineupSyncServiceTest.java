@@ -28,6 +28,7 @@ import static org.mockito.ArgumentMatchers.anyCollection;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -96,6 +97,15 @@ class ApiFootballFixtureLineupSyncServiceTest {
                         : Set.of("position"));
         keepCurrentValueWhenOverridden();
 
+        Fixture fixtureDraft = fixture.toBuilder().id(null).build();
+        FixtureLineup lineupDraft = service.previewLineups(fixture, fixtureDraft, List.of(response)).get(0);
+        assertThat(fixtureDraft.getHomeFormation()).isEqualTo("4-4-2");
+        assertThat(fixtureDraft.getHomeCoachName()).isEqualTo("API coach");
+        assertThat(fixture.getHomeCoachName()).isEqualTo("Old coach");
+        assertThat(lineupDraft.getJerseyNumber()).isEqualTo(8);
+        assertThat(lineupDraft.getPosition()).isEqualTo("M");
+        assertThat(entity.getJerseyNumber()).isEqualTo(7);
+
         int count = service.syncLineups(fixture, List.of(response));
 
         assertThat(count).isEqualTo(1);
@@ -105,6 +115,29 @@ class ApiFootballFixtureLineupSyncServiceTest {
         assertThat(entity.getPosition()).isEqualTo("M");
         assertThat(entity.getGrid()).isEqualTo("1:2");
         assertThat(entity.isStarter()).isTrue();
+    }
+
+    @Test
+    void skipsPlaceholderPlayerIdInPrivateLineup() {
+        Team home = Team.builder().teamId(42L).build();
+        Team away = Team.builder().teamId(49L).build();
+        Fixture fixture = Fixture.builder().fixtureId(1000L).homeTeam(home).awayTeam(away).build();
+        ApiFootballLineupDto.PlayerInfo playerInfo = new ApiFootballLineupDto.PlayerInfo();
+        ReflectionTestUtils.setField(playerInfo, "id", 0L);
+        ApiFootballLineupDto.PlayerEntry entry = new ApiFootballLineupDto.PlayerEntry();
+        ReflectionTestUtils.setField(entry, "player", playerInfo);
+        ApiFootballLineupDto.TeamInfo teamInfo = new ApiFootballLineupDto.TeamInfo();
+        ReflectionTestUtils.setField(teamInfo, "id", 42L);
+        ApiFootballLineupDto.LineupResponse response = new ApiFootballLineupDto.LineupResponse();
+        ReflectionTestUtils.setField(response, "team", teamInfo);
+        ReflectionTestUtils.setField(response, "startXI", List.of(entry));
+
+        when(teamRepository.findByTeamId(42L)).thenReturn(Optional.of(home));
+        when(adminOverrideService.overriddenFields(any(), anyLong(), anyCollection())).thenReturn(Set.of());
+        keepCurrentValueWhenOverridden();
+
+        assertThat(service.previewLineups(fixture, fixture.toBuilder().build(), List.of(response))).isEmpty();
+        verifyNoInteractions(apiFootballPlayerSyncService);
     }
 
     private void keepCurrentValueWhenOverridden() {

@@ -26,6 +26,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.anyCollection;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.verifyNoInteractions;
 
 @ExtendWith(MockitoExtension.class)
 class ApiFootballFixturePlayerStatSyncServiceTest {
@@ -89,11 +90,40 @@ class ApiFootballFixturePlayerStatSyncServiceTest {
                 .thenReturn(List.of(AdminFieldOverride.of(
                         AdminOverrideTargetType.FIXTURE_PLAYER_STAT, 201L, "goals")));
 
+        PlayerFixtureStat draft = service.previewPlayerStats(fixture, List.of(response)).get(0);
+        assertThat(draft).isNotSameAs(entity);
+        assertThat(draft.getGoals()).isEqualTo(2);
+        assertThat(draft.getMinutesPlayed()).isNull();
+        assertThat(entity.getMinutesPlayed()).isEqualTo(90);
+
         int synced = service.syncPlayerStats(fixture, List.of(response));
 
         assertThat(synced).isEqualTo(1);
         assertThat(entity.getGoals()).isEqualTo(2);
         assertThat(entity.getMinutesPlayed()).isNull();
         assertThat(entity.getRating()).isEqualTo(8.0);
+    }
+
+    @Test
+    void skipsPlaceholderPlayerIdInPrivateStats() {
+        ApiFootballFixturePlayerStatSyncService service = new ApiFootballFixturePlayerStatSyncService(
+                apiFootballClient, fixtureRepository, playerFixtureStatRepository,
+                teamRepository, playerSyncService, new AdminOverrideService(adminFieldOverrideRepository));
+        Team team = Team.builder().teamId(42L).build();
+        Fixture fixture = Fixture.builder().fixtureId(1000L).build();
+        ApiFootballLiveDto.TeamInfo teamInfo = new ApiFootballLiveDto.TeamInfo();
+        ReflectionTestUtils.setField(teamInfo, "id", 42L);
+        ApiFootballLiveDto.PlayerInfo playerInfo = new ApiFootballLiveDto.PlayerInfo();
+        ReflectionTestUtils.setField(playerInfo, "id", 0L);
+        ApiFootballLiveDto.PlayerStatResponse playerStat = new ApiFootballLiveDto.PlayerStatResponse();
+        ReflectionTestUtils.setField(playerStat, "player", playerInfo);
+        ApiFootballLiveDto.FixturePlayersResponse response = new ApiFootballLiveDto.FixturePlayersResponse();
+        ReflectionTestUtils.setField(response, "team", teamInfo);
+        ReflectionTestUtils.setField(response, "players", List.of(playerStat));
+
+        when(teamRepository.findByTeamId(42L)).thenReturn(Optional.of(team));
+
+        assertThat(service.previewPlayerStats(fixture, List.of(response))).isEmpty();
+        verifyNoInteractions(playerSyncService);
     }
 }

@@ -1341,6 +1341,9 @@ function buildLineupPlayerDetails(
 
   [playerStats?.homeTeam, playerStats?.awayTeam].forEach((team) => {
     (team?.players ?? []).forEach((player) => {
+      if (player.playerId === null) {
+        return;
+      }
       const detail = ensureDetail(player.playerId);
       detail.rating = player.rating && player.rating > 0 ? player.rating : null;
       detail.goals = player.goals ?? 0;
@@ -1404,7 +1407,8 @@ function selectTopRatedPlayerId(
 ) {
   const players = [playerStats?.homeTeam, playerStats?.awayTeam]
     .flatMap((team) => team?.players ?? [])
-    .filter((player) => lineupPlayerIds.has(player.playerId) && player.rating !== null && player.rating > 0)
+    .filter((player) => player.playerId !== null && lineupPlayerIds.has(player.playerId)
+      && player.rating !== null && player.rating > 0)
     .sort(compareTopRatedPlayers);
   return players[0]?.playerId ?? null;
 }
@@ -1419,7 +1423,7 @@ function compareTopRatedPlayers(left: FixturePlayerStat, right: FixturePlayerSta
     compareNumberDescending(left.shotsTotal, right.shotsTotal) ||
     compareNumberAscending(left.foulsCommitted, right.foulsCommitted) ||
     compareNumberAscending(left.yellowCards, right.yellowCards) ||
-    left.playerId - right.playerId
+    (left.playerId ?? 0) - (right.playerId ?? 0)
   );
 }
 
@@ -1668,8 +1672,8 @@ function PlayerStatTable({ group }: { group: FixtureTeamPlayerStats }) {
           </thead>
           <tbody>
             {players.length ? (
-              players.map((player) => (
-                <PlayerStatRow key={player.playerId} player={player} />
+              players.map((player, index) => (
+                <PlayerStatRow key={player.playerId ?? `${player.playerName}-${index}`} player={player} />
               ))
             ) : (
               <tr>
@@ -1713,13 +1717,13 @@ function SortableStatHead({
 }
 
 function PlayerStatRow({ player }: { player: FixturePlayerStat }) {
+  const name = <>{player.jerseyNumber ? `${player.jerseyNumber}. ` : ""}{displayLocalizedName(player.playerNameKo, player.playerName)}</>;
   return (
     <tr>
       <td>
-        <Link className="player-stat-link" to={`/players/${player.playerId}`}>
-          {player.jerseyNumber ? `${player.jerseyNumber}. ` : ""}
-          {displayLocalizedName(player.playerNameKo, player.playerName)}
-        </Link>
+        {player.playerId === null
+          ? <span className="player-stat-name">{name}</span>
+          : <Link className="player-stat-link" to={`/players/${player.playerId}`}>{name}</Link>}
       </td>
       <td>{compactPosition(player.position)}</td>
       <td>{numberText(player.minutesPlayed)}</td>

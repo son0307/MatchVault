@@ -1,5 +1,9 @@
 package com.son.soccerStreaming.player.service;
 
+import com.son.soccerStreaming.apifootball.service.FixtureDetailGenerationRankingReadStore;
+import com.son.soccerStreaming.apifootball.service.FixtureDetailGenerationReadStore;
+import com.son.soccerStreaming.apifootball.service.FixtureDetailGenerationResolver;
+import com.son.soccerStreaming.apifootball.service.FixtureDetailGenerationStore;
 import com.son.soccerStreaming.fixture.entity.Fixture;
 import com.son.soccerStreaming.fixture.entity.PlayerFixtureStat;
 import com.son.soccerStreaming.fixture.repository.PlayerFixtureStatRepository;
@@ -23,6 +27,8 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.never;
 
 @ExtendWith(MockitoExtension.class)
 class PlayerServiceTest {
@@ -35,9 +41,47 @@ class PlayerServiceTest {
     private PlayerTeamSeasonStatRepository playerTeamSeasonStatRepository;
     @Mock
     private MediaUrlService mediaUrlService;
+    @Mock
+    private FixtureDetailGenerationResolver generationResolver;
+    @Mock
+    private FixtureDetailGenerationReadStore generationReadStore;
+    @Mock
+    private FixtureDetailGenerationRankingReadStore generationRankingReadStore;
+    @Mock
+    private FixtureDetailGenerationStore generationStore;
 
     @InjectMocks
     private PlayerService playerService;
+
+    @Test
+    void seasonSummaryAndRecentMatchesReadTheSamePublishedGeneration() {
+        when(playerRepository.existsByPlayerId(7L)).thenReturn(true);
+        when(generationResolver.enabled()).thenReturn(true);
+        when(generationResolver.activeForSeason(2025)).thenReturn(12L);
+        when(generationReadStore.findPlayerStatsForPlayer(12L, 7L, 2025)).thenReturn(List.of());
+        when(generationRankingReadStore.playerSeasonStats(12L, 7L, 2025)).thenReturn(List.of());
+
+        assertThat(playerService.getPlayerSeasonSummary(7L, 2025).getSeason()).isEqualTo(2025);
+        assertThat(playerService.getPlayerRecentMatches(7L, 2025, 5)).isEmpty();
+        verify(playerFixtureStatRepository, never())
+                .findAllByPlayerPlayerIdAndFixtureSeasonOrderByFixtureFixtureDateDescFixtureFixtureIdDesc(7L, 2025);
+        verify(playerTeamSeasonStatRepository, never()).findAllByPlayerPlayerIdAndSeason(7L, 2025);
+    }
+
+    @Test
+    void playerPanelUsesPublishedGenerationsAcrossSeasons() {
+        Player player = Player.builder().playerId(7L).name("Player").build();
+        when(playerRepository.findByPlayerId(7L)).thenReturn(Optional.of(player));
+        when(generationResolver.enabled()).thenReturn(true);
+        when(generationStore.activeSeasons()).thenReturn(List.of(2025));
+        when(generationResolver.activeForSeason(2025)).thenReturn(12L);
+        when(generationReadStore.findPlayerStatsForPlayer(12L, 7L, 2025)).thenReturn(List.of());
+        when(generationRankingReadStore.playerSeasonStats(12L, 7L, 2025)).thenReturn(List.of());
+
+        assertThat(playerService.getPlayerPanel(7L).getMatches()).isEmpty();
+        verify(playerFixtureStatRepository, never())
+                .findAllByPlayerPlayerIdOrderByFixtureFixtureDateDescFixtureFixtureIdDesc(7L);
+    }
 
     @Test
     void getPlayerPanelFiltersSeasonSummaryTeamsByActualMatchTeams() {

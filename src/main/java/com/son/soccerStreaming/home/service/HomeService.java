@@ -1,5 +1,7 @@
 package com.son.soccerStreaming.home.service;
 
+import com.son.soccerStreaming.apifootball.service.FixtureDetailGenerationReadStore;
+import com.son.soccerStreaming.apifootball.service.FixtureDetailGenerationResolver;
 import com.son.soccerStreaming.favorite.dto.FavoriteDashboardResponseDto;
 import com.son.soccerStreaming.favorite.service.FavoriteService;
 import com.son.soccerStreaming.fixture.dto.FixtureResponseDto;
@@ -18,6 +20,8 @@ import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.util.List;
+import java.util.ArrayList;
+import java.util.Comparator;
 
 @Service
 @RequiredArgsConstructor
@@ -28,6 +32,8 @@ public class HomeService {
     private final FixtureRepository fixtureRepository;
     private final TeamStandingService teamStandingService;
     private final FavoriteService favoriteService;
+    private final FixtureDetailGenerationResolver generationResolver;
+    private final FixtureDetailGenerationReadStore generationReadStore;
 
     @Transactional(readOnly = true)
     public HomeSummaryResponseDto getSummary(Integer season, Long userId) {
@@ -39,12 +45,7 @@ public class HomeService {
                 .withZoneSameInstant(ZoneOffset.UTC)
                 .toLocalDateTime();
 
-        List<FixtureResponseDto.Summary> todayFixtures = fixtureRepository
-                .findAllBySeasonAndFixtureDateGreaterThanEqualAndFixtureDateLessThanOrderByFixtureDateAsc(
-                        season,
-                        startDateTime,
-                        endDateTime
-                )
+        List<FixtureResponseDto.Summary> todayFixtures = todayFixtures(season, startDateTime, endDateTime)
                 .stream()
                 .map(this::toFixtureSummary)
                 .toList();
@@ -59,6 +60,28 @@ public class HomeService {
                 .standings(standings)
                 .favorites(favorites)
                 .build();
+    }
+
+    private List<Fixture> todayFixtures(Integer season, LocalDateTime start, LocalDateTime end) {
+        Long generationId = season == null ? null : generationResolver.activeForSeason(season);
+        if (generationId == null || generationId <= 0) {
+            return fixtureRepository.findAllBySeasonAndFixtureDateGreaterThanEqualAndFixtureDateLessThanOrderByFixtureDateAsc(
+                    season, start, end);
+        }
+        List<Fixture> fixtures = new ArrayList<>();
+        Long cursor = null;
+        while (true) {
+            List<Fixture> page = generationReadStore.findRecentFixtures(
+                    List.of(generationId), cursor, season, null, start, end, null, 500);
+            int count = Math.min(page.size(), 500);
+            fixtures.addAll(page.subList(0, count));
+            if (page.size() <= 500) {
+                break;
+            }
+            cursor = page.get(count - 1).getId();
+        }
+        fixtures.sort(Comparator.comparing(Fixture::getFixtureDate));
+        return fixtures;
     }
 
     private FixtureResponseDto.Summary toFixtureSummary(Fixture fixture) {

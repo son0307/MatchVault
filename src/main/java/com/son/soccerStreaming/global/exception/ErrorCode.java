@@ -14,6 +14,7 @@ public enum ErrorCode {
     INVALID_ADMIN_OVERRIDE_FIELD(HttpStatus.BAD_REQUEST, "Invalid admin override field."),
     INVALID_ADMIN_EVENT_FIELD(HttpStatus.BAD_REQUEST, "Invalid admin event field."),
     INVALID_ADMIN_EDIT_FIELD(HttpStatus.BAD_REQUEST, "필수 입력 항목은 비워둘 수 없습니다."),
+    INVALID_ADMIN_CHANGED_FIELDS(HttpStatus.BAD_REQUEST, "수정한 필드 정보가 없습니다. 관리자 화면을 새로고침해 주세요."),
     INVALID_ADMIN_SEARCH_KEYWORD(HttpStatus.BAD_REQUEST, "Admin search keyword is too long."),
     INVALID_ADMIN_SYNC_COVERAGE(HttpStatus.BAD_REQUEST, "This season does not support the requested API-Football data."),
     ADMIN_SYNC_STANDINGS_REQUIRED(HttpStatus.BAD_REQUEST, "선수 동기화 전에 해당 시즌의 팀과 순위를 먼저 동기화해 주세요."),

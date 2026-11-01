@@ -2,6 +2,9 @@ package com.son.soccerStreaming.admin.service;
 
 import com.son.soccerStreaming.apifootball.service.ApiFootballFixtureDetailSyncService;
 import com.son.soccerStreaming.apifootball.service.ApiFootballFixtureSyncService;
+import com.son.soccerStreaming.apifootball.service.FixtureDetailGenerationReadStore;
+import com.son.soccerStreaming.apifootball.service.FixtureDetailGenerationResolver;
+import com.son.soccerStreaming.apifootball.service.FixtureDetailLiveChangeStore;
 import com.son.soccerStreaming.apifootball.service.ApiFootballInjurySyncService;
 import com.son.soccerStreaming.apifootball.service.ApiFootballPlayerSyncService;
 import com.son.soccerStreaming.apifootball.service.ApiFootballStandingSyncService;
@@ -9,6 +12,8 @@ import com.son.soccerStreaming.apifootball.service.ApiFootballTeamSyncService;
 import com.son.soccerStreaming.apifootball.service.ApiFootballSyncExecutionGuard;
 import com.son.soccerStreaming.apifootball.service.ApiFootballSyncStatusService;
 import com.son.soccerStreaming.apifootball.service.SyncJobPublisher;
+import com.son.soccerStreaming.apifootball.service.RedisSyncJobStream;
+import com.son.soccerStreaming.apifootball.service.SyncQueueMessage;
 import com.son.soccerStreaming.apifootball.scheduler.ApiFootballSyncFailureRetryScheduler;
 import com.son.soccerStreaming.apifootball.service.SyncProgressReporter;
 import com.son.soccerStreaming.apifootball.service.LeagueSeasonCoverageSyncService;
@@ -54,6 +59,7 @@ import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.redis.connection.stream.RecordId;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.LocalDateTime;
@@ -124,6 +130,8 @@ class AdminServiceTest {
     private AdminSyncTaskRunner adminSyncTaskRunner;
     @Mock
     private AdminSyncJobService adminSyncJobService;
+    @Mock
+    private RedisSyncJobStream redisSyncJobStream;
     @Spy
     private ApiFootballSyncExecutionGuard apiFootballSyncExecutionGuard = new ApiFootballSyncExecutionGuard();
     @Mock
@@ -132,9 +140,50 @@ class AdminServiceTest {
     private SyncJobPublisher syncJobPublisher;
     @Mock
     private MediaUrlService mediaUrlService;
+    @Mock
+    private AdminFixtureGenerationGuard fixtureGenerationGuard;
+    @Mock
+    private FixtureDetailGenerationResolver generationResolver;
+    @Mock
+    private FixtureDetailGenerationReadStore generationReadStore;
+    @Mock
+    private FixtureDetailLiveChangeStore liveChangeStore;
 
     @InjectMocks
     private AdminService adminService;
+
+    @Test
+    void exposesRecentDeadLettersWithoutTheirRawPayload() {
+        when(redisSyncJobStream.recentDeadLetters(10)).thenReturn(List.of(
+                new RedisSyncJobStream.QueuedSyncJob(RecordId.of("1000-0"),
+                        new SyncQueueMessage("scheduled-1", "fixtures", "fixtures:39", "{\"private\":\"value\"}"))));
+        when(redisSyncJobStream.deadLetterCount()).thenReturn(1L);
+
+        AdminDto.DeadSyncJobListResponse response = adminService.getDeadSyncJobs();
+
+        assertThat(response.getTotal()).isEqualTo(1);
+        assertThat(response.getJobs()).hasSize(1);
+        assertThat(response.getJobs().get(0).getJobId()).isEqualTo("scheduled-1");
+        assertThat(response.getJobs().get(0).getFailedAt()).isEqualTo(OffsetDateTime.parse("1970-01-01T00:00:01Z"));
+    }
+
+    @Test
+    void fixtureDetailShowsThePublishedGenerationAndBaseRowEditVersion() {
+        Team home = Team.builder().id(1L).teamId(47L).name("Home").build();
+        Team away = Team.builder().id(2L).teamId(49L).name("Away").build();
+        Fixture base = Fixture.builder().id(10L).fixtureId(100L).season(2025)
+                .version(4L).homeTeam(home).awayTeam(away).homeScore(1).build();
+        Fixture published = base.toBuilder().homeScore(2).build();
+        when(fixtureRepository.findWithTeamsByFixtureId(100L)).thenReturn(Optional.of(base));
+        when(generationResolver.activeForSeason(2025)).thenReturn(7L);
+        when(generationReadStore.findFixture(7L, 100L)).thenReturn(Optional.of(published));
+
+        AdminDto.FixtureAdminDetailResponse result = adminService.getFixtureAdminDetail(100L);
+
+        assertThat(result.getGenerationId()).isEqualTo(7L);
+        assertThat(result.getFixture().getHomeScore()).isEqualTo(2);
+        assertThat(result.getFixture().getVersion()).isEqualTo(4L);
+    }
 
     @Test
     void getFixtureTeamsReturnsOnlyTeamsParticipatingInTheSeason() {
@@ -627,6 +676,50 @@ class AdminServiceTest {
                 List.of("fixtureDate")
         );
         verify(fixtureRedisService).evictFixtureCaches(1000L);
+    }
+
+    @Test
+    void updateFixtureMarksOnlyFieldsChangedFromTheVisibleGeneration() {
+        Team home = Team.builder().teamId(1L).teamId(47L).name("Home").build();
+        Team away = Team.builder().teamId(2L).teamId(49L).name("Away").build();
+        Fixture base = Fixture.builder().id(10L).fixtureId(100L).season(2025).version(0L)
+                .homeTeam(home).awayTeam(away).referee("Old referee")
+                .venueName("Old venue").homePlayerColorPrimary("#AABBCC").build();
+        Fixture visible = base.toBuilder().referee("New referee").venueName("Old venue").build();
+        AdminDto.FixtureUpdateRequest request = new AdminDto.FixtureUpdateRequest();
+        ReflectionTestUtils.setField(request, "version", 0L);
+        ReflectionTestUtils.setField(request, "referee", "New referee");
+        ReflectionTestUtils.setField(request, "venueName", "Admin venue");
+        ReflectionTestUtils.setField(request, "homeCoachName", "Admin coach");
+        ReflectionTestUtils.setField(request, "homePlayerColorPrimary", "AABBCC");
+        ReflectionTestUtils.setField(request, "changedFields", List.of("venueName", "homeCoachName"));
+        when(fixtureRepository.findWithTeamsByFixtureId(100L)).thenReturn(Optional.of(base));
+        when(generationResolver.activeForSeason(2025)).thenReturn(7L);
+        when(generationReadStore.findFixture(7L, 100L)).thenReturn(Optional.of(visible));
+        when(appUserRepository.findById(1L)).thenReturn(Optional.of(adminUser()));
+
+        adminService.updateFixture(1L, 100L, request);
+
+        assertThat(base.getReferee()).isEqualTo("Old referee");
+        assertThat(base.getVenueName()).isEqualTo("Admin venue");
+        assertThat(base.getHomeCoachName()).isEqualTo("Admin coach");
+        assertThat(base.getHomePlayerColorPrimary()).isEqualTo("#AABBCC");
+        verify(adminOverrideService).markOverrides(AdminOverrideTargetType.FIXTURE, 100L,
+                List.of("venueName", "homeCoachName"));
+    }
+
+    @Test
+    void updateFixtureRequiresExplicitEditedFieldsForPublishedGeneration() {
+        Fixture fixture = Fixture.builder().fixtureId(100L).season(2025).version(0L).build();
+        AdminDto.FixtureUpdateRequest request = new AdminDto.FixtureUpdateRequest();
+        ReflectionTestUtils.setField(request, "version", 0L);
+        when(fixtureRepository.findWithTeamsByFixtureId(100L)).thenReturn(Optional.of(fixture));
+        when(generationResolver.activeForSeason(2025)).thenReturn(7L);
+
+        assertThatThrownBy(() -> adminService.updateFixture(1L, 100L, request))
+                .isInstanceOf(CustomException.class)
+                .extracting("errorCode").isEqualTo(ErrorCode.INVALID_ADMIN_CHANGED_FIELDS);
+        verifyNoInteractions(adminOverrideService);
     }
 
     @Test

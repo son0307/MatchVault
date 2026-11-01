@@ -1,5 +1,8 @@
 package com.son.soccerStreaming.fixture.service;
 
+import com.son.soccerStreaming.apifootball.service.FixtureDetailGenerationReadStore;
+import com.son.soccerStreaming.apifootball.service.FixtureDetailGenerationResolver;
+import com.son.soccerStreaming.apifootball.service.FixtureDetailLiveChangeStore;
 import com.son.soccerStreaming.fixture.dto.FixtureLineupResponseDto;
 import com.son.soccerStreaming.fixture.entity.FixtureLineup;
 import com.son.soccerStreaming.fixture.entity.Fixture;
@@ -26,11 +29,21 @@ public class FixtureLineupService {
     private final FixtureRepository fixtureRepository;
     private final PlayerAbsenceRepository playerAbsenceRepository;
     private final MediaUrlService mediaUrlService;
+    private final FixtureDetailGenerationResolver generationResolver;
+    private final FixtureDetailGenerationReadStore generationReadStore;
+    private final FixtureDetailLiveChangeStore liveChangeStore;
 
     public FixtureLineupResponseDto.Lineup getFixtureLineups(Long fixtureId) {
-        Fixture fixture = fixtureRepository.findByFixtureId(fixtureId)
+        Fixture published = fixtureRepository.findByFixtureId(fixtureId)
                 .orElseThrow(() -> new CustomException(ErrorCode.FIXTURE_NOT_FOUND));
-        List<FixtureLineup> lineups = fixtureLineupRepository.findAllByFixtureId(fixtureId);
+        Long generationId = published.getSeason() == null ? null
+                : generationResolver.activeForSeason(published.getSeason());
+        Fixture fixture = generationId == null ? published : generationReadStore.findFixture(generationId, fixtureId)
+                        .orElseThrow(() -> new IllegalStateException("Published generation is missing fixture " + fixtureId));
+        List<FixtureLineup> lineups = generationId == null || liveChangeStore.changed(
+                published.getSeason(), fixtureId, FixtureDetailLiveChangeStore.Part.LINEUP)
+                ? fixtureLineupRepository.findAllByFixtureId(fixtureId)
+                : generationReadStore.findLineups(generationId, fixture);
         List<PlayerAbsence> absences = playerAbsenceRepository.findAllByFixtureFixtureId(fixtureId);
 
         return FixtureLineupResponseDto.Lineup.builder()

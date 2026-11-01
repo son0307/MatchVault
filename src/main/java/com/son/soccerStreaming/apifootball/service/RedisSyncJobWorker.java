@@ -206,7 +206,7 @@ public class RedisSyncJobWorker implements SmartLifecycle {
                     if (message.jobId().startsWith("admin-")) {
                         runAdmin(message, payload);
                     } else {
-                        runScheduled(message.task(), payload);
+                        runScheduled(message.task(), payload, message.jobId());
                     }
                 } catch (SyncLockLostException exception) {
                     throw exception;
@@ -255,7 +255,8 @@ public class RedisSyncJobWorker implements SmartLifecycle {
                 job.getTargetId(), job.getDetails(), progress -> {
                     try {
                         return switch (job.getTask()) {
-                            case "fixture-details" -> details.syncSeasonFixtureDetails(payload.season(), false, progress);
+                            case "fixture-details" -> details.syncSeasonFixtureDetails(
+                                    payload.season(), false, progress, message.jobId());
                             case "players" -> players.syncRegisteredPlayers(payload.league(), payload.season(), progress);
                             case "injuries" -> injuries.syncInjuries(payload.league(), payload.season(), progress);
                             default -> throw new IllegalArgumentException("Unknown admin sync task: " + job.getTask());
@@ -297,14 +298,15 @@ public class RedisSyncJobWorker implements SmartLifecycle {
         }
     }
 
-    private void runScheduled(String task, SyncJobPayload payload) {
+    private void runScheduled(String task, SyncJobPayload payload, String jobId) {
         switch (task) {
             case "seasons" -> seasons.syncLeagueSeasons(payload.league());
             case "teams" -> teams.syncTeams(payload.league(), payload.season());
             case "standings" -> standings.syncStandings(payload.league(), payload.season());
             case "fixtures" -> fixtures.syncSeasonFixtures(payload.league(), payload.season());
             case "fixtures-live" -> fixtures.syncLiveFixtures(payload.league(), payload.season());
-            case "fixture-details" -> details.syncSeasonFixtureDetails(payload.season(), false);
+            case "fixture-details" -> details.syncSeasonFixtureDetails(
+                    payload.season(), false, SyncProgressReporter.NO_OP, jobId);
             case "fixture-details-live" -> {
                 List<Fixture> live = fixtureRepository.findAllByFixtureStatus("LIVE");
                 if (!live.isEmpty()) {

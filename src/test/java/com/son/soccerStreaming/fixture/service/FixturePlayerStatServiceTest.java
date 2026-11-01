@@ -1,5 +1,9 @@
 package com.son.soccerStreaming.fixture.service;
 
+import com.son.soccerStreaming.apifootball.service.FixtureDetailGenerationReadStore;
+import com.son.soccerStreaming.apifootball.service.FixtureDetailGenerationResolver;
+import com.son.soccerStreaming.apifootball.service.FixtureDetailLiveChangeStore;
+import com.son.soccerStreaming.apifootball.service.FixtureDetailAnonymousPlayerStatReader;
 import com.son.soccerStreaming.fixture.dto.FixturePlayerStatResponseDto;
 import com.son.soccerStreaming.fixture.entity.Fixture;
 import com.son.soccerStreaming.fixture.entity.FixtureLineup;
@@ -31,6 +35,14 @@ class FixturePlayerStatServiceTest {
     private PlayerFixtureStatRepository playerFixtureStatRepository;
     @Mock
     private FixtureLineupRepository fixtureLineupRepository;
+    @Mock
+    private FixtureDetailGenerationResolver generationResolver;
+    @Mock
+    private FixtureDetailGenerationReadStore generationReadStore;
+    @Mock
+    private FixtureDetailLiveChangeStore liveChangeStore;
+    @Mock
+    private FixtureDetailAnonymousPlayerStatReader anonymousPlayerStatReader;
 
     @InjectMocks
     private FixturePlayerStatService fixturePlayerStatService;
@@ -87,6 +99,29 @@ class FixturePlayerStatServiceTest {
                 .singleElement()
                 .extracting(FixturePlayerStatResponseDto.PlayerStat::getJerseyNumber)
                 .isEqualTo(7);
+    }
+
+    @Test
+    void includesAnonymousStatsOnlyInPublishedFixtureDetail() {
+        Team home = team(1L, 47L, "Tottenham");
+        Team away = team(2L, 42L, "Arsenal");
+        Fixture fixture = Fixture.builder().fixtureId(100L).season(2025)
+                .homeTeam(home).awayTeam(away).build();
+        var anonymous = FixturePlayerStatResponseDto.PlayerStat.builder()
+                .playerName("Younes Ibrahim").minutesPlayed(0).goals(0).build();
+
+        when(fixtureRepository.findByFixtureId(100L)).thenReturn(Optional.of(fixture));
+        when(generationResolver.activeForSeason(2025)).thenReturn(7L);
+        when(generationReadStore.findFixture(7L, 100L)).thenReturn(Optional.of(fixture));
+        when(generationReadStore.findPlayerStats(7L, fixture)).thenReturn(List.of());
+        when(generationReadStore.findLineups(7L, fixture)).thenReturn(List.of());
+        when(anonymousPlayerStatReader.findForFixture(7L, 100L)).thenReturn(List.of(
+                new FixtureDetailAnonymousPlayerStatReader.AnonymousPlayerStat(47L, anonymous)));
+
+        var response = fixturePlayerStatService.getFixturePlayerStats(100L);
+
+        assertThat(response.getHomeTeam().getPlayers()).containsExactly(anonymous);
+        assertThat(response.getAwayTeam().getPlayers()).isEmpty();
     }
 
     private PlayerFixtureStat stat(Fixture fixture, Team team, Player player) {

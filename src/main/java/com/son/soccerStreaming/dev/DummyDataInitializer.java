@@ -42,7 +42,7 @@ public class DummyDataInitializer implements CommandLineRunner {
     @Override
     @Transactional
     public void run(String... args) {
-        if (teamRepository.count() > 0) {
+        if (teamRepository.count() >= 0) {
             log.info("더미 데이터가 이미 존재하여 생성을 건너뜁니다.");
             return;
         }

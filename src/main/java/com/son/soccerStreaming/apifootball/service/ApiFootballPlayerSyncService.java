@@ -277,7 +277,7 @@ public class ApiFootballPlayerSyncService {
     @Transactional
     public Optional<Player> findOrFetchPlayer(Long playerId, String fallbackName, Team team,
                                               Integer number, String position, String photoUrl) {
-        if (playerId == null) {
+        if (playerId == null || playerId <= 0) {
             return Optional.empty();
         }
 
@@ -336,6 +336,9 @@ public class ApiFootballPlayerSyncService {
 
     @Transactional
     public Optional<Player> fetchProfile(Long playerId, Integer number, String position) {
+        if (playerId == null || playerId <= 0) {
+            return Optional.empty();
+        }
         return apiFootballClient.getPlayerProfiles(playerId).stream()
                 .map(ApiFootballPlayerDto.ProfileResponse::getPlayer)
                 .filter(player -> player != null && player.getId() != null)

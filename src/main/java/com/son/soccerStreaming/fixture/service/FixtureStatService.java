@@ -1,5 +1,8 @@
 package com.son.soccerStreaming.fixture.service;
 
+import com.son.soccerStreaming.apifootball.service.FixtureDetailGenerationReadStore;
+import com.son.soccerStreaming.apifootball.service.FixtureDetailGenerationResolver;
+import com.son.soccerStreaming.apifootball.service.FixtureDetailLiveChangeStore;
 import com.son.soccerStreaming.fixture.dto.FixtureStatResponseDto;
 import com.son.soccerStreaming.fixture.entity.Fixture;
 import com.son.soccerStreaming.fixture.entity.FixtureStat;
@@ -22,13 +25,23 @@ public class FixtureStatService {
 
     private final FixtureRepository fixtureRepository;
     private final FixtureStatRepository fixtureStatRepository;
+    private final FixtureDetailGenerationResolver generationResolver;
+    private final FixtureDetailGenerationReadStore generationReadStore;
+    private final FixtureDetailLiveChangeStore liveChangeStore;
 
     @Transactional(readOnly = true)
     public FixtureStatResponseDto getFixtureStats(Long fixtureId) {
-        Fixture fixture = fixtureRepository.findByFixtureId(fixtureId)
+        Fixture published = fixtureRepository.findByFixtureId(fixtureId)
                 .orElseThrow(() -> new CustomException(ErrorCode.FIXTURE_NOT_FOUND));
+        Long generationId = published.getSeason() == null ? null
+                : generationResolver.activeForSeason(published.getSeason());
+        Fixture fixture = generationId == null ? published : generationReadStore.findFixture(generationId, fixtureId)
+                        .orElseThrow(() -> new IllegalStateException("Published generation is missing fixture " + fixtureId));
 
-        Map<Long, FixtureStat> statsByTeamId = fixtureStatRepository.findAllByFixtureFixtureId(fixtureId).stream()
+        Map<Long, FixtureStat> statsByTeamId = (generationId == null || liveChangeStore.changed(
+                published.getSeason(), fixtureId, FixtureDetailLiveChangeStore.Part.TEAM_STAT)
+                ? fixtureStatRepository.findAllByFixtureFixtureId(fixtureId)
+                : generationReadStore.findTeamStats(generationId, fixture)).stream()
                 .filter(stat -> stat.getTeam() != null)
                 .collect(Collectors.toMap(stat -> stat.getTeam().getTeamId(), Function.identity()));
 
@@ -40,6 +53,24 @@ public class FixtureStatService {
     }
 
     public FixtureStatResponseDto.TeamStatSummary getTeamStatSummary(Long fixtureId, Long teamId, int score) {
+        if (!generationResolver.enabled()) {
+            return fixtureStatRepository.findByFixtureFixtureIdAndTeamTeamId(fixtureId, teamId)
+                    .map(stat -> toSummary(teamId, score, stat))
+                    .orElseGet(() -> emptySummary(teamId, score));
+        }
+        Fixture published = fixtureRepository.findByFixtureId(fixtureId).orElse(null);
+        Long generationId = published == null || published.getSeason() == null ? null
+                : generationResolver.activeForSeason(published.getSeason());
+        if (generationId != null && !liveChangeStore.changed(
+                published.getSeason(), fixtureId, FixtureDetailLiveChangeStore.Part.TEAM_STAT)) {
+            Fixture fixture = generationReadStore.findFixture(generationId, fixtureId)
+                    .orElseThrow(() -> new IllegalStateException("Published generation is missing fixture " + fixtureId));
+            return generationReadStore.findTeamStats(generationId, fixture).stream()
+                    .filter(stat -> stat.getTeam().getTeamId().equals(teamId))
+                    .findFirst()
+                    .map(stat -> toSummary(teamId, score, stat))
+                    .orElseGet(() -> emptySummary(teamId, score));
+        }
         return fixtureStatRepository.findByFixtureFixtureIdAndTeamTeamId(fixtureId, teamId)
                 .map(stat -> toSummary(teamId, score, stat))
                 .orElseGet(() -> emptySummary(teamId, score));

@@ -1,5 +1,7 @@
 package com.son.soccerStreaming.team.service;
 
+import com.son.soccerStreaming.apifootball.service.FixtureDetailGenerationRankingReadStore;
+import com.son.soccerStreaming.apifootball.service.FixtureDetailGenerationResolver;
 import com.son.soccerStreaming.fixture.repository.PlayerFixtureStatRepository;
 import com.son.soccerStreaming.media.service.MediaUrlService;
 import com.son.soccerStreaming.player.entity.Player;
@@ -29,9 +31,27 @@ class TeamPlayerRankingServiceTest {
     private PlayerFixtureStatRepository playerFixtureStatRepository;
     @Mock
     private MediaUrlService mediaUrlService;
+    @Mock
+    private FixtureDetailGenerationResolver generationResolver;
+    @Mock
+    private FixtureDetailGenerationRankingReadStore generationRankingReadStore;
 
     @InjectMocks
     private TeamPlayerRankingService teamPlayerRankingService;
+
+    @Test
+    void readsTeamRankingFromPublishedGeneration() {
+        Team team = Team.builder().teamId(47L).name("Tottenham").build();
+        Player player = Player.builder().playerId(10L).name("Player").build();
+        when(generationResolver.enabled()).thenReturn(true);
+        when(generationResolver.activeForSeason(2025)).thenReturn(7L);
+        when(generationRankingReadStore.teamStats(7L, 47L, 2025))
+                .thenReturn(List.of(seasonStat(player, team, 2025, 8, 2, 720)));
+        when(generationRankingReadStore.latestTeams(7L, 2025, List.of(10L))).thenReturn(List.of());
+
+        assertThat(teamPlayerRankingService.getPlayerRankings(47L, 2025).getRows())
+                .extracting(TeamResponseDto.PlayerRanking::getPlayerId).containsExactly(10L);
+    }
 
     @Test
     void getPlayerRankingsKeepsOnlyPlayersWhoseLatestMatchBelongsToTeam() {

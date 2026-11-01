@@ -1,5 +1,8 @@
 package com.son.soccerStreaming.search.service;
 
+import com.son.soccerStreaming.apifootball.service.FixtureDetailGenerationReadStore;
+import com.son.soccerStreaming.apifootball.service.FixtureDetailGenerationResolver;
+import com.son.soccerStreaming.apifootball.service.FixtureDetailGenerationStore;
 import com.son.soccerStreaming.fixture.entity.Fixture;
 import com.son.soccerStreaming.fixture.repository.FixtureRepository;
 import com.son.soccerStreaming.global.util.DateTimeUtils;
@@ -27,6 +30,9 @@ public class SearchService {
     private final PlayerRepository playerRepository;
     private final FixtureRepository fixtureRepository;
     private final MediaUrlService mediaUrlService;
+    private final FixtureDetailGenerationResolver generationResolver;
+    private final FixtureDetailGenerationStore generationStore;
+    private final FixtureDetailGenerationReadStore generationReadStore;
 
     @Transactional(readOnly = true)
     public SearchResponseDto search(String keyword) {
@@ -68,7 +74,21 @@ public class SearchService {
     }
 
     private List<SearchResponseDto.FixtureResult> searchFixtures(List<String> tokens) {
-        return fixtureRepository.searchByTeamNameTokens(tokens, RESULT_LIMIT).stream()
+        List<Fixture> fixtures;
+        if (generationResolver.enabled()) {
+            List<Long> generationIds = generationStore.activeSeasons().stream()
+                    .map(season -> {
+                        Long generationId = generationResolver.activeForSeason(season);
+                        if (generationId == null) {
+                            throw new IllegalStateException("Published fixture detail generation is missing for season " + season);
+                        }
+                        return generationId;
+                    }).toList();
+            fixtures = generationReadStore.searchFixtures(generationIds, tokens, RESULT_LIMIT);
+        } else {
+            fixtures = fixtureRepository.searchByTeamNameTokens(tokens, RESULT_LIMIT);
+        }
+        return fixtures.stream()
                 .map(this::toFixtureResult)
                 .toList();
     }

@@ -1,5 +1,7 @@
 package com.son.soccerStreaming.league.service;
 
+import com.son.soccerStreaming.apifootball.service.FixtureDetailGenerationRankingReadStore;
+import com.son.soccerStreaming.apifootball.service.FixtureDetailGenerationResolver;
 import com.son.soccerStreaming.fixture.repository.PlayerFixtureStatRepository;
 import com.son.soccerStreaming.global.config.RedisCacheConfig;
 import com.son.soccerStreaming.league.dto.LeaguePlayerRankingResponseDto;
@@ -36,18 +38,20 @@ public class LeaguePlayerRankingService {
     private final PlayerFixtureStatRepository playerFixtureStatRepository;
     private final TeamStandingRepository teamStandingRepository;
     private final MediaUrlService mediaUrlService;
+    private final FixtureDetailGenerationResolver generationResolver;
+    private final FixtureDetailGenerationRankingReadStore generationRankingReadStore;
 
     @Cacheable(
             cacheManager = RedisCacheConfig.RANKINGS_CACHE_MANAGER,
             cacheNames = RedisCacheConfig.LEAGUE_PLAYER_RANKINGS_CACHE,
-            key = "'v5:league:' + #leagueId + ':season:' + #season",
+            key = "'v7:league:' + #leagueId + ':season:' + #season + ':generation:' + @fixtureDetailGenerationResolver.activeForSeason(#season) + ':live:' + (@fixtureDetailGenerationResolver.enabled() ? @fixtureDetailGenerationStore.activeLiveRevision(#season) : 0)",
             sync = true
     )
     public LeaguePlayerRankingResponseDto getRankings(Integer leagueId, Integer season) {
-        List<PlayerTeamSeasonStat> stats = playerTeamSeasonStatRepository.findAllForLeagueRankings(
-                leagueId.longValue(),
-                season
-        );
+        Long generationId = generationResolver.enabled() ? generationResolver.activeForSeason(season) : null;
+        List<PlayerTeamSeasonStat> stats = generationId == null
+                ? playerTeamSeasonStatRepository.findAllForLeagueRankings(leagueId.longValue(), season)
+                : generationRankingReadStore.leagueStats(generationId, leagueId.longValue(), season);
         if (stats.isEmpty()) {
             return emptyResponse(leagueId, season);
         }
@@ -57,12 +61,14 @@ public class LeaguePlayerRankingService {
                 .distinct()
                 .toList();
         Map<Long, PlayerFixtureStatRepository.PlayerRankingMatchAggregate> matchAggregates =
-                playerFixtureStatRepository.findRankingMatchAggregates(playerIds, season).stream()
+                (generationId == null
+                        ? playerFixtureStatRepository.findRankingMatchAggregates(playerIds, season)
+                        : generationRankingReadStore.matchAggregates(generationId, season, playerIds)).stream()
                         .collect(Collectors.toMap(
                                 PlayerFixtureStatRepository.PlayerRankingMatchAggregate::getPlayerId,
                                 item -> item
                         ));
-        Map<Long, Long> latestTeamByPlayer = latestTeamByPlayer(playerIds, season);
+        Map<Long, Long> latestTeamByPlayer = latestTeamByPlayer(generationId, playerIds, season);
         List<TeamStanding> standings = teamStandingRepository.findAllByLeagueIdAndSeason(leagueId, season);
         Map<Long, Integer> teamMatchesPlayed = standings.stream()
                 .collect(Collectors.toMap(
@@ -198,8 +204,10 @@ public class LeaguePlayerRankingService {
                 .orElse(stats.get(0));
     }
 
-    private Map<Long, Long> latestTeamByPlayer(List<Long> playerIds, Integer season) {
-        return playerFixtureStatRepository.findLatestTeamByPlayerIdsAndSeason(playerIds, season).stream()
+    private Map<Long, Long> latestTeamByPlayer(Long generationId, List<Long> playerIds, Integer season) {
+        return (generationId == null
+                ? playerFixtureStatRepository.findLatestTeamByPlayerIdsAndSeason(playerIds, season)
+                : generationRankingReadStore.latestTeams(generationId, season, playerIds)).stream()
                 .collect(Collectors.toMap(
                         PlayerFixtureStatRepository.LatestPlayerTeam::getPlayerId,
                         PlayerFixtureStatRepository.LatestPlayerTeam::getTeamId

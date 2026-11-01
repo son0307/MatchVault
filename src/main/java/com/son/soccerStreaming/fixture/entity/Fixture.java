@@ -20,7 +20,7 @@ import java.util.regex.Pattern;
         @Index(name = "idx_fixture_away_season_date", columnList = "away_team_id, season, fixture_date")
 })
 @Getter
-@Builder
+@Builder(toBuilder = true)
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @AllArgsConstructor(access = AccessLevel.PROTECTED)
 public class Fixture {

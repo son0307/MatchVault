@@ -1,5 +1,7 @@
 package com.son.soccerStreaming.team.service;
 
+import com.son.soccerStreaming.apifootball.service.FixtureDetailGenerationRankingReadStore;
+import com.son.soccerStreaming.apifootball.service.FixtureDetailGenerationResolver;
 import com.son.soccerStreaming.player.dto.PlayerResponseDto;
 import com.son.soccerStreaming.media.service.MediaUrlService;
 import com.son.soccerStreaming.team.dto.TeamResponseDto;
@@ -30,6 +32,8 @@ public class TeamService {
     private final PlayerFixtureStatRepository playerFixtureStatRepository;
     private final MediaUrlService mediaUrlService;
     private final TeamPlayerRankingService teamPlayerRankingService;
+    private final FixtureDetailGenerationResolver generationResolver;
+    private final FixtureDetailGenerationRankingReadStore generationRankingReadStore;
 
     public List<TeamResponseDto.Summary> getTeams() {
         return teamRepository.findAllByOrderByNameAsc().stream()
@@ -54,8 +58,11 @@ public class TeamService {
     }
 
     public List<PlayerResponseDto.Summary> getPlayersByTeam(Long teamId, Integer season) {
-        List<PlayerTeamSeasonStat> candidates = playerTeamSeasonStatRepository.findAllByTeamAndSeason(teamId, season);
-        Map<Long, Long> latestTeamByPlayer = latestTeamByPlayer(candidates, season);
+        Long generationId = generationResolver.enabled() ? generationResolver.activeForSeason(season) : null;
+        List<PlayerTeamSeasonStat> candidates = generationId == null
+                ? playerTeamSeasonStatRepository.findAllByTeamAndSeason(teamId, season)
+                : generationRankingReadStore.teamStats(generationId, teamId, season);
+        Map<Long, Long> latestTeamByPlayer = latestTeamByPlayer(candidates, season, generationId);
 
         // 경기 출전 기록이 있으면 최신 출전 팀 기준으로 이적 선수를 걸러내고, 기록이 없으면 시즌 등록 정보를 따른다.
         return candidates.stream()
@@ -70,7 +77,8 @@ public class TeamService {
         return teamPlayerRankingService.getPlayerRankings(team.getTeamId(), season);
     }
 
-    private Map<Long, Long> latestTeamByPlayer(List<PlayerTeamSeasonStat> candidates, Integer season) {
+    private Map<Long, Long> latestTeamByPlayer(List<PlayerTeamSeasonStat> candidates, Integer season,
+                                               Long generationId) {
         if (candidates.isEmpty()) {
             return Map.of();
         }
@@ -80,7 +88,9 @@ public class TeamService {
                 .distinct()
                 .toList();
 
-        return playerFixtureStatRepository.findTeamHistoryByPlayerIdsAndSeasonOrderByLatest(playerIds, season).stream()
+        return (generationId == null
+                ? playerFixtureStatRepository.findTeamHistoryByPlayerIdsAndSeasonOrderByLatest(playerIds, season)
+                : generationRankingReadStore.latestTeams(generationId, season, playerIds)).stream()
                 .collect(Collectors.toMap(
                         PlayerFixtureStatRepository.LatestPlayerTeam::getPlayerId,
                         item -> item,

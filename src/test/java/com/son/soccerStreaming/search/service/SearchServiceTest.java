@@ -1,5 +1,8 @@
 package com.son.soccerStreaming.search.service;
 
+import com.son.soccerStreaming.apifootball.service.FixtureDetailGenerationReadStore;
+import com.son.soccerStreaming.apifootball.service.FixtureDetailGenerationResolver;
+import com.son.soccerStreaming.apifootball.service.FixtureDetailGenerationStore;
 import com.son.soccerStreaming.fixture.entity.Fixture;
 import com.son.soccerStreaming.fixture.repository.FixtureRepository;
 import com.son.soccerStreaming.media.service.MediaUrlService;
@@ -35,9 +38,27 @@ class SearchServiceTest {
     private FixtureRepository fixtureRepository;
     @Mock
     private MediaUrlService mediaUrlService;
+    @Mock
+    private FixtureDetailGenerationResolver generationResolver;
+    @Mock
+    private FixtureDetailGenerationStore generationStore;
+    @Mock
+    private FixtureDetailGenerationReadStore generationReadStore;
 
     @InjectMocks
     private SearchService searchService;
+
+    @Test
+    void fixtureSearchUsesPinnedPublishedGeneration() {
+        when(generationResolver.enabled()).thenReturn(true);
+        when(generationStore.activeSeasons()).thenReturn(List.of(2025));
+        when(generationResolver.activeForSeason(2025)).thenReturn(9L);
+        when(generationReadStore.searchFixtures(List.of(9L), List.of("Tottenham"), 10))
+                .thenReturn(List.of());
+
+        assertThat(searchService.search("Tottenham", SearchType.FIXTURE).getFixtures()).isEmpty();
+        verify(fixtureRepository, never()).searchByTeamNameTokens(List.of("Tottenham"), 10);
+    }
 
     @Test
     void searchReturnsMatchingTeamsPlayersAndFixtures() {

@@ -151,6 +151,31 @@ public class ApiFootballFixtureSyncService {
         return Optional.of(fixtureRepository.save(fixture));
     }
 
+    /** Apply the same API and admin override rules to a detached draft for private generation storage. */
+    public Fixture previewFixtureResponse(Fixture current, ApiFootballLiveDto.FixtureResponse response) {
+        ApiFootballLiveDto.Teams teams = response != null ? response.getTeams() : null;
+        if (current == null || response == null || response.getFixture() == null
+                || !current.getFixtureId().equals(response.getFixture().getId())
+                || teams == null || teams.getHome() == null || teams.getHome().getId() == null
+                || teams.getAway() == null || teams.getAway().getId() == null) {
+            throw new IllegalArgumentException("Fixture detail response does not match the published fixture");
+        }
+        if ((current.getHomeTeam() != null
+                && !current.getHomeTeam().getTeamId().equals(teams.getHome().getId()))
+                || (current.getAwayTeam() != null
+                && !current.getAwayTeam().getTeamId().equals(teams.getAway().getId()))) {
+            throw new IllegalArgumentException("Fixture detail response changed the fixture teams");
+        }
+        Fixture draft = current.toBuilder().id(null).build();
+        Set<String> overrides = adminOverrideService.overriddenFields(
+                AdminOverrideTargetType.FIXTURE,
+                current.getFixtureId(),
+                OVERRIDE_FIELDS
+        );
+        updateFixture(draft, response, overrides);
+        return draft;
+    }
+
     private boolean matchesSeason(ApiFootballLiveDto.FixtureResponse response, Integer season) {
         ApiFootballLiveDto.LeagueInfo leagueInfo = response.getLeague();
         if (leagueInfo == null) {
@@ -185,7 +210,9 @@ public class ApiFootballFixtureSyncService {
                         overrides, "referee", fixture.getReferee(),
                         fixtureInfo != null ? fixtureInfo.getReferee() : fixture.getReferee()),
                 fixtureInfo != null ? fixtureInfo.getTimezone() : fixture.getTimezone(),
-                fixtureInfo != null ? fixtureInfo.getTimestamp() : fixture.getTimestamp(),
+                adminOverrideService.apiValueUnlessOverridden(
+                        overrides, "fixtureDate", fixture.getTimestamp(),
+                        fixtureInfo != null ? fixtureInfo.getTimestamp() : fixture.getTimestamp()),
                 periods != null ? periods.getFirst() : fixture.getFirstPeriod(),
                 periods != null ? periods.getSecond() : fixture.getSecondPeriod(),
                 adminOverrideService.apiValueUnlessOverridden(

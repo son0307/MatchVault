@@ -31,7 +31,7 @@ import lombok.NoArgsConstructor;
         @Index(name = "idx_fixture_lineup_player", columnList = "player_id")
 })
 @Getter
-@Builder
+@Builder(toBuilder = true)
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @AllArgsConstructor(access = AccessLevel.PROTECTED)
 public class FixtureLineup {

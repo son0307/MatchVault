@@ -22,6 +22,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.ArrayList;
 import java.util.Optional;
 import java.util.Set;
 
@@ -173,6 +174,50 @@ public class ApiFootballFixturePlayerStatSyncService {
 
         updatePlayerStat(entity, stat);
         return true;
+    }
+
+    /** Calculates private-generation rows without mutating the published player stat entities. */
+    public List<PlayerFixtureStat> previewPlayerStats(
+            Fixture fixture, List<ApiFootballLiveDto.FixturePlayersResponse> teamStats) {
+        if (teamStats == null || teamStats.isEmpty()) {
+            return List.of();
+        }
+        List<PlayerFixtureStat> drafts = new ArrayList<>();
+        for (ApiFootballLiveDto.FixturePlayersResponse teamStat : teamStats) {
+            if (teamStat == null) {
+                throw new IllegalArgumentException("Fixture player statistics contain a null team response");
+            }
+            Team team = findTeam(teamStat.getTeam()).orElseThrow(() ->
+                    new IllegalArgumentException("Fixture player statistics refer to an unknown team"));
+            if (teamStat.getPlayers() == null) {
+                continue;
+            }
+            for (ApiFootballLiveDto.PlayerStatResponse playerStat : teamStat.getPlayers()) {
+                if (playerStat == null) {
+                    throw new IllegalArgumentException("Fixture player statistics contain a null player response");
+                }
+                if (playerStat.getPlayer() != null && playerStat.getPlayer().getId() != null
+                        && playerStat.getPlayer().getId() <= 0) {
+                    log.warn("Skip fixture player statistic with invalid player ID. fixtureId={}, playerId={}",
+                            fixture.getFixtureId(), playerStat.getPlayer().getId());
+                    continue;
+                }
+                Player player = findPlayer(playerStat.getPlayer(), team).orElseThrow(() ->
+                        new IllegalArgumentException("Fixture player statistic refers to an unknown player"));
+                ApiFootballLiveDto.PlayerStatistics values = firstStat(playerStat);
+                if (values == null) {
+                    throw new IllegalArgumentException("Fixture player statistic has no values");
+                }
+                PlayerFixtureStat current = playerFixtureStatRepository
+                        .findByFixtureFixtureIdAndPlayerPlayerId(fixture.getFixtureId(), player.getPlayerId())
+                        .orElseGet(() -> PlayerFixtureStat.builder()
+                                .fixture(fixture).team(team).player(player).build());
+                PlayerFixtureStat draft = current.toBuilder().build();
+                updatePlayerStat(draft, values);
+                drafts.add(draft);
+            }
+        }
+        return drafts;
     }
 
     private void updatePlayerStat(PlayerFixtureStat entity, ApiFootballLiveDto.PlayerStatistics stat) {

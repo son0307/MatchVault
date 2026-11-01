@@ -1,5 +1,7 @@
 package com.son.soccerStreaming.team.service;
 
+import com.son.soccerStreaming.apifootball.service.FixtureDetailGenerationRankingReadStore;
+import com.son.soccerStreaming.apifootball.service.FixtureDetailGenerationResolver;
 import com.son.soccerStreaming.fixture.repository.PlayerFixtureStatRepository;
 import com.son.soccerStreaming.global.config.RedisCacheConfig;
 import com.son.soccerStreaming.media.service.MediaUrlService;
@@ -24,16 +26,21 @@ public class TeamPlayerRankingService {
     private final PlayerTeamSeasonStatRepository playerTeamSeasonStatRepository;
     private final PlayerFixtureStatRepository playerFixtureStatRepository;
     private final MediaUrlService mediaUrlService;
+    private final FixtureDetailGenerationResolver generationResolver;
+    private final FixtureDetailGenerationRankingReadStore generationRankingReadStore;
 
     @Cacheable(
             cacheManager = RedisCacheConfig.RANKINGS_CACHE_MANAGER,
             cacheNames = RedisCacheConfig.TEAM_PLAYER_RANKINGS_CACHE,
-            key = "'team:' + #teamId + ':season:' + #season",
+            key = "'v3:team:' + #teamId + ':season:' + #season + ':generation:' + @fixtureDetailGenerationResolver.activeForSeason(#season) + ':live:' + (@fixtureDetailGenerationResolver.enabled() ? @fixtureDetailGenerationStore.activeLiveRevision(#season) : 0)",
             sync = true
     )
     public TeamResponseDto.PlayerRankings getPlayerRankings(Long teamId, Integer season) {
-        List<PlayerTeamSeasonStat> candidates = playerTeamSeasonStatRepository.findAllByTeamAndSeason(teamId, season);
-        Map<Long, Long> latestTeamByPlayer = latestTeamByPlayer(candidates, season);
+        Long generationId = generationResolver.enabled() ? generationResolver.activeForSeason(season) : null;
+        List<PlayerTeamSeasonStat> candidates = generationId == null
+                ? playerTeamSeasonStatRepository.findAllByTeamAndSeason(teamId, season)
+                : generationRankingReadStore.teamStats(generationId, teamId, season);
+        Map<Long, Long> latestTeamByPlayer = latestTeamByPlayer(candidates, season, generationId);
         List<TeamResponseDto.PlayerRanking> rows = candidates.stream()
                 .filter(stat -> belongsToTeamByLatestMatch(stat, teamId, latestTeamByPlayer))
                 .map(this::toPlayerRanking)
@@ -44,7 +51,8 @@ public class TeamPlayerRankingService {
                 .build();
     }
 
-    private Map<Long, Long> latestTeamByPlayer(List<PlayerTeamSeasonStat> candidates, Integer season) {
+    private Map<Long, Long> latestTeamByPlayer(List<PlayerTeamSeasonStat> candidates, Integer season,
+                                               Long generationId) {
         if (candidates.isEmpty()) {
             return Map.of();
         }
@@ -54,7 +62,9 @@ public class TeamPlayerRankingService {
                 .distinct()
                 .toList();
 
-        return playerFixtureStatRepository.findTeamHistoryByPlayerIdsAndSeasonOrderByLatest(playerIds, season).stream()
+        return (generationId == null
+                ? playerFixtureStatRepository.findTeamHistoryByPlayerIdsAndSeasonOrderByLatest(playerIds, season)
+                : generationRankingReadStore.latestTeams(generationId, season, playerIds)).stream()
                 .collect(Collectors.toMap(
                         PlayerFixtureStatRepository.LatestPlayerTeam::getPlayerId,
                         item -> item,

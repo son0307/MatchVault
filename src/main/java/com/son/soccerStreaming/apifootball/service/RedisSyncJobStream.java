@@ -2,6 +2,7 @@ package com.son.soccerStreaming.apifootball.service;
 
 import org.springframework.dao.DataAccessException;
 import org.springframework.data.domain.Range;
+import org.springframework.data.redis.connection.Limit;
 import org.springframework.data.redis.connection.stream.Consumer;
 import org.springframework.data.redis.connection.stream.MapRecord;
 import org.springframework.data.redis.connection.stream.ReadOffset;
@@ -148,6 +149,15 @@ public class RedisSyncJobStream {
         if (count == null || count != 1L) {
             throw new IllegalStateException("Failed sync job was not pending when moved: " + job.id());
         }
+    }
+
+    public long deadLetterCount() {
+        Long count = streams().size(streamKey + ":dead");
+        return count == null ? 0 : count;
+    }
+
+    public List<QueuedSyncJob> recentDeadLetters(int limit) {
+        return decode(streams().reverseRange(streamKey + ":dead", Range.unbounded(), Limit.limit().count(limit)));
     }
 
     public List<QueuedSyncJob> readNew(String consumerName, Duration wait) {

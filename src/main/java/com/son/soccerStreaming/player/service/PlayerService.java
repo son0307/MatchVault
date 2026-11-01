@@ -1,5 +1,9 @@
 package com.son.soccerStreaming.player.service;
 
+import com.son.soccerStreaming.apifootball.service.FixtureDetailGenerationRankingReadStore;
+import com.son.soccerStreaming.apifootball.service.FixtureDetailGenerationReadStore;
+import com.son.soccerStreaming.apifootball.service.FixtureDetailGenerationResolver;
+import com.son.soccerStreaming.apifootball.service.FixtureDetailGenerationStore;
 import com.son.soccerStreaming.player.dto.PlayerResponseDto;
 import com.son.soccerStreaming.fixture.entity.Fixture;
 import com.son.soccerStreaming.media.service.MediaUrlService;
@@ -18,6 +22,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Comparator;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -33,15 +38,20 @@ public class PlayerService {
     private final PlayerFixtureStatRepository playerFixtureStatRepository;
     private final PlayerTeamSeasonStatRepository playerTeamSeasonStatRepository;
     private final MediaUrlService mediaUrlService;
+    private final FixtureDetailGenerationResolver generationResolver;
+    private final FixtureDetailGenerationReadStore generationReadStore;
+    private final FixtureDetailGenerationRankingReadStore generationRankingReadStore;
+    private final FixtureDetailGenerationStore generationStore;
 
     @Transactional(readOnly = true)
     public PlayerResponseDto.Details getPlayerDetails(Long playerId) {
         Player player = playerRepository.findByPlayerId(playerId)
                 .orElseThrow(() -> new CustomException(ErrorCode.PLAYER_NOT_FOUND));
-        Team latestTeam = playerFixtureStatRepository
-                .findTopByPlayerPlayerIdOrderByFixtureFixtureDateDescFixtureFixtureIdDesc(playerId)
-                .map(PlayerFixtureStat::getTeam)
-                .orElse(null);
+        Team latestTeam = generationResolver.enabled()
+                ? publishedMatchStats(playerId).stream().findFirst().map(PlayerFixtureStat::getTeam).orElse(null)
+                : playerFixtureStatRepository
+                        .findTopByPlayerPlayerIdOrderByFixtureFixtureDateDescFixtureFixtureIdDesc(playerId)
+                        .map(PlayerFixtureStat::getTeam).orElse(null);
 
         return toDetails(player, latestTeam);
     }
@@ -76,8 +86,24 @@ public class PlayerService {
                 .orElseThrow(() -> new CustomException(ErrorCode.PLAYER_NOT_FOUND));
 
         // 시즌 요약은 API-Football의 시즌 누적 스탯을 저장한 테이블에서 바로 가져온다.
-        List<PlayerFixtureStat> matchStats = playerFixtureStatRepository
-                .findAllByPlayerPlayerIdOrderByFixtureFixtureDateDescFixtureFixtureIdDesc(playerId);
+        List<PlayerFixtureStat> matchStats;
+        List<PlayerTeamSeasonStat> seasonStats;
+        if (generationResolver.enabled()) {
+            matchStats = publishedMatchStats(playerId);
+            seasonStats = new ArrayList<>();
+            for (Integer season : generationStore.activeSeasons()) {
+                Long generationId = generationResolver.activeForSeason(season);
+                if (generationId == null) {
+                    throw new IllegalStateException("Published fixture detail generation is missing for season " + season);
+                }
+                seasonStats.addAll(generationRankingReadStore.playerSeasonStats(generationId, playerId, season));
+            }
+            seasonStats.sort(Comparator.comparing(PlayerTeamSeasonStat::getSeason).reversed());
+        } else {
+            matchStats = playerFixtureStatRepository
+                    .findAllByPlayerPlayerIdOrderByFixtureFixtureDateDescFixtureFixtureIdDesc(playerId);
+            seasonStats = playerTeamSeasonStatRepository.findAllByPlayerPlayerIdOrderBySeasonDesc(playerId);
+        }
         Team latestTeam = matchStats.stream()
                 .findFirst()
                 .map(PlayerFixtureStat::getTeam)
@@ -87,7 +113,6 @@ public class PlayerService {
                 .map(this::toMatchStat)
                 .toList();
 
-        List<PlayerTeamSeasonStat> seasonStats = playerTeamSeasonStatRepository.findAllByPlayerPlayerIdOrderBySeasonDesc(playerId);
         List<PlayerResponseDto.SeasonSummary> seasons = aggregateSeasonSummaries(
                 seasonStats,
                 teamsBySeasonFromMatches(matches),
@@ -101,17 +126,36 @@ public class PlayerService {
                 .build();
     }
 
+    private List<PlayerFixtureStat> publishedMatchStats(Long playerId) {
+        List<PlayerFixtureStat> matchStats = new ArrayList<>();
+        for (Integer season : generationStore.activeSeasons()) {
+            Long generationId = generationResolver.activeForSeason(season);
+            if (generationId == null) {
+                throw new IllegalStateException("Published fixture detail generation is missing for season " + season);
+            }
+            matchStats.addAll(generationReadStore.findPlayerStatsForPlayer(generationId, playerId, season));
+        }
+        matchStats.sort(Comparator.comparing((PlayerFixtureStat stat) -> stat.getFixture().getFixtureDate())
+                .thenComparing(stat -> stat.getFixture().getFixtureId()).reversed());
+        return matchStats;
+    }
+
     @Transactional(readOnly = true)
     public PlayerResponseDto.SeasonSummary getPlayerSeasonSummary(Long playerId, Integer season) {
         ensurePlayerExists(playerId);
 
-        List<PlayerFixtureStat> matchStats = playerFixtureStatRepository
-                .findAllByPlayerPlayerIdAndFixtureSeasonOrderByFixtureFixtureDateDescFixtureFixtureIdDesc(playerId, season);
+        Long generationId = generationResolver.enabled() ? generationResolver.activeForSeason(season) : null;
+        List<PlayerFixtureStat> matchStats = generationId == null
+                ? playerFixtureStatRepository
+                        .findAllByPlayerPlayerIdAndFixtureSeasonOrderByFixtureFixtureDateDescFixtureFixtureIdDesc(playerId, season)
+                : generationReadStore.findPlayerStatsForPlayer(generationId, playerId, season);
         List<PlayerResponseDto.MatchStat> matches = matchStats
                 .stream()
                 .map(this::toMatchStat)
                 .toList();
-        List<PlayerTeamSeasonStat> seasonStats = playerTeamSeasonStatRepository.findAllByPlayerPlayerIdAndSeason(playerId, season);
+        List<PlayerTeamSeasonStat> seasonStats = generationId == null
+                ? playerTeamSeasonStatRepository.findAllByPlayerPlayerIdAndSeason(playerId, season)
+                : generationRankingReadStore.playerSeasonStats(generationId, playerId, season);
         List<PlayerResponseDto.SeasonSummary> summaries = aggregateSeasonSummaries(
                 seasonStats,
                 teamsBySeasonFromMatches(matches),
@@ -128,8 +172,12 @@ public class PlayerService {
         ensurePlayerExists(playerId);
         int limit = Math.max(1, Math.min(size, 30));
 
-        return playerFixtureStatRepository
-                .findAllByPlayerPlayerIdAndFixtureSeasonOrderByFixtureFixtureDateDescFixtureFixtureIdDesc(playerId, season)
+        Long generationId = generationResolver.enabled() ? generationResolver.activeForSeason(season) : null;
+        List<PlayerFixtureStat> matchStats = generationId == null
+                ? playerFixtureStatRepository
+                        .findAllByPlayerPlayerIdAndFixtureSeasonOrderByFixtureFixtureDateDescFixtureFixtureIdDesc(playerId, season)
+                : generationReadStore.findPlayerStatsForPlayer(generationId, playerId, season);
+        return matchStats
                 .stream()
                 .limit(limit)
                 .map(this::toMatchStat)

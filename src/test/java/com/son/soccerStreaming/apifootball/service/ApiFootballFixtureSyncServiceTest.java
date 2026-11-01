@@ -1,6 +1,7 @@
 package com.son.soccerStreaming.apifootball.service;
 
 import com.son.soccerStreaming.admin.service.AdminOverrideService;
+import com.son.soccerStreaming.admin.entity.AdminOverrideTargetType;
 import com.son.soccerStreaming.apifootball.client.ApiFootballClient;
 import com.son.soccerStreaming.apifootball.dto.ApiFootballLiveDto;
 import com.son.soccerStreaming.fixture.entity.Fixture;
@@ -19,7 +20,11 @@ import java.util.Set;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class ApiFootballFixtureSyncServiceTest {
@@ -95,6 +100,42 @@ class ApiFootballFixtureSyncServiceTest {
         assertThat(fixture.getFixtureStatus()).isEqualTo("LIVE");
         assertThat(fixture.getElapsed()).isEqualTo(90);
         assertThat(fixture.getExtra()).isEqualTo(6);
+    }
+
+    @Test
+    void previewAppliesResponseWithoutChangingPublishedFixture() {
+        Fixture current = Fixture.builder()
+                .fixtureId(1000L)
+                .fixtureDate(LocalDateTime.of(2026, 8, 8, 12, 0))
+                .homeScore(0)
+                .awayScore(0)
+                .build();
+        ApiFootballLiveDto.FixtureInfo fixtureInfo = new ApiFootballLiveDto.FixtureInfo();
+        ReflectionTestUtils.setField(fixtureInfo, "id", 1000L);
+        ApiFootballLiveDto.Goals goals = new ApiFootballLiveDto.Goals();
+        ReflectionTestUtils.setField(goals, "home", 1);
+        ReflectionTestUtils.setField(goals, "away", 0);
+        ApiFootballLiveDto.FixtureResponse response = new ApiFootballLiveDto.FixtureResponse();
+        ReflectionTestUtils.setField(response, "fixture", fixtureInfo);
+        ReflectionTestUtils.setField(response, "goals", goals);
+        ApiFootballLiveDto.TeamInfo home = new ApiFootballLiveDto.TeamInfo();
+        ApiFootballLiveDto.TeamInfo away = new ApiFootballLiveDto.TeamInfo();
+        ReflectionTestUtils.setField(home, "id", 1L);
+        ReflectionTestUtils.setField(away, "id", 2L);
+        ApiFootballLiveDto.Teams teams = new ApiFootballLiveDto.Teams();
+        ReflectionTestUtils.setField(teams, "home", home);
+        ReflectionTestUtils.setField(teams, "away", away);
+        ReflectionTestUtils.setField(response, "teams", teams);
+        when(adminOverrideService.overriddenFields(eq(AdminOverrideTargetType.FIXTURE), eq(1000L), any()))
+                .thenReturn(Set.of());
+        keepCurrentValueWhenOverridden();
+
+        Fixture draft = service.previewFixtureResponse(current, response);
+
+        assertThat(draft).isNotSameAs(current);
+        assertThat(draft.getHomeScore()).isEqualTo(1);
+        assertThat(current.getHomeScore()).isZero();
+        verify(fixtureRepository, never()).save(any());
     }
 
     private void keepCurrentValueWhenOverridden() {

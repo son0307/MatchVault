@@ -6,6 +6,8 @@ import org.springframework.data.redis.connection.stream.MapRecord;
 import org.springframework.data.redis.connection.stream.PendingMessage;
 import org.springframework.data.redis.connection.stream.PendingMessages;
 import org.springframework.data.redis.connection.stream.RecordId;
+import org.springframework.data.redis.connection.Limit;
+import org.springframework.data.domain.Range;
 import org.springframework.data.redis.core.StreamOperations;
 import org.springframework.data.redis.core.StringRedisTemplate;
 
@@ -91,5 +93,22 @@ class RedisSyncJobStreamTest {
 
         when(streams.acknowledge(RedisSyncJobStream.STREAM, RedisSyncJobStream.GROUP, id)).thenReturn(0L);
         assertThatThrownBy(() -> queue.acknowledge(id)).isInstanceOf(IllegalStateException.class);
+    }
+
+    @Test
+    void readsTheMostRecentDeadLettersWithoutChangingThem() {
+        doReturn(streams).when(redis).opsForStream();
+        @SuppressWarnings("unchecked")
+        MapRecord<String, String, String> record = mock(MapRecord.class);
+        when(record.getId()).thenReturn(RecordId.of("1000-0"));
+        when(record.getValue()).thenReturn(Map.of(
+                "jobId", "scheduled-1", "task", "fixtures", "syncKey", "fixtures:39", "payload", "{}"));
+        when(streams.reverseRange(eq(RedisSyncJobStream.STREAM + ":dead"), any(Range.class),
+                any(Limit.class))).thenReturn(List.of(record));
+        when(streams.size(RedisSyncJobStream.STREAM + ":dead")).thenReturn(1L);
+
+        assertThat(queue.deadLetterCount()).isEqualTo(1);
+        assertThat(queue.recentDeadLetters(10)).extracting(job -> job.message().jobId())
+                .containsExactly("scheduled-1");
     }
 }

@@ -15,7 +15,7 @@ import lombok.*;
         @Index(name = "idx_player_fixture_stat_player_fixture", columnList = "player_id, fixture_id")
 })
 @Getter
-@Builder
+@Builder(toBuilder = true)
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @AllArgsConstructor(access = AccessLevel.PROTECTED)
 public class PlayerFixtureStat {

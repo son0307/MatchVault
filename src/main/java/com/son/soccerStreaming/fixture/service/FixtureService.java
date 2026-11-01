@@ -1,5 +1,9 @@
 package com.son.soccerStreaming.fixture.service;
 
+import com.son.soccerStreaming.apifootball.service.FixtureDetailGenerationReadStore;
+import com.son.soccerStreaming.apifootball.service.FixtureDetailGenerationResolver;
+import com.son.soccerStreaming.apifootball.service.FixtureDetailGenerationStore;
+import com.son.soccerStreaming.apifootball.service.FixtureDetailLiveChangeStore;
 import com.son.soccerStreaming.fixture.dto.CursorResponse;
 import com.son.soccerStreaming.fixture.dto.FixtureMetaResponseDto;
 import com.son.soccerStreaming.fixture.dto.FixtureResponseDto;
@@ -29,28 +33,39 @@ public class FixtureService {
 
     private final FixtureRepository fixtureRepository;
     private final MediaUrlService mediaUrlService;
+    private final FixtureDetailGenerationResolver generationResolver;
+    private final FixtureDetailGenerationReadStore generationReadStore;
+    private final FixtureDetailGenerationStore generationStore;
+    private final FixtureDetailLiveChangeStore liveChangeStore;
 
     @Transactional(readOnly = true)
     public FixtureResponseDto.Summary getFixture(Long fixtureId) {
-        Fixture fixture = fixtureRepository.findByFixtureId(fixtureId)
+        Fixture publishedFixture = fixtureRepository.findByFixtureId(fixtureId)
                 .orElseThrow(() -> new CustomException(ErrorCode.FIXTURE_NOT_FOUND));
-
+        Long generationId = publishedFixture.getSeason() == null ? null
+                : generationResolver.activeForSeason(publishedFixture.getSeason());
+        Fixture fixture = generationId == null ? publishedFixture : generationReadStore.findFixture(generationId, fixtureId)
+                        .orElseThrow(() -> new IllegalStateException(
+                                "Published generation is missing fixture " + fixtureId));
         return toSummary(fixture);
     }
 
     @Transactional(readOnly = true)
     public FixtureResponseDto.HeadToHead getHeadToHead(Long fixtureId) {
-        Fixture fixture = fixtureRepository.findWithTeamsByFixtureId(fixtureId)
+        Fixture published = fixtureRepository.findWithTeamsByFixtureId(fixtureId)
                 .orElseThrow(() -> new CustomException(ErrorCode.FIXTURE_NOT_FOUND));
+        Long generationId = generationResolver.enabled() && published.getSeason() != null
+                ? requiredGeneration(published.getSeason()) : null;
+        Fixture fixture = generationId == null ? published : generationReadStore.findFixture(generationId, fixtureId)
+                        .orElseThrow(() -> new IllegalStateException(
+                                "Published generation is missing fixture " + fixtureId));
         Long homeTeamId = fixture.getHomeTeam().getTeamId();
         Long awayTeamId = fixture.getAwayTeam().getTeamId();
-        List<Fixture> matches = fixtureRepository.findHeadToHeadFixtures(
-                fixture.getLeagueId(),
-                homeTeamId,
-                awayTeamId,
-                FINISHED_FIXTURE_STATUSES,
-                HEAD_TO_HEAD_MATCH_LIMIT
-        );
+        List<Fixture> matches = generationResolver.enabled()
+                ? generationReadStore.findHeadToHead(activeGenerationIds(null), fixture.getLeagueId(),
+                        homeTeamId, awayTeamId, FINISHED_FIXTURE_STATUSES, HEAD_TO_HEAD_MATCH_LIMIT)
+                : fixtureRepository.findHeadToHeadFixtures(fixture.getLeagueId(), homeTeamId, awayTeamId,
+                        FINISHED_FIXTURE_STATUSES, HEAD_TO_HEAD_MATCH_LIMIT);
 
         int homeWins = 0;
         int draws = 0;
@@ -102,8 +117,11 @@ public class FixtureService {
                                                                         LocalDate date, LocalDate dateFrom,
                                                                         LocalDate dateTo, Long teamId, int size) {
         DateRange dateRange = utcRangeForKoreaDates(date, dateFrom, dateTo);
-        List<Fixture> fixtures = fixtureRepository.findRecentFixturesWithCursor(
-                cursorId, season, round, dateRange.startDateTime(), dateRange.endDateTime(), teamId, size);
+        List<Fixture> fixtures = generationResolver.enabled()
+                ? generationReadStore.findRecentFixtures(activeGenerationIds(season), cursorId, season,
+                        round, dateRange.startDateTime(), dateRange.endDateTime(), teamId, size)
+                : fixtureRepository.findRecentFixturesWithCursor(
+                        cursorId, season, round, dateRange.startDateTime(), dateRange.endDateTime(), teamId, size);
 
         boolean hasNext = false;
         if (fixtures.size() > size) {
@@ -126,6 +144,17 @@ public class FixtureService {
 
     @Transactional(readOnly = true)
     public FixtureMetaResponseDto getFixtureMeta(Integer season) {
+        if (generationResolver.enabled()) {
+            Long generationId = requiredGeneration(season);
+            FixtureDetailGenerationReadStore.FixtureMeta meta = generationReadStore.meta(generationId, season);
+            return FixtureMetaResponseDto.builder()
+                    .minDate(toKoreaDate(meta.minDate()))
+                    .maxDate(toKoreaDate(meta.maxDate()))
+                    .latestStartedDate(toKoreaDate(meta.latestStartedDate()))
+                    .minRound(meta.minRound())
+                    .maxRound(meta.maxRound())
+                    .build();
+        }
         return FixtureMetaResponseDto.builder()
                 .minDate(toKoreaDate(fixtureRepository.findMinFixtureDateBySeason(season).orElse(null)))
                 .maxDate(toKoreaDate(fixtureRepository.findMaxFixtureDateBySeason(season).orElse(null)))
@@ -134,6 +163,23 @@ public class FixtureService {
                 .minRound(fixtureRepository.findMinRoundBySeason(season).orElse(null))
                 .maxRound(fixtureRepository.findMaxRoundBySeason(season).orElse(null))
                 .build();
+    }
+
+    private List<Long> activeGenerationIds(Integer season) {
+        if (season != null) {
+            return List.of(requiredGeneration(season));
+        }
+        return generationStore.activeSeasons().stream()
+                .map(this::requiredGeneration)
+                .toList();
+    }
+
+    private Long requiredGeneration(Integer season) {
+        Long generationId = generationResolver.activeForSeason(season);
+        if (generationId == null) {
+            throw new IllegalStateException("Published fixture detail generation is missing for season " + season);
+        }
+        return generationId;
     }
 
     private FixtureResponseDto.Summary toSummary(Fixture fixture) {

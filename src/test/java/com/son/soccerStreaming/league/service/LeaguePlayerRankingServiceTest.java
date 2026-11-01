@@ -1,5 +1,7 @@
 package com.son.soccerStreaming.league.service;
 
+import com.son.soccerStreaming.apifootball.service.FixtureDetailGenerationRankingReadStore;
+import com.son.soccerStreaming.apifootball.service.FixtureDetailGenerationResolver;
 import com.son.soccerStreaming.fixture.repository.PlayerFixtureStatRepository;
 import com.son.soccerStreaming.league.dto.LeaguePlayerRankingResponseDto;
 import com.son.soccerStreaming.media.service.MediaUrlService;
@@ -35,9 +37,29 @@ class LeaguePlayerRankingServiceTest {
     private TeamStandingRepository teamStandingRepository;
     @Mock
     private MediaUrlService mediaUrlService;
+    @Mock
+    private FixtureDetailGenerationResolver generationResolver;
+    @Mock
+    private FixtureDetailGenerationRankingReadStore generationRankingReadStore;
 
     @InjectMocks
     private LeaguePlayerRankingService service;
+
+    @Test
+    void readsRankingInputsFromOnePublishedGeneration() {
+        Team team = team(42L, "Arsenal");
+        Player player = player(1L, "Player");
+        when(generationResolver.enabled()).thenReturn(true);
+        when(generationResolver.activeForSeason(2025)).thenReturn(7L);
+        when(generationRankingReadStore.leagueStats(7L, 39L, 2025))
+                .thenReturn(List.of(stat(player, team, 2, 0, 180, 7.0, 1, 0, 0, 0, 0)));
+        when(generationRankingReadStore.matchAggregates(7L, 2025, List.of(1L))).thenReturn(List.of());
+        when(generationRankingReadStore.latestTeams(7L, 2025, List.of(1L))).thenReturn(List.of());
+
+        assertThat(service.getRankings(39, 2025).getGoals())
+                .extracting(LeaguePlayerRankingResponseDto.Row::getPlayerId).containsExactly(1L);
+        verify(playerTeamSeasonStatRepository, never()).findAllForLeagueRankings(39L, 2025);
+    }
 
     @Test
     void aggregatesTransferredPlayerAndUsesPenaltyGoalsAsScoringTieBreaker() {

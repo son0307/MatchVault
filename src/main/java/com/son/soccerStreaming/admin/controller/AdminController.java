@@ -420,6 +420,11 @@ public class AdminController {
         return ResponseEntity.ok(adminService.getSyncJobs(limit));
     }
 
+    @GetMapping("/sync/jobs/dead")
+    public ResponseEntity<AdminDto.DeadSyncJobListResponse> getDeadSyncJobs() {
+        return ResponseEntity.ok(adminService.getDeadSyncJobs());
+    }
+
     @PostMapping("/sync/jobs/{jobId}/cancel")
     public ResponseEntity<AdminDto.SyncCancelResponse> cancelSyncJob(
             @AuthenticationPrincipal AuthUserDetails userDetails,

@@ -85,6 +85,7 @@ public class AdminDto {
     @AllArgsConstructor
     public static class FixtureUpdateRequest {
         private Long version;
+        private List<String> changedFields;
         private OffsetDateTime fixtureDate;
         private String referee;
         private String timezone;
@@ -341,6 +342,7 @@ public class AdminDto {
     @Getter
     @Builder
     public static class FixtureAdminDetailResponse {
+        private Long generationId;
         private FixtureAdminResponse fixture;
         private List<ManualOverrideResponse> eventOverrides;
         private List<FixtureEventAdminResponse> events;
@@ -574,6 +576,23 @@ public class AdminDto {
     @Builder
     public static class SyncJobListResponse {
         private List<SyncJobResponse> jobs;
+    }
+
+    @Getter
+    @Builder
+    public static class DeadSyncJobResponse {
+        private String streamId;
+        private String jobId;
+        private String task;
+        private String syncKey;
+        private OffsetDateTime failedAt;
+    }
+
+    @Getter
+    @Builder
+    public static class DeadSyncJobListResponse {
+        private long total;
+        private List<DeadSyncJobResponse> jobs;
     }
 
     @Getter

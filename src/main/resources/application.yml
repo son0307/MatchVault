@@ -162,5 +162,14 @@ api-football:
       season: ${API_FOOTBALL_INJURIES_SEASON:2025}
       daily-cron: ${API_FOOTBALL_INJURIES_DAILY_CRON:0 45 5 * * *}
 
+fixture-detail:
+  generation-cleanup:
+    enabled: ${FIXTURE_DETAIL_GENERATION_CLEANUP_ENABLED:true}
+    cron: ${FIXTURE_DETAIL_GENERATION_CLEANUP_CRON:0 30 2 * * *}
+    zone: ${FIXTURE_DETAIL_GENERATION_CLEANUP_ZONE:Asia/Seoul}
+    retention-days: ${FIXTURE_DETAIL_GENERATION_CLEANUP_RETENTION_DAYS:7}
+    retain-retired: ${FIXTURE_DETAIL_GENERATION_CLEANUP_RETAIN_RETIRED:2}
+    max-per-run: ${FIXTURE_DETAIL_GENERATION_CLEANUP_MAX_PER_RUN:5}
+
 server:
   port: ${PORT_ENV:8080}

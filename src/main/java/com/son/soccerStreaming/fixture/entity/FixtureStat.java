@@ -10,7 +10,7 @@ import lombok.*;
         @UniqueConstraint(columnNames = {"fixture_id", "team_id"})
 })
 @Getter
-@Builder
+@Builder(toBuilder = true)
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @AllArgsConstructor(access = AccessLevel.PROTECTED)
 public class FixtureStat {

@@ -1,5 +1,7 @@
 package com.son.soccerStreaming.home.service;
 
+import com.son.soccerStreaming.apifootball.service.FixtureDetailGenerationReadStore;
+import com.son.soccerStreaming.apifootball.service.FixtureDetailGenerationResolver;
 import com.son.soccerStreaming.favorite.dto.FavoriteDashboardResponseDto;
 import com.son.soccerStreaming.favorite.service.FavoriteService;
 import com.son.soccerStreaming.fixture.entity.Fixture;
@@ -32,9 +34,40 @@ class HomeServiceTest {
     private TeamStandingService teamStandingService;
     @Mock
     private FavoriteService favoriteService;
+    @Mock
+    private FixtureDetailGenerationResolver generationResolver;
+    @Mock
+    private FixtureDetailGenerationReadStore generationReadStore;
 
     @InjectMocks
     private HomeService homeService;
+
+    @Test
+    void getSummaryReadsTodayFixturesFromPublishedGeneration() {
+        Fixture fixture = Fixture.builder().id(10L).fixtureId(100L)
+                .fixtureDate(LocalDateTime.of(2026, 5, 22, 12, 0))
+                .homeTeam(Team.builder().teamId(47L).name("Tottenham").build())
+                .awayTeam(Team.builder().teamId(49L).name("Chelsea").build())
+                .build();
+        when(generationResolver.activeForSeason(2025)).thenReturn(7L);
+        when(generationReadStore.findRecentFixtures(
+                org.mockito.ArgumentMatchers.eq(List.of(7L)),
+                org.mockito.ArgumentMatchers.isNull(),
+                org.mockito.ArgumentMatchers.eq(2025),
+                org.mockito.ArgumentMatchers.isNull(),
+                org.mockito.ArgumentMatchers.any(LocalDateTime.class),
+                org.mockito.ArgumentMatchers.any(LocalDateTime.class),
+                org.mockito.ArgumentMatchers.isNull(),
+                org.mockito.ArgumentMatchers.eq(500))).thenReturn(List.of(fixture));
+        when(teamStandingService.getStandings(2025)).thenReturn(List.of());
+
+        assertThat(homeService.getSummary(2025, null).getTodayFixtures())
+                .extracting("fixtureId").containsExactly(100L);
+        verify(fixtureRepository, never())
+                .findAllBySeasonAndFixtureDateGreaterThanEqualAndFixtureDateLessThanOrderByFixtureDateAsc(
+                        org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(),
+                        org.mockito.ArgumentMatchers.any());
+    }
 
     @Test
     void getSummaryReturnsTodayFixturesStandingsAndFavoritesForLoggedInUser() {

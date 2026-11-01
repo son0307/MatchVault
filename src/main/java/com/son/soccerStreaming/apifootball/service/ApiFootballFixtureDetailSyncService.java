@@ -17,8 +17,10 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StopWatch;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 @Slf4j
 @Service
@@ -37,9 +39,19 @@ public class ApiFootballFixtureDetailSyncService {
     private final OptimisticLockRetryExecutor optimisticLockRetryExecutor;
     private final EntityManager entityManager;
     private final ApiFootballSyncStatusService apiFootballSyncStatusService;
+    private final FixtureDetailGenerationStore generationStore;
+    private final FixtureDetailGenerationEventWriter generationEventWriter;
+    private final FixtureDetailGenerationAggregationService generationAggregationService;
+    private final FixtureDetailGenerationPublisher generationPublisher;
+    private final FixtureDetailGenerationResolver generationResolver;
+    private final FixtureDetailGenerationReadStore generationReadStore;
+    private final FixtureDetailLiveChangeStore liveChangeStore;
 
     @Value("${api-football.sync.fixture-details.chunk-size:10}")
     private int chunkSize;
+
+    @Value("${fixture-detail.generation-batch.enabled:false}")
+    private boolean generationBatchEnabled;
 
     public FixtureDetailSyncResult syncFixtureDetail(Long fixtureId, boolean applyLiveStandingImpact) {
         apiFootballSyncStatusService.recordAttempt("fixture-detail", "Fixture Detail");
@@ -164,6 +176,7 @@ public class ApiFootballFixtureDetailSyncService {
                 chunkWatch.start("api");
                 List<ApiFootballLiveDto.FixtureResponse> responses = apiFootballClient.getFixturesByIds(chunk);
                 chunkWatch.stop();
+                validateFixtureResponses(chunk, responses);
                 progressReporter.checkCancelled();
 
                 chunkWatch.start("upsert");
@@ -179,6 +192,9 @@ public class ApiFootballFixtureDetailSyncService {
                                     processed.add(result);
                                 }
                             }
+                            if (processed.size() != chunk.size()) {
+                                throw new IllegalStateException("Fixture detail chunk could not persist every requested fixture");
+                            }
                             // Admin-triggered bulk sync runs in a web request, so clear managed entities per chunk.
                             entityManager.flush();
                             entityManager.clear();
@@ -188,12 +204,6 @@ public class ApiFootballFixtureDetailSyncService {
                 results.addAll(chunkResults);
                 processedUnits += chunk.size();
                 successfulUnits += chunkResults.size();
-                int missingCount = Math.max(0, chunk.size() - chunkResults.size());
-                failedUnits += missingCount;
-                if (missingCount > 0) {
-                    progressReporter.error("FIXTURE_CHUNK", chunk.toString(),
-                            "Some requested fixtures were missing from the API response. missingCount=" + missingCount);
-                }
                 progressReporter.update(processedUnits, successfulUnits, failedUnits, results.size());
                 chunkWatch.stop();
 
@@ -241,9 +251,114 @@ public class ApiFootballFixtureDetailSyncService {
         return syncSeasonFixtureDetails(season, applyLiveStandingImpact, SyncProgressReporter.NO_OP);
     }
 
+    /** Fetches one season into a private generation. Normalization and publication happen separately. */
+    public long stageSeasonFixtureResponses(Integer season, SyncProgressReporter progressReporter) {
+        List<Long> fixtureIds = fixtureRepository.findAllBySeasonOrderByFixtureDateAsc(season).stream()
+                .map(Fixture::getFixtureId)
+                .toList();
+        long generationId = generationStore.create(season, fixtureIds);
+        int processed = 0;
+        int successful = 0;
+        progressReporter.beginPhase("STAGING_FIXTURES", fixtureIds.size(), "fixtures", 0);
+        List<List<Long>> seasonChunks = chunks(fixtureIds);
+        try {
+            for (List<Long> chunk : seasonChunks) {
+                progressReporter.checkCancelled();
+                try {
+                    List<ApiFootballLiveDto.FixtureResponse> responses = apiFootballClient.getFixturesByIds(chunk);
+                    validateFixtureResponses(chunk, responses);
+                    progressReporter.checkCancelled();
+                    generationStore.stageChunk(generationId, chunk, responses);
+                    for (ApiFootballLiveDto.FixtureResponse response : responses) {
+                        Long fixtureId = fixtureIdOf(response);
+                        Fixture current = publishedFixtureForPreview(season, fixtureId);
+                        Fixture draft = apiFootballFixtureSyncService.previewFixtureResponse(current, response);
+                        var lineupDrafts = apiFootballFixtureLineupSyncService.previewLineups(
+                                current, draft, response.getLineups());
+                        generationStore.applyFixtureResponse(generationId, draft);
+                        generationEventWriter.apply(generationId, current, response.getEvents());
+                        generationStore.applyLineups(generationId, current.getId(), lineupDrafts);
+                        generationStore.applyTeamStats(generationId, current.getId(),
+                                apiFootballFixtureStatSyncService.previewFixtureStats(current, response.getStatistics()));
+                        generationStore.applyPlayerStats(generationId, current.getId(),
+                                apiFootballFixturePlayerStatSyncService.previewPlayerStats(current, response.getPlayers()));
+                        generationStore.markFixtureMaterialized(generationId, fixtureId);
+                    }
+                    successful += chunk.size();
+                } catch (SyncCancelledException | SyncLockLostException exception) {
+                    throw exception;
+                } catch (Exception exception) {
+                    progressReporter.error("FIXTURE_CHUNK", chunk.toString(), exception.getMessage());
+                    processed += chunk.size();
+                    progressReporter.update(processed, successful, processed - successful, successful);
+                    throw new ApiFootballFixtureDetailSyncException(
+                            List.of(List.copyOf(chunk)), seasonChunks.size(), exception);
+                }
+                processed += chunk.size();
+                progressReporter.update(processed, successful, processed - successful, successful);
+            }
+            progressReporter.checkCancelled();
+            generationStore.markNormalized(generationId);
+            progressReporter.beginPhase("REBUILDING_SEASON_STATS", 1, "season", successful);
+            generationAggregationService.rebuild(generationId, season);
+            generationStore.markAggregated(generationId);
+            progressReporter.update(1, 1, 0, successful);
+            return generationId;
+        } catch (RuntimeException exception) {
+            try {
+                generationStore.markFailed(generationId);
+            } catch (RuntimeException statusFailure) {
+                exception.addSuppressed(statusFailure);
+            }
+            throw exception;
+        }
+    }
+
+    private Fixture publishedFixtureForPreview(int season, long fixtureId) {
+        Long activeGenerationId = generationStore.activeGenerationId(season);
+        if (activeGenerationId != null && activeGenerationId > 0) {
+            return generationReadStore.findFixture(activeGenerationId, fixtureId)
+                    .orElseThrow(() -> new IllegalStateException(
+                            "Published fixture disappeared during generation preparation: " + fixtureId));
+        }
+        return fixtureRepository.findByFixtureId(fixtureId)
+                .orElseThrow(() -> new IllegalStateException(
+                        "Published fixture disappeared during generation preparation: " + fixtureId));
+    }
+
     public int syncSeasonFixtureDetails(Integer season, boolean applyLiveStandingImpact,
                                         SyncProgressReporter progressReporter) {
+        return syncSeasonFixtureDetails(season, applyLiveStandingImpact, progressReporter, null);
+    }
+
+    public int syncSeasonFixtureDetails(Integer season, boolean applyLiveStandingImpact,
+                                        SyncProgressReporter progressReporter, String jobId) {
         apiFootballSyncStatusService.recordAttempt("fixture-details", "Season Details", season);
+        if (generationBatchEnabled) {
+            if (!generationResolver.enabled()) {
+                throw new IllegalStateException("Generation reads must be enabled before generation batch writes");
+            }
+            Integer publishedCount = generationStore.publishedJobFixtureCount(jobId);
+            if (publishedCount != null) {
+                apiFootballSyncStatusService.recordSuccess("fixture-details", "Season Details", season);
+                return publishedCount;
+            }
+            int fixtureCount = fixtureRepository.findAllBySeasonOrderByFixtureDateAsc(season).size();
+            long generationId = stageSeasonFixtureResponses(season, progressReporter);
+            try {
+                progressReporter.checkCancelled();
+                generationPublisher.publish(season, generationId, jobId, fixtureCount);
+            } catch (RuntimeException exception) {
+                try {
+                    generationStore.markFailed(generationId);
+                } catch (RuntimeException statusFailure) {
+                    exception.addSuppressed(statusFailure);
+                }
+                throw exception;
+            }
+            apiFootballSyncStatusService.recordSuccess("fixture-details", "Season Details", season);
+            return fixtureCount;
+        }
         List<Long> fixtureIds = fixtureRepository.findAllBySeasonOrderByFixtureDateAsc(season).stream()
                 .map(Fixture::getFixtureId)
                 .toList();
@@ -266,6 +381,24 @@ public class ApiFootballFixtureDetailSyncService {
             chunks.add(fixtureIds.subList(i, Math.min(i + size, fixtureIds.size())));
         }
         return chunks;
+    }
+
+    private void validateFixtureResponses(List<Long> requestedIds, List<ApiFootballLiveDto.FixtureResponse> responses) {
+        if (responses == null) {
+            throw new IllegalStateException("Fixture detail API returned no response list");
+        }
+        Set<Long> requested = new HashSet<>(requestedIds);
+        Set<Long> received = new HashSet<>();
+        for (ApiFootballLiveDto.FixtureResponse response : responses) {
+            Long fixtureId = fixtureIdOf(response);
+            if (fixtureId == null || !requested.contains(fixtureId) || !received.add(fixtureId)) {
+                throw new IllegalStateException("Fixture detail API returned an invalid or duplicate fixture ID: " + fixtureId);
+            }
+        }
+        if (!received.containsAll(requested)) {
+            throw new IllegalStateException("Fixture detail API omitted requested fixture IDs: " + requestedIds.stream()
+                    .filter(id -> !received.contains(id)).toList());
+        }
     }
 
     private Long fixtureIdOf(ApiFootballLiveDto.FixtureResponse response) {

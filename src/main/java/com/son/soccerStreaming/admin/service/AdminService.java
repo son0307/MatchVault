@@ -2,6 +2,9 @@ package com.son.soccerStreaming.admin.service;
 
 import com.son.soccerStreaming.apifootball.service.ApiFootballFixtureDetailSyncService;
 import com.son.soccerStreaming.apifootball.service.ApiFootballFixtureSyncService;
+import com.son.soccerStreaming.apifootball.service.FixtureDetailGenerationReadStore;
+import com.son.soccerStreaming.apifootball.service.FixtureDetailGenerationResolver;
+import com.son.soccerStreaming.apifootball.service.FixtureDetailLiveChangeStore;
 import com.son.soccerStreaming.apifootball.service.ApiFootballInjurySyncService;
 import com.son.soccerStreaming.apifootball.service.ApiFootballPlayerSyncService;
 import com.son.soccerStreaming.apifootball.service.ApiFootballStandingSyncService;
@@ -10,6 +13,7 @@ import com.son.soccerStreaming.apifootball.service.ApiFootballSyncAlreadyRunning
 import com.son.soccerStreaming.apifootball.service.ApiFootballSyncExecutionGuard;
 import com.son.soccerStreaming.apifootball.service.SyncJobPayload;
 import com.son.soccerStreaming.apifootball.service.SyncJobPublisher;
+import com.son.soccerStreaming.apifootball.service.RedisSyncJobStream;
 import com.son.soccerStreaming.apifootball.scheduler.ApiFootballSyncFailureRetryScheduler;
 import com.son.soccerStreaming.apifootball.service.LeagueSeasonCoverageSyncService;
 import com.son.soccerStreaming.admin.dto.AdminDto;
@@ -199,11 +203,16 @@ public class AdminService {
     private final LeagueSeasonCoverageSyncService leagueSeasonCoverageSyncService;
     private final AdminSyncTaskRunner adminSyncTaskRunner;
     private final AdminSyncJobService adminSyncJobService;
+    private final RedisSyncJobStream redisSyncJobStream;
     private final ApiFootballSyncExecutionGuard apiFootballSyncExecutionGuard;
     private final ApiFootballSyncFailureRetryScheduler apiFootballSyncFailureRetryScheduler;
     private final SyncJobPublisher syncJobPublisher;
     private final MediaUrlService mediaUrlService;
     private final EntityManager entityManager;
+    private final AdminFixtureGenerationGuard fixtureGenerationGuard;
+    private final FixtureDetailGenerationResolver generationResolver;
+    private final FixtureDetailGenerationReadStore generationReadStore;
+    private final FixtureDetailLiveChangeStore liveChangeStore;
     private final ConcurrentMap<String, ManualSyncState> manualSyncStates = new ConcurrentHashMap<>();
 
     @Transactional(readOnly = true)
@@ -278,48 +287,71 @@ public class AdminService {
         request.normalizeTextFields();
         Fixture fixture = findFixtureWithTeams(fixtureId);
         validateAdminEditVersion(request.getVersion(), fixture.getVersion());
+        Long activeGenerationId = fixture.getSeason() == null ? null
+                : generationResolver.activeForSeason(fixture.getSeason());
+        List<String> requestedFields = request.getChangedFields();
+        if (activeGenerationId != null && requestedFields == null) {
+            throw new CustomException(ErrorCode.INVALID_ADMIN_CHANGED_FIELDS);
+        }
+        if (requestedFields != null && requestedFields.stream()
+                .anyMatch(field -> field == null || !FIXTURE_OVERRIDE_FIELDS.contains(field))) {
+            throw new CustomException(ErrorCode.INVALID_ADMIN_OVERRIDE_FIELD);
+        }
+        Set<String> editedFields = requestedFields == null ? null : Set.copyOf(requestedFields);
+        if (editedFields != null && editedFields.isEmpty()) {
+            return toFixtureDetailResponse(fixture);
+        }
+        Fixture visibleFixture = activeGenerationId == null ? fixture
+                : generationReadStore.findFixture(activeGenerationId, fixtureId)
+                        .orElseThrow(() -> new IllegalStateException(
+                                "Published generation is missing fixture " + fixtureId));
+        List<FieldChange> changes = changedFixtureFields(visibleFixture, request).stream()
+                .filter(change -> editedFields == null || editedFields.contains(change.fieldName()))
+                .toList();
+        if (editedFields != null && changes.isEmpty()) {
+            return toFixtureDetailResponse(fixture);
+        }
         entityManager.lock(fixture, LockModeType.OPTIMISTIC_FORCE_INCREMENT);
-        List<FieldChange> changes = changedFixtureFields(fixture, request);
         LocalDateTime fixtureDateUtc = request.getFixtureDate() != null
                 ? LocalDateTime.ofInstant(request.getFixtureDate().toInstant(), ZoneOffset.UTC)
-                : fixture.getFixtureDate();
-        Long timestamp = request.getFixtureDate() != null
-                ? request.getFixtureDate().toInstant().getEpochSecond()
+                : visibleFixture.getFixtureDate();
+        Long timestamp = changed(changes, "fixtureDate")
+                ? Long.valueOf(request.getFixtureDate().toInstant().getEpochSecond())
                 : fixture.getTimestamp();
 
         fixture.updateFixtureMetadata(
-                fixtureDateUtc,
-                request.getReferee(),
+                adminValue(changes, "fixtureDate", fixture.getFixtureDate(), fixtureDateUtc),
+                adminValue(changes, "referee", fixture.getReferee(), request.getReferee()),
                 fixture.getTimezone(),
                 timestamp,
                 fixture.getFirstPeriod(),
                 fixture.getSecondPeriod(),
-                request.getVenueId(),
-                request.getVenueName(),
-                request.getVenueCity()
+                adminValue(changes, "venueId", fixture.getVenueId(), request.getVenueId()),
+                adminValue(changes, "venueName", fixture.getVenueName(), request.getVenueName()),
+                adminValue(changes, "venueCity", fixture.getVenueCity(), request.getVenueCity())
         );
-        fixture.updateVenueKoreanName(request.getVenueNameKo());
+        fixture.updateVenueKoreanName(adminValue(changes, "venueNameKo", fixture.getVenueNameKo(), request.getVenueNameKo()));
         fixture.updateTactics(
-                request.getHomeFormation(),
-                request.getAwayFormation(),
-                request.getHomeCoachName(),
-                request.getAwayCoachName()
+                adminValue(changes, "homeFormation", fixture.getHomeFormation(), request.getHomeFormation()),
+                adminValue(changes, "awayFormation", fixture.getAwayFormation(), request.getAwayFormation()),
+                adminValue(changes, "homeCoachName", fixture.getHomeCoachName(), request.getHomeCoachName()),
+                adminValue(changes, "awayCoachName", fixture.getAwayCoachName(), request.getAwayCoachName())
         );
         fixture.updateHomeLineupColors(
-                request.getHomePlayerColorPrimary(),
-                request.getHomePlayerColorNumber(),
-                request.getHomePlayerColorBorder(),
-                request.getHomeGoalkeeperColorPrimary(),
-                request.getHomeGoalkeeperColorNumber(),
-                request.getHomeGoalkeeperColorBorder()
+                adminValue(changes, "homePlayerColorPrimary", fixture.getHomePlayerColorPrimary(), request.getHomePlayerColorPrimary()),
+                adminValue(changes, "homePlayerColorNumber", fixture.getHomePlayerColorNumber(), request.getHomePlayerColorNumber()),
+                adminValue(changes, "homePlayerColorBorder", fixture.getHomePlayerColorBorder(), request.getHomePlayerColorBorder()),
+                adminValue(changes, "homeGoalkeeperColorPrimary", fixture.getHomeGoalkeeperColorPrimary(), request.getHomeGoalkeeperColorPrimary()),
+                adminValue(changes, "homeGoalkeeperColorNumber", fixture.getHomeGoalkeeperColorNumber(), request.getHomeGoalkeeperColorNumber()),
+                adminValue(changes, "homeGoalkeeperColorBorder", fixture.getHomeGoalkeeperColorBorder(), request.getHomeGoalkeeperColorBorder())
         );
         fixture.updateAwayLineupColors(
-                request.getAwayPlayerColorPrimary(),
-                request.getAwayPlayerColorNumber(),
-                request.getAwayPlayerColorBorder(),
-                request.getAwayGoalkeeperColorPrimary(),
-                request.getAwayGoalkeeperColorNumber(),
-                request.getAwayGoalkeeperColorBorder()
+                adminValue(changes, "awayPlayerColorPrimary", fixture.getAwayPlayerColorPrimary(), request.getAwayPlayerColorPrimary()),
+                adminValue(changes, "awayPlayerColorNumber", fixture.getAwayPlayerColorNumber(), request.getAwayPlayerColorNumber()),
+                adminValue(changes, "awayPlayerColorBorder", fixture.getAwayPlayerColorBorder(), request.getAwayPlayerColorBorder()),
+                adminValue(changes, "awayGoalkeeperColorPrimary", fixture.getAwayGoalkeeperColorPrimary(), request.getAwayGoalkeeperColorPrimary()),
+                adminValue(changes, "awayGoalkeeperColorNumber", fixture.getAwayGoalkeeperColorNumber(), request.getAwayGoalkeeperColorNumber()),
+                adminValue(changes, "awayGoalkeeperColorBorder", fixture.getAwayGoalkeeperColorBorder(), request.getAwayGoalkeeperColorBorder())
         );
         if (!changes.isEmpty()) {
             adminOverrideService.markOverrides(
@@ -1023,6 +1055,24 @@ public class AdminService {
         return adminSyncJobService.recentJobs(limit);
     }
 
+    public AdminDto.DeadSyncJobListResponse getDeadSyncJobs() {
+        var jobs = redisSyncJobStream.recentDeadLetters(10).stream().map(job -> {
+            String streamId = job.id().getValue();
+            return AdminDto.DeadSyncJobResponse.builder()
+                    .streamId(streamId)
+                    .jobId(job.message().jobId())
+                    .task(job.message().task())
+                    .syncKey(job.message().syncKey())
+                    .failedAt(Instant.ofEpochMilli(Long.parseLong(streamId.substring(0, streamId.indexOf('-'))))
+                            .atOffset(ZoneOffset.UTC))
+                    .build();
+        }).toList();
+        return AdminDto.DeadSyncJobListResponse.builder()
+                .total(redisSyncJobStream.deadLetterCount())
+                .jobs(jobs)
+                .build();
+    }
+
     public AdminDto.SyncCancelResponse cancelSyncJob(Long adminUserId, Long jobId) {
         AppUser admin = findUser(adminUserId);
         AdminSyncJobService.CancelResult result = adminSyncJobService.requestCancel(jobId);
@@ -1372,13 +1422,17 @@ public class AdminService {
     }
 
     private Fixture findFixtureWithTeams(Long fixtureId) {
-        return fixtureRepository.findWithTeamsByFixtureId(fixtureId)
+        Fixture fixture = fixtureRepository.findWithTeamsByFixtureId(fixtureId)
                 .orElseThrow(() -> new CustomException(ErrorCode.FIXTURE_NOT_FOUND));
+        fixtureGenerationGuard.verifyMutation(fixture.getSeason());
+        return fixture;
     }
 
     private Fixture findFixtureForEventUpdate(Long fixtureId) {
-        return fixtureRepository.findByFixtureIdForEventUpdate(fixtureId)
+        Fixture fixture = fixtureRepository.findByFixtureIdForEventUpdate(fixtureId)
                 .orElseThrow(() -> new CustomException(ErrorCode.FIXTURE_NOT_FOUND));
+        fixtureGenerationGuard.verifyMutation(fixture.getSeason());
+        return fixture;
     }
 
     private FixtureLineup findFixtureLineup(Long fixtureId, Long teamId, Long playerId) {
@@ -1528,7 +1582,9 @@ public class AdminService {
         LocalDateTime requestedFixtureDateUtc = request.getFixtureDate() != null
                 ? LocalDateTime.ofInstant(request.getFixtureDate().toInstant(), ZoneOffset.UTC)
                 : null;
-        addIfChanged(changes, "fixtureDate", fixture.getFixtureDate(), requestedFixtureDateUtc);
+        if (requestedFixtureDateUtc != null) {
+            addIfChanged(changes, "fixtureDate", fixture.getFixtureDate(), requestedFixtureDateUtc);
+        }
         addIfChanged(changes, "referee", fixture.getReferee(), request.getReferee());
         addIfChanged(changes, "venueId", fixture.getVenueId(), request.getVenueId());
         addIfChanged(changes, "venueName", fixture.getVenueName(), request.getVenueName());
@@ -1551,6 +1607,14 @@ public class AdminService {
         addIfChanged(changes, "awayGoalkeeperColorNumber", fixture.getAwayGoalkeeperColorNumber(), request.getAwayGoalkeeperColorNumber());
         addIfChanged(changes, "awayGoalkeeperColorBorder", fixture.getAwayGoalkeeperColorBorder(), request.getAwayGoalkeeperColorBorder());
         return changes;
+    }
+
+    private boolean changed(List<FieldChange> changes, String fieldName) {
+        return changes.stream().anyMatch(change -> change.fieldName().equals(fieldName));
+    }
+
+    private <T> T adminValue(List<FieldChange> changes, String fieldName, T baseValue, T requestedValue) {
+        return changed(changes, fieldName) ? requestedValue : baseValue;
     }
 
     private List<FieldChange> changedFixtureLineupFields(
@@ -1653,22 +1717,47 @@ public class AdminService {
 
     private AdminDto.FixtureAdminDetailResponse toFixtureDetailResponse(Fixture fixture) {
         Long fixtureId = fixture.getFixtureId();
+        Long generationId = fixture.getSeason() == null ? null
+                : generationResolver.activeForSeason(fixture.getSeason());
+        if (generationId != null && generationId <= 0) {
+            generationId = null;
+        }
+        Fixture visible = generationId != null
+                ? generationReadStore.findFixture(generationId, fixtureId)
+                        .orElseThrow(() -> new IllegalStateException(
+                                "Published generation is missing fixture " + fixtureId))
+                : fixture;
+        // The edit token still belongs to the managed base row.
+        visible = visible.toBuilder().version(fixture.getVersion()).build();
         return AdminDto.FixtureAdminDetailResponse.builder()
-                .fixture(toFixtureResponse(fixture))
+                .generationId(generationId)
+                .fixture(toFixtureResponse(visible))
                 .eventOverrides(toOverrideResponses(AdminOverrideTargetType.FIXTURE_EVENT, fixtureId))
-                .events(fixtureEventRepository.findAllByFixtureFixtureIdOrderByMatchTimeAsc(fixtureId)
+                .events((generationId != null && !liveChangeStore.changed(
+                        fixture.getSeason(), fixtureId, FixtureDetailLiveChangeStore.Part.EVENT)
+                        ? generationReadStore.findEvents(generationId, visible)
+                        : fixtureEventRepository.findAllByFixtureFixtureIdOrderByMatchTimeAsc(fixtureId))
                         .stream()
                         .map(this::toFixtureEventResponse)
                         .toList())
-                .lineups(fixtureLineupRepository.findAllByFixtureId(fixtureId)
+                .lineups((generationId != null && !liveChangeStore.changed(
+                        fixture.getSeason(), fixtureId, FixtureDetailLiveChangeStore.Part.LINEUP)
+                        ? generationReadStore.findLineups(generationId, visible)
+                        : fixtureLineupRepository.findAllByFixtureId(fixtureId))
                         .stream()
                         .map(this::toFixtureLineupResponse)
                         .toList())
-                .teamStats(fixtureStatRepository.findAllByFixtureFixtureId(fixtureId)
+                .teamStats((generationId != null && !liveChangeStore.changed(
+                        fixture.getSeason(), fixtureId, FixtureDetailLiveChangeStore.Part.TEAM_STAT)
+                        ? generationReadStore.findTeamStats(generationId, visible)
+                        : fixtureStatRepository.findAllByFixtureFixtureId(fixtureId))
                         .stream()
                         .map(this::toFixtureTeamStatResponse)
                         .toList())
-                .playerStats(playerFixtureStatRepository.findAllByFixtureFixtureId(fixtureId)
+                .playerStats((generationId != null && !liveChangeStore.changed(
+                        fixture.getSeason(), fixtureId, FixtureDetailLiveChangeStore.Part.PLAYER_STAT)
+                        ? generationReadStore.findPlayerStats(generationId, visible)
+                        : playerFixtureStatRepository.findAllByFixtureFixtureId(fixtureId))
                         .stream()
                         .map(this::toFixturePlayerStatResponse)
                         .toList())

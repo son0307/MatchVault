@@ -67,6 +67,12 @@ class ApiFootballFixtureStatSyncServiceTest {
                 .thenReturn(List.of(AdminFieldOverride.of(
                         AdminOverrideTargetType.FIXTURE_TEAM_STAT, 101L, "totalShots")));
 
+        FixtureStat draft = service.previewFixtureStats(fixture, List.of(response)).get(0);
+        assertThat(draft).isNotSameAs(entity);
+        assertThat(draft.getTotalShots()).isEqualTo(12);
+        assertThat(draft.getFouls()).isEqualTo(8);
+        assertThat(entity.getFouls()).isEqualTo(3);
+
         int synced = service.syncFixtureStats(fixture, List.of(response));
 
         assertThat(synced).isEqualTo(1);

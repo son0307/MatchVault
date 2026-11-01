@@ -20,6 +20,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.cache.annotation.CacheEvict;
 
 import java.util.List;
+import java.util.ArrayList;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
@@ -125,14 +126,42 @@ public class ApiFootballFixtureStatSyncService {
 
     private void upsertFixtureStat(Fixture fixture, Team team,
                                    List<ApiFootballFixtureStatisticsDto.Statistic> statistics) {
-        Map<String, Object> values = valuesByType(statistics);
-
         FixtureStat entity = fixtureStatRepository
                 .findByFixtureFixtureIdAndTeamTeamId(fixture.getFixtureId(), team.getTeamId())
                 .orElseGet(() -> fixtureStatRepository.save(FixtureStat.builder()
                         .fixture(fixture)
                         .team(team)
                         .build()));
+
+        applyStatValues(entity, statistics);
+    }
+
+    /** Calculates private-generation values on copies, leaving the published JPA entities unchanged. */
+    public List<FixtureStat> previewFixtureStats(
+            Fixture fixture, List<ApiFootballFixtureStatisticsDto.FixtureStatisticsResponse> teamStats) {
+        if (teamStats == null || teamStats.isEmpty()) {
+            return List.of();
+        }
+        List<FixtureStat> drafts = new ArrayList<>();
+        for (ApiFootballFixtureStatisticsDto.FixtureStatisticsResponse teamStat : teamStats) {
+            if (teamStat == null) {
+                throw new IllegalArgumentException("Fixture team statistics contain a null response");
+            }
+            Team team = findTeam(teamStat).orElseThrow(() ->
+                    new IllegalArgumentException("Fixture team statistics refer to an unknown team"));
+            FixtureStat current = fixtureStatRepository
+                    .findByFixtureFixtureIdAndTeamTeamId(fixture.getFixtureId(), team.getTeamId())
+                    .orElseGet(() -> FixtureStat.builder().fixture(fixture).team(team).build());
+            FixtureStat draft = current.toBuilder().build();
+            applyStatValues(draft, teamStat.getStatistics());
+            drafts.add(draft);
+        }
+        return drafts;
+    }
+
+    private void applyStatValues(FixtureStat entity,
+                                 List<ApiFootballFixtureStatisticsDto.Statistic> statistics) {
+        Map<String, Object> values = valuesByType(statistics);
 
         Set<String> overrides = adminOverrideService.overriddenFields(
                 AdminOverrideTargetType.FIXTURE_TEAM_STAT,

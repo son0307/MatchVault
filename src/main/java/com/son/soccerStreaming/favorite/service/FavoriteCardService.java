@@ -1,5 +1,8 @@
 package com.son.soccerStreaming.favorite.service;
 
+import com.son.soccerStreaming.apifootball.service.FixtureDetailGenerationRankingReadStore;
+import com.son.soccerStreaming.apifootball.service.FixtureDetailGenerationReadStore;
+import com.son.soccerStreaming.apifootball.service.FixtureDetailGenerationResolver;
 import com.son.soccerStreaming.favorite.dto.FavoriteDashboardResponseDto;
 import com.son.soccerStreaming.fixture.entity.Fixture;
 import com.son.soccerStreaming.fixture.entity.PlayerFixtureStat;
@@ -27,6 +30,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.util.List;
+import java.util.Comparator;
 
 @Service
 @Transactional(readOnly = true)
@@ -44,10 +48,13 @@ public class FavoriteCardService {
     private final PlayerFixtureStatRepository playerFixtureStatRepository;
     private final PlayerTeamSeasonStatRepository playerTeamSeasonStatRepository;
     private final MediaUrlService mediaUrlService;
+    private final FixtureDetailGenerationResolver generationResolver;
+    private final FixtureDetailGenerationReadStore generationReadStore;
+    private final FixtureDetailGenerationRankingReadStore generationRankingReadStore;
 
     @Cacheable(
             cacheNames = RedisCacheConfig.FAVORITE_TEAM_CARD_CACHE,
-            key = "'v2:team:' + #teamId + ':season:' + #season"
+            key = "'v3:team:' + #teamId + ':season:' + #season + ':generation:' + @fixtureDetailGenerationResolver.activeForSeason(#season) + ':live:' + (@fixtureDetailGenerationResolver.enabled() ? @fixtureDetailGenerationStore.activeLiveRevision(#season) : 0)"
     )
     public FavoriteDashboardResponseDto.TeamCard getTeamCard(Long teamId, Integer season) {
         Team team = teamRepository.findByTeamId(teamId)
@@ -56,24 +63,39 @@ public class FavoriteCardService {
                 .findByTeamTeamIdAndLeagueIdAndSeason(team.getTeamId(), PREMIER_LEAGUE_ID, season)
                 .orElse(null);
         LocalDateTime now = LocalDateTime.now(ZoneOffset.UTC);
-        List<FavoriteDashboardResponseDto.TeamFixture> recentFixtures = fixtureRepository
+        Long generationId = generationResolver.enabled() ? generationResolver.activeForSeason(season) : null;
+        List<Fixture> publishedTeamFixtures = generationId == null ? null
+                : generationReadStore.findRecentFixtures(List.of(generationId), null, season,
+                        null, null, null, teamId, 500);
+        List<FavoriteDashboardResponseDto.TeamFixture> recentFixtures = (publishedTeamFixtures == null
+                ? fixtureRepository
                 .findRecentFinishedByTeam(
                         team.getTeamId(),
                         season,
                         FINISHED_STATUS_SHORTS,
                         PageRequest.of(0, RECENT_TEAM_FIXTURE_LIMIT)
                 )
+                : publishedTeamFixtures.stream()
+                        .filter(this::isFinished)
+                        .sorted(Comparator.comparing(Fixture::getFixtureDate)
+                                .thenComparing(Fixture::getFixtureId).reversed())
+                        .limit(RECENT_TEAM_FIXTURE_LIMIT).toList())
                 .stream()
                 .map(fixture -> toTeamFixture(fixture, team))
                 .toList();
-        FavoriteDashboardResponseDto.TeamFixture nextFixture = fixtureRepository
-                .findNextByTeam(team.getTeamId(), season, now, PageRequest.of(0, 1))
+        FavoriteDashboardResponseDto.TeamFixture nextFixture = (publishedTeamFixtures == null
+                ? fixtureRepository.findNextByTeam(team.getTeamId(), season, now, PageRequest.of(0, 1))
+                : publishedTeamFixtures.stream().filter(fixture -> fixture.getFixtureDate().isAfter(now))
+                        .sorted(Comparator.comparing(Fixture::getFixtureDate)
+                                .thenComparing(Fixture::getFixtureId)).limit(1).toList())
                 .stream()
                 .findFirst()
                 .map(fixture -> toTeamFixture(fixture, team))
                 .orElse(null);
-        FavoriteDashboardResponseDto.LiveTeamFixture liveFixture = fixtureRepository
-                .findLiveByTeam(team.getTeamId(), season, PageRequest.of(0, 1))
+        FavoriteDashboardResponseDto.LiveTeamFixture liveFixture = (publishedTeamFixtures == null
+                ? fixtureRepository.findLiveByTeam(team.getTeamId(), season, PageRequest.of(0, 1))
+                : publishedTeamFixtures.stream().filter(fixture -> "LIVE".equals(fixture.getFixtureStatus()))
+                        .sorted(Comparator.comparing(Fixture::getFixtureDate)).limit(1).toList())
                 .stream()
                 .findFirst()
                 .map(this::toLiveTeamFixture)
@@ -95,18 +117,25 @@ public class FavoriteCardService {
 
     @Cacheable(
             cacheNames = RedisCacheConfig.FAVORITE_PLAYER_CARD_CACHE,
-            key = "'v2:player:' + #playerId + ':season:' + #season"
+            key = "'v3:player:' + #playerId + ':season:' + #season + ':generation:' + @fixtureDetailGenerationResolver.activeForSeason(#season) + ':live:' + (@fixtureDetailGenerationResolver.enabled() ? @fixtureDetailGenerationStore.activeLiveRevision(#season) : 0)"
     )
     public FavoriteDashboardResponseDto.PlayerCard getPlayerCard(Long playerId, Integer season) {
         Player player = playerRepository.findByPlayerId(playerId)
                 .orElseThrow(() -> new CustomException(ErrorCode.PLAYER_NOT_FOUND));
-        PlayerFixtureStat recentMatch = playerFixtureStatRepository
+        Long generationId = generationResolver.enabled() ? generationResolver.activeForSeason(season) : null;
+        PlayerFixtureStat recentMatch = (generationId == null ? playerFixtureStatRepository
                 .findRecentFinishedByPlayerId(player.getPlayerId(), season, FINISHED_STATUS_SHORTS, PageRequest.of(0, 1))
+                : generationReadStore.findPlayerStatsForPlayer(generationId, playerId, season).stream()
+                        .filter(stat -> isFinished(stat.getFixture()))
+                        .sorted(Comparator.comparing((PlayerFixtureStat stat) -> stat.getFixture().getFixtureDate())
+                                .thenComparing(stat -> stat.getFixture().getFixtureId()).reversed())
+                        .limit(1).toList())
                 .stream()
                 .findFirst()
                 .orElse(null);
-        List<PlayerTeamSeasonStat> seasonStats = playerTeamSeasonStatRepository
-                .findAllByPlayerPlayerIdAndSeason(player.getPlayerId(), season);
+        List<PlayerTeamSeasonStat> seasonStats = generationId == null
+                ? playerTeamSeasonStatRepository.findAllByPlayerPlayerIdAndSeason(player.getPlayerId(), season)
+                : generationRankingReadStore.playerSeasonStats(generationId, playerId, season);
 
         return FavoriteDashboardResponseDto.PlayerCard.builder()
                 .playerId(player.getPlayerId())
@@ -117,6 +146,11 @@ public class FavoriteCardService {
                 .recentMatch(recentMatch != null ? toRecentPlayerMatch(recentMatch) : null)
                 .seasonStat(seasonStats.isEmpty() ? null : toPlayerSeasonStat(season, seasonStats))
                 .build();
+    }
+
+    private boolean isFinished(Fixture fixture) {
+        return "FINISHED".equals(fixture.getFixtureStatus())
+                || FINISHED_STATUS_SHORTS.contains(fixture.getStatusShort());
     }
 
     private FavoriteDashboardResponseDto.TeamFixture toTeamFixture(Fixture fixture, Team favoriteTeam) {

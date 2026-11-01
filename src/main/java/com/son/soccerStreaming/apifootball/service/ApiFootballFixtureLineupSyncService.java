@@ -19,6 +19,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.ArrayList;
 import java.util.Optional;
 import java.util.Set;
 
@@ -89,6 +90,70 @@ public class ApiFootballFixtureLineupSyncService {
         return syncedCount;
     }
 
+    /** Updates the fixture draft's tactics and returns detached lineup rows for a private generation. */
+    public List<FixtureLineup> previewLineups(Fixture currentFixture, Fixture fixtureDraft,
+                                               List<ApiFootballLineupDto.LineupResponse> lineups) {
+        if (lineups == null || lineups.isEmpty()) {
+            return List.of();
+        }
+        List<FixtureLineup> drafts = new ArrayList<>();
+        for (ApiFootballLineupDto.LineupResponse response : lineups) {
+            if (response == null) {
+                throw new IllegalArgumentException("Fixture lineup response contains null");
+            }
+            Team team = findTeam(response.getTeam()).orElseThrow(() ->
+                    new IllegalArgumentException("Fixture lineup team is missing"));
+            updateFixtureTactics(fixtureDraft, team, response);
+            previewPlayers(currentFixture, team, response.getStartXI(), true, drafts);
+            previewPlayers(currentFixture, team, response.getSubstitutes(), false, drafts);
+        }
+        return drafts;
+    }
+
+    private void previewPlayers(Fixture fixture, Team team, List<ApiFootballLineupDto.PlayerEntry> entries,
+                                boolean starter, List<FixtureLineup> drafts) {
+        if (entries == null) {
+            return;
+        }
+        for (ApiFootballLineupDto.PlayerEntry entry : entries) {
+            ApiFootballLineupDto.PlayerInfo info = entry != null ? entry.getPlayer() : null;
+            if (info == null || info.getId() == null) {
+                throw new IllegalArgumentException("Fixture lineup player ID is missing");
+            }
+            if (info.getId() <= 0) {
+                log.warn("Skip fixture lineup player with invalid ID. fixtureId={}, playerId={}",
+                        fixture.getFixtureId(), info.getId());
+                continue;
+            }
+            Player player = apiFootballPlayerSyncService.findOrFetchPlayer(
+                    info.getId(), info.getName(), team, info.getNumber(), info.getPos(), null)
+                    .orElseThrow(() -> new IllegalArgumentException("Fixture lineup player is missing: " + info.getId()));
+            FixtureLineup current = fixtureLineupRepository
+                    .findByFixtureFixtureIdAndTeamTeamIdAndPlayerPlayerId(
+                            fixture.getFixtureId(), team.getTeamId(), player.getPlayerId())
+                    .orElseGet(() -> FixtureLineup.builder()
+                            .fixture(fixture).team(team).player(player)
+                            .jerseyNumber(valueOrZero(info.getNumber()))
+                            .position(valueOrUnknown(info.getPos()))
+                            .grid(info.getGrid()).isStarter(starter).build());
+            FixtureLineup draft = current.toBuilder().build();
+            Set<String> overrides = current.getId() == null ? Set.of()
+                    : adminOverrideService.overriddenFields(
+                            AdminOverrideTargetType.FIXTURE_LINEUP, current.getId(), LINEUP_OVERRIDE_FIELDS);
+            draft.updateLineup(
+                    adminOverrideService.apiValueUnlessOverridden(
+                            overrides, "jerseyNumber", draft.getJerseyNumber(), valueOrZero(info.getNumber())),
+                    adminOverrideService.apiValueUnlessOverridden(
+                            overrides, "position", draft.getPosition(), valueOrUnknown(info.getPos())),
+                    adminOverrideService.apiValueUnlessOverridden(
+                            overrides, "grid", draft.getGrid(), info.getGrid()),
+                    adminOverrideService.apiValueUnlessOverridden(
+                            overrides, "starter", draft.isStarter(), starter)
+            );
+            drafts.add(draft);
+        }
+    }
+
     @Transactional
     public int syncLineups(List<Fixture> fixtures) {
         int syncedCount = 0;
@@ -109,8 +174,8 @@ public class ApiFootballFixtureLineupSyncService {
 
         int syncedCount = 0;
         for (ApiFootballLineupDto.PlayerEntry entry : entries) {
-            ApiFootballLineupDto.PlayerInfo playerInfo = entry.getPlayer();
-            if (playerInfo == null || playerInfo.getId() == null) {
+            ApiFootballLineupDto.PlayerInfo playerInfo = entry != null ? entry.getPlayer() : null;
+            if (playerInfo == null || playerInfo.getId() == null || playerInfo.getId() <= 0) {
                 continue;
             }
 

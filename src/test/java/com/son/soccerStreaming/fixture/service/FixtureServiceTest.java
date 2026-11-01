@@ -1,5 +1,9 @@
 package com.son.soccerStreaming.fixture.service;
 
+import com.son.soccerStreaming.apifootball.service.FixtureDetailGenerationReadStore;
+import com.son.soccerStreaming.apifootball.service.FixtureDetailGenerationResolver;
+import com.son.soccerStreaming.apifootball.service.FixtureDetailGenerationStore;
+import com.son.soccerStreaming.apifootball.service.FixtureDetailLiveChangeStore;
 import com.son.soccerStreaming.fixture.dto.FixtureResponseDto;
 import com.son.soccerStreaming.fixture.entity.Fixture;
 import com.son.soccerStreaming.fixture.repository.FixtureRepository;
@@ -22,6 +26,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.never;
 
 @ExtendWith(MockitoExtension.class)
 class FixtureServiceTest {
@@ -30,6 +35,14 @@ class FixtureServiceTest {
     private FixtureRepository fixtureRepository;
     @Mock
     private MediaUrlService mediaUrlService;
+    @Mock
+    private FixtureDetailGenerationResolver generationResolver;
+    @Mock
+    private FixtureDetailGenerationReadStore generationReadStore;
+    @Mock
+    private FixtureDetailGenerationStore generationStore;
+    @Mock
+    private FixtureDetailLiveChangeStore liveChangeStore;
 
     @InjectMocks
     private FixtureService fixtureService;
@@ -66,6 +79,7 @@ class FixtureServiceTest {
                 .build();
 
         when(fixtureRepository.findByFixtureId(100L)).thenReturn(Optional.of(fixture));
+        when(generationResolver.activeForSeason(2025)).thenReturn(null);
         when(mediaUrlService.teamLogoUrl(homeTeam)).thenReturn("home.png");
         when(mediaUrlService.teamLogoUrl(awayTeam)).thenReturn("away.png");
 
@@ -87,6 +101,36 @@ class FixtureServiceTest {
         assertThat(response.getStatusLong()).isEqualTo("Match Finished");
         assertThat(response.getElapsed()).isEqualTo(90);
         assertThat(response.getExtra()).isEqualTo(4);
+    }
+
+    @Test
+    void getFixtureUsesPinnedPublishedGeneration() {
+        Team home = Team.builder().teamId(1L).name("Home").build();
+        Team away = Team.builder().teamId(2L).name("Away").build();
+        Fixture current = Fixture.builder().fixtureId(100L).season(2025)
+                .fixtureDate(LocalDateTime.of(2025, 8, 1, 12, 0))
+                .homeTeam(home).awayTeam(away).homeScore(0).build();
+        Fixture version = current.toBuilder().homeScore(2).build();
+        when(fixtureRepository.findByFixtureId(100L)).thenReturn(Optional.of(current));
+        when(generationResolver.activeForSeason(2025)).thenReturn(7L);
+        when(generationReadStore.findFixture(7L, 100L)).thenReturn(Optional.of(version));
+
+        assertThat(fixtureService.getFixture(100L).getHomeScore()).isEqualTo(2);
+    }
+
+    @Test
+    void getFixtureKeepsNewerLiveFixtureChangeAfterPublication() {
+        Team home = Team.builder().teamId(1L).name("Home").build();
+        Team away = Team.builder().teamId(2L).name("Away").build();
+        Fixture live = Fixture.builder().fixtureId(100L).season(2025)
+                .fixtureDate(LocalDateTime.of(2025, 8, 1, 12, 0))
+                .homeTeam(home).awayTeam(away).homeScore(3).build();
+        when(fixtureRepository.findByFixtureId(100L)).thenReturn(Optional.of(live));
+        when(generationResolver.activeForSeason(2025)).thenReturn(7L);
+        when(generationReadStore.findFixture(7L, 100L)).thenReturn(Optional.of(live));
+
+        assertThat(fixtureService.getFixture(100L).getHomeScore()).isEqualTo(3);
+        verify(generationReadStore).findFixture(7L, 100L);
     }
 
     @Test
@@ -269,5 +313,21 @@ class FixtureServiceTest {
         assertThat(response.getLatestStartedDate()).isEqualTo(LocalDate.of(2023, 5, 1));
         assertThat(response.getMinRound()).isEqualTo(1);
         assertThat(response.getMaxRound()).isEqualTo(38);
+    }
+
+    @Test
+    void recentFixturesAndMetaUsePublishedGenerationWhenEnabled() {
+        when(generationResolver.enabled()).thenReturn(true);
+        when(generationResolver.activeForSeason(2025)).thenReturn(9L);
+        when(generationReadStore.findRecentFixtures(List.of(9L), null, 2025, null,
+                null, null, null, 20)).thenReturn(List.of());
+        when(generationReadStore.meta(9L, 2025)).thenReturn(
+                new FixtureDetailGenerationReadStore.FixtureMeta(
+                        LocalDateTime.of(2025, 8, 1, 12, 0), null, null, 1, 38));
+
+        assertThat(fixtureService.getRecentFixtures(null, 2025, null, null, 20).getContent()).isEmpty();
+        assertThat(fixtureService.getFixtureMeta(2025).getMinRound()).isEqualTo(1);
+        verify(fixtureRepository, never()).findRecentFixturesWithCursor(null, 2025, null,
+                null, null, null, 20);
     }
 }

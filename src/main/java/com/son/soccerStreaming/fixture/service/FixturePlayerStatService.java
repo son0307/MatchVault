@@ -1,5 +1,9 @@
 package com.son.soccerStreaming.fixture.service;
 
+import com.son.soccerStreaming.apifootball.service.FixtureDetailGenerationReadStore;
+import com.son.soccerStreaming.apifootball.service.FixtureDetailGenerationResolver;
+import com.son.soccerStreaming.apifootball.service.FixtureDetailLiveChangeStore;
+import com.son.soccerStreaming.apifootball.service.FixtureDetailAnonymousPlayerStatReader;
 import com.son.soccerStreaming.fixture.dto.FixturePlayerStatResponseDto;
 import com.son.soccerStreaming.fixture.entity.Fixture;
 import com.son.soccerStreaming.fixture.entity.FixtureLineup;
@@ -18,6 +22,7 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Stream;
 
 @Service
 @RequiredArgsConstructor
@@ -26,33 +31,52 @@ public class FixturePlayerStatService {
     private final FixtureRepository fixtureRepository;
     private final PlayerFixtureStatRepository playerFixtureStatRepository;
     private final FixtureLineupRepository fixtureLineupRepository;
+    private final FixtureDetailGenerationResolver generationResolver;
+    private final FixtureDetailGenerationReadStore generationReadStore;
+    private final FixtureDetailLiveChangeStore liveChangeStore;
+    private final FixtureDetailAnonymousPlayerStatReader anonymousPlayerStatReader;
 
     @Transactional(readOnly = true)
     public FixturePlayerStatResponseDto getFixturePlayerStats(Long fixtureId) {
-        Fixture fixture = fixtureRepository.findByFixtureId(fixtureId)
+        Fixture published = fixtureRepository.findByFixtureId(fixtureId)
                 .orElseThrow(() -> new CustomException(ErrorCode.FIXTURE_NOT_FOUND));
-        List<PlayerFixtureStat> stats = playerFixtureStatRepository.findAllByFixtureFixtureId(fixtureId);
-        Map<PlayerFixtureKey, Integer> lineupNumbers = lineupNumbersByPlayer(fixtureId);
+        Long generationId = published.getSeason() == null ? null
+                : generationResolver.activeForSeason(published.getSeason());
+        Fixture fixture = generationId == null ? published : generationReadStore.findFixture(generationId, fixtureId)
+                        .orElseThrow(() -> new IllegalStateException("Published generation is missing fixture " + fixtureId));
+        List<PlayerFixtureStat> stats = generationId == null || liveChangeStore.changed(
+                published.getSeason(), fixtureId, FixtureDetailLiveChangeStore.Part.PLAYER_STAT)
+                ? playerFixtureStatRepository.findAllByFixtureFixtureId(fixtureId)
+                : generationReadStore.findPlayerStats(generationId, fixture);
+        List<FixtureLineup> lineups = generationId == null || liveChangeStore.changed(
+                published.getSeason(), fixtureId, FixtureDetailLiveChangeStore.Part.LINEUP)
+                ? fixtureLineupRepository.findAllByFixtureId(fixtureId)
+                : generationReadStore.findLineups(generationId, fixture);
+        Map<PlayerFixtureKey, Integer> lineupNumbers = lineupNumbersByPlayer(lineups);
+        List<FixtureDetailAnonymousPlayerStatReader.AnonymousPlayerStat> anonymousStats =
+                generationId == null ? List.of() : anonymousPlayerStatReader.findForFixture(generationId, fixtureId);
 
         return FixturePlayerStatResponseDto.builder()
                 .fixtureId(fixtureId)
-                .homeTeam(buildTeamStats(fixture.getHomeTeam(), stats, lineupNumbers))
-                .awayTeam(buildTeamStats(fixture.getAwayTeam(), stats, lineupNumbers))
+                .homeTeam(buildTeamStats(fixture.getHomeTeam(), stats, lineupNumbers, anonymousStats))
+                .awayTeam(buildTeamStats(fixture.getAwayTeam(), stats, lineupNumbers, anonymousStats))
                 .build();
     }
 
     private FixturePlayerStatResponseDto.TeamPlayerStats buildTeamStats(
             Team team,
             List<PlayerFixtureStat> allStats,
-            Map<PlayerFixtureKey, Integer> lineupNumbers
+            Map<PlayerFixtureKey, Integer> lineupNumbers,
+            List<FixtureDetailAnonymousPlayerStatReader.AnonymousPlayerStat> anonymousStats
     ) {
-        List<FixturePlayerStatResponseDto.PlayerStat> players = allStats.stream()
+        List<FixturePlayerStatResponseDto.PlayerStat> players = Stream.concat(allStats.stream()
                 .filter(stat -> stat.getTeam() != null && team.getId().equals(stat.getTeam().getId()))
-                .sorted(Comparator.comparing(
-                        stat -> jerseyNumberOf(stat, lineupNumbers),
-                        Comparator.nullsLast(Integer::compareTo)
-                ))
-                .map(stat -> toPlayerStat(stat, lineupNumbers))
+                .map(stat -> toPlayerStat(stat, lineupNumbers)),
+                anonymousStats.stream()
+                        .filter(stat -> team.getTeamId().equals(stat.teamId()))
+                        .map(FixtureDetailAnonymousPlayerStatReader.AnonymousPlayerStat::stat))
+                .sorted(Comparator.comparing(FixturePlayerStatResponseDto.PlayerStat::getJerseyNumber,
+                        Comparator.nullsLast(Integer::compareTo)))
                 .toList();
 
         return FixturePlayerStatResponseDto.TeamPlayerStats.builder()
@@ -108,9 +132,9 @@ public class FixturePlayerStatService {
                 .build();
     }
 
-    private Map<PlayerFixtureKey, Integer> lineupNumbersByPlayer(Long fixtureId) {
+    private Map<PlayerFixtureKey, Integer> lineupNumbersByPlayer(List<FixtureLineup> lineups) {
         Map<PlayerFixtureKey, Integer> numbers = new HashMap<>();
-        for (FixtureLineup lineup : fixtureLineupRepository.findAllByFixtureId(fixtureId)) {
+        for (FixtureLineup lineup : lineups) {
             if (lineup.getPlayer() == null || lineup.getTeam() == null) {
                 continue;
             }

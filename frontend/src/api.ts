@@ -294,7 +294,7 @@ export type FixtureTeamPlayerStats = {
 };
 
 export type FixturePlayerStat = {
-  playerId: number;
+  playerId: number | null;
   playerName: string | null;
   playerNameKo: string | null;
   jerseyNumber: number | null;

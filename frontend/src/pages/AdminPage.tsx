@@ -121,6 +121,7 @@ type FixtureSummaryAdmin = {
 };
 
 type FixtureDetailAdmin = {
+  generationId: number | null;
   fixture: FixtureAdmin;
   eventOverrides?: AdminOverride[];
   events: FixtureEventAdmin[];
@@ -257,6 +258,14 @@ type SyncJob = {
   startedAt: string | null;
   completedAt: string | null;
   errors: SyncJobError[];
+};
+
+type DeadSyncJob = {
+  streamId: string;
+  jobId: string;
+  task: string;
+  syncKey: string;
+  failedAt: string;
 };
 
 type AdminSyncResponse = {
@@ -540,6 +549,9 @@ export function AdminPage({ authState }: AdminPageProps) {
   const [coverageStatus, setCoverageStatus] = useState<CoverageStatus>("loading");
   const [syncJobs, setSyncJobs] = useState<SyncJob[]>([]);
   const [syncJobsStatus, setSyncJobsStatus] = useState<LoadStatus>("idle");
+  const [deadSyncJobs, setDeadSyncJobs] = useState<DeadSyncJob[]>([]);
+  const [deadSyncJobTotal, setDeadSyncJobTotal] = useState(0);
+  const [deadSyncJobsStatus, setDeadSyncJobsStatus] = useState<LoadStatus>("idle");
   const [cancellingJobId, setCancellingJobId] = useState<number | null>(null);
   const [logs, setLogs] = useState<AuditLog[]>([]);
   const [auditStatus, setAuditStatus] = useState<LoadStatus>("idle");
@@ -575,6 +587,7 @@ export function AdminPage({ authState }: AdminPageProps) {
       void reloadSyncJobs(false);
       if (activeSection === "sync") {
         void reloadSyncStatusesSafely();
+        void reloadDeadSyncJobs();
         void loadSeasonCoverages(setSeasonCoverages, setCoverageStatus);
       }
       if (activeSection === "logs") {
@@ -975,6 +988,18 @@ export function AdminPage({ authState }: AdminPageProps) {
     }
   }
 
+  async function reloadDeadSyncJobs() {
+    setDeadSyncJobsStatus("loading");
+    try {
+      const response = await adminGet<{ total: number; jobs: DeadSyncJob[] }>("/api/v1/admin/sync/jobs/dead");
+      setDeadSyncJobs(response.jobs ?? []);
+      setDeadSyncJobTotal(response.total ?? 0);
+      setDeadSyncJobsStatus("ready");
+    } catch {
+      setDeadSyncJobsStatus("error");
+    }
+  }
+
   async function cancelSyncJob(job: SyncJob) {
     if (job.status !== "QUEUED" && job.status !== "RUNNING") {
       return;
@@ -1245,7 +1270,7 @@ export function AdminPage({ authState }: AdminPageProps) {
     }
   }
 
-  async function saveFixture(event: FormEvent<HTMLFormElement>) {
+  async function saveFixture(event: FormEvent<HTMLFormElement>, changedFields: string[] = []) {
     event.preventDefault();
     if (!selectedFixture) {
       return;
@@ -1254,7 +1279,7 @@ export function AdminPage({ authState }: AdminPageProps) {
     await saveFixturePayload(
       fixtureId,
       `/api/v1/admin/fixtures/${fixtureId}`,
-      { ...formBody(event.currentTarget, fixtureFields), version: selectedFixture.fixture.version },
+      { ...formBody(event.currentTarget, fixtureFields), version: selectedFixture.fixture.version, changedFields },
       "경기 기본 정보를 저장했습니다.",
     );
   }
@@ -1273,7 +1298,7 @@ export function AdminPage({ authState }: AdminPageProps) {
       if (!canSaveFixture(fixtureId)) {
         throw new Error("현재 열려 있는 경기와 저장 대상이 일치하지 않습니다. 경기를 다시 선택해주세요.");
       }
-      const updated = await adminJson<FixtureDetailAdmin>(url, method, body);
+      const updated = await adminJson<FixtureDetailAdmin>(url, method, body, selectedFixture?.generationId);
       clearApiMemoryCache();
       if (canSaveFixture(fixtureId) && updated.fixture.fixtureId === fixtureId) {
         setFixtureSelection({ fixtureId, status: "ready", detail: updated });
@@ -1832,8 +1857,8 @@ export function AdminPage({ authState }: AdminPageProps) {
         <div className="admin-sync-jobs" aria-live="polite">
           <div className="admin-sync-jobs-heading">
             <strong>백그라운드 동기화 작업</strong>
-            <button type="button" className="section-retry-button" disabled={syncJobsStatus === "loading"} onClick={() => void reloadSyncJobs(false)}>
-              {syncJobsStatus === "loading" ? <LoaderCircle className="admin-loading-icon" aria-hidden="true" /> : null}
+            <button type="button" className="section-retry-button" disabled={syncJobsStatus === "loading" || deadSyncJobsStatus === "loading"} onClick={() => { void reloadSyncJobs(false); void reloadDeadSyncJobs(); }}>
+              {syncJobsStatus === "loading" || deadSyncJobsStatus === "loading" ? <LoaderCircle className="admin-loading-icon" aria-hidden="true" /> : null}
               새로고침
             </button>
           </div>
@@ -1862,6 +1887,29 @@ export function AdminPage({ authState }: AdminPageProps) {
             onCancel={cancelSyncJob}
             collapsible
           />
+          <details className="admin-sync-job-section admin-sync-job-section-collapsible">
+            <summary>
+              <h4>실패 스트림 <span>{deadSyncJobsStatus === "ready" ? deadSyncJobTotal : "?"}</span></h4>
+              <ChevronDown size={18} aria-hidden="true" />
+            </summary>
+            {deadSyncJobsStatus === "loading" && deadSyncJobs.length === 0 ? <p className="muted admin-sync-job-empty">실패 작업을 불러오는 중입니다.</p> : null}
+            {deadSyncJobsStatus === "error" ? <p className="admin-inline-error">실패 스트림을 불러오지 못했습니다.</p> : null}
+            {deadSyncJobsStatus === "ready" && deadSyncJobs.length === 0 ? <p className="muted admin-sync-job-empty">최종 실패한 작업이 없습니다.</p> : null}
+            {deadSyncJobsStatus === "ready" && deadSyncJobs.length > 0 ? <p className="muted admin-sync-job-empty">최근 {deadSyncJobs.length}건 · 작업 실행 3회 실패 후 이동한 내역</p> : null}
+            {deadSyncJobs.map((job) => (
+              <article className="admin-sync-job failed" key={job.streamId}>
+                <div className="admin-sync-job-heading">
+                  <div>
+                    <strong>{syncTaskLabel(job.task)}</strong>
+                    <span>작업 ID: {job.jobId}</span>
+                  </div>
+                  <span className="status-pill">최종 실패</span>
+                </div>
+                <p className="muted">대상: {job.syncKey}</p>
+                <p className="muted">실패 스트림 이동: {formatDateTime(job.failedAt)}</p>
+              </article>
+            ))}
+          </details>
         </div>
         {coverageStatus === "error" ? (
           <p className="muted admin-sync-message">시즌 지원 범위를 불러오지 못해 수동 동기화 요청을 잠시 막았습니다.</p>
@@ -2262,12 +2310,31 @@ function AdminForm({
   onClearOverrides?: () => void;
   onClearOverride?: (fieldName: string) => void;
   submitLabel: string;
-  onSubmit: (event: FormEvent<HTMLFormElement>) => void;
+  onSubmit: (event: FormEvent<HTMLFormElement>, changedFields?: string[]) => void;
   disabled?: boolean;
 }) {
   const overrideSet = new Set((overrides ?? []).map((override) => override.fieldName));
+  const editedFields = useRef(new Set<string>());
+
+  useEffect(() => {
+    editedFields.current.clear();
+  }, [value.fixtureId, value.version]);
+
   return (
-    <form className="admin-edit-form" onSubmit={onSubmit}>
+    <form
+      className="admin-edit-form"
+      onChangeCapture={(event) => {
+        const input = event.nativeEvent.target;
+        if (!(input instanceof HTMLInputElement || input instanceof HTMLSelectElement)) {
+          return;
+        }
+        const fieldName = input.dataset.fieldName || input.name;
+        if (fields.some((field) => field.name === fieldName)) {
+          editedFields.current.add(fieldName);
+        }
+      }}
+      onSubmit={(event) => onSubmit(event, [...editedFields.current])}
+    >
       <h3>{title}</h3>
       <AdminOverrideStatus
         overrides={overrides}
@@ -2351,7 +2418,7 @@ function FixtureEditor({
   disabled,
 }: {
   detail: FixtureDetailAdmin;
-  onSaveFixture: (event: FormEvent<HTMLFormElement>) => void;
+  onSaveFixture: (event: FormEvent<HTMLFormElement>, changedFields?: string[]) => void;
   onSavePayload: (fixtureId: number, url: string, body: Record<string, unknown>, successMessage: string, method?: string) => Promise<void>;
   disabled?: boolean;
 }) {
@@ -2934,6 +3001,7 @@ function ColorPreviewField({ field, value, overridden }: { field: FieldConfig; v
         />
         <input
           className={`admin-color-preview${pickerColor ? "" : " empty"}`}
+          data-field-name={field.name}
           type="color"
           value={pickerColor || "#ffffff"}
           onChange={(event) => setColorCode(event.target.value.replace("#", "").toUpperCase())}
@@ -3295,10 +3363,13 @@ async function adminGet<T>(url: string, init: RequestInit = {}): Promise<T> {
   return adminRequest<T>(url, { ...init, method: "GET" });
 }
 
-async function adminJson<T>(url: string, method: string, body?: unknown): Promise<T> {
+async function adminJson<T>(url: string, method: string, body?: unknown, generationId?: number | null): Promise<T> {
   return adminRequest<T>(url, {
     method,
-    headers: body === undefined ? undefined : { "Content-Type": "application/json" },
+    headers: {
+      ...(body === undefined ? {} : { "Content-Type": "application/json" }),
+      ...(generationId == null ? {} : { "X-Fixture-Generation": String(generationId) }),
+    },
     body: body === undefined ? undefined : JSON.stringify(body),
   });
 }

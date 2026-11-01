@@ -1,5 +1,8 @@
 package com.son.soccerStreaming.favorite.service;
 
+import com.son.soccerStreaming.apifootball.service.FixtureDetailGenerationRankingReadStore;
+import com.son.soccerStreaming.apifootball.service.FixtureDetailGenerationReadStore;
+import com.son.soccerStreaming.apifootball.service.FixtureDetailGenerationResolver;
 import com.son.soccerStreaming.fixture.entity.Fixture;
 import com.son.soccerStreaming.fixture.repository.FixtureRepository;
 import com.son.soccerStreaming.fixture.repository.PlayerFixtureStatRepository;
@@ -44,6 +47,12 @@ class FavoriteCardServiceTest {
     private PlayerTeamSeasonStatRepository playerTeamSeasonStatRepository;
     @Mock
     private MediaUrlService mediaUrlService;
+    @Mock
+    private FixtureDetailGenerationResolver generationResolver;
+    @Mock
+    private FixtureDetailGenerationReadStore generationReadStore;
+    @Mock
+    private FixtureDetailGenerationRankingReadStore generationRankingReadStore;
 
     @InjectMocks
     private FavoriteCardService favoriteCardService;

@@ -16,7 +16,7 @@ import lombok.*;
                 @Index(name = "idx_player_team_season_stat_league_season", columnList = "league_id, season")
         })
 @Getter
-@Builder
+@Builder(toBuilder = true)
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @AllArgsConstructor(access = AccessLevel.PROTECTED)
 public class PlayerTeamSeasonStat {

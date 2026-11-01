@@ -88,6 +88,17 @@ sequenceDiagram
 
 ## 동기화 작업 처리 순서
 
+시즌 경기 상세 세대 정리 기능을 배포할 때는 새 애플리케이션을 켜기 전에 기존 DB에
+[`sql/fixture-detail-generation-cleanup.sql`](../sql/fixture-detail-generation-cleanup.sql)을 한 번 적용한다.
+이 SQL은 공개 작업 영수증의 세대 외래 키만 제거한다. 영수증 행은 남아 있어 늦게 재전달된
+Redis 작업의 중복 공개를 방지한다. SQL이 빠지면 정리 트랜잭션은 외래 키 오류로 롤백된다.
+
+세대 정리 스케줄러는 세대 조회·배치·정리 설정이 모두 켜져 있을 때 매일 02:30(Asia/Seoul)에
+실행한다. 실패 세대는 7일 뒤, 이전 공개 세대는 최근 2개를 남기고 교체된 지 7일이 지난 뒤
+삭제한다. 한 번에 최대 5개 세대를 각각 별도 트랜잭션으로 정리하고 현재 공개 세대는 제외한다.
+실행 시각과 보관 정책은 `FIXTURE_DETAIL_GENERATION_CLEANUP_*` 설정으로 조정할 수 있으며,
+7일·2개보다 작은 값은 적용하지 않는다.
+
 ### 발행
 
 - 스케줄러와 시작 시 동기화 Runner는 Redis 큐가 켜져 있을 때 작업을 직접 실행하지 않고 [SyncJobPublisher](../src/main/java/com/son/soccerStreaming/apifootball/service/SyncJobPublisher.java)에 전달한다. `task`, `syncKey`, `league`·`season` 인자를 담은 [SyncQueueMessage](../src/main/java/com/son/soccerStreaming/apifootball/service/SyncQueueMessage.java)와 [SyncJobPayload](../src/main/java/com/son/soccerStreaming/apifootball/service/SyncJobPayload.java)를 사용한다. 예약 작업 ID에는 시간 단위를 잘라 만든 실행 시각을 포함한다.

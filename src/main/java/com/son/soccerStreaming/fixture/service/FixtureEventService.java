@@ -1,5 +1,8 @@
 package com.son.soccerStreaming.fixture.service;
 
+import com.son.soccerStreaming.apifootball.service.FixtureDetailGenerationReadStore;
+import com.son.soccerStreaming.apifootball.service.FixtureDetailGenerationResolver;
+import com.son.soccerStreaming.apifootball.service.FixtureDetailLiveChangeStore;
 import com.son.soccerStreaming.fixture.dto.FixtureEventResponseDto;
 import com.son.soccerStreaming.fixture.entity.FixtureEvent;
 import com.son.soccerStreaming.player.entity.Player;
@@ -22,15 +25,25 @@ public class FixtureEventService {
     private final FixtureRepository fixtureRepository;
     private final FixtureEventRepository fixtureEventRepository;
     private final MediaUrlService mediaUrlService;
+    private final FixtureDetailGenerationResolver generationResolver;
+    private final FixtureDetailGenerationReadStore generationReadStore;
+    private final FixtureDetailLiveChangeStore liveChangeStore;
 
     @Transactional(readOnly = true)
     public FixtureEventResponseDto getFixtureEvents(Long fixtureId) {
-        if (fixtureRepository.findByFixtureId(fixtureId).isEmpty()) {
-            throw new CustomException(ErrorCode.FIXTURE_NOT_FOUND);
-        }
+        var publishedFixture = fixtureRepository.findByFixtureId(fixtureId)
+                .orElseThrow(() -> new CustomException(ErrorCode.FIXTURE_NOT_FOUND));
+        Long generationId = publishedFixture.getSeason() == null ? null
+                : generationResolver.activeForSeason(publishedFixture.getSeason());
 
-        List<FixtureEventResponseDto.Event> events = fixtureEventRepository
-                .findAllByFixtureFixtureIdOrderByMatchTimeAsc(fixtureId)
+        List<FixtureEvent> source = generationId == null || liveChangeStore.changed(
+                publishedFixture.getSeason(), fixtureId, FixtureDetailLiveChangeStore.Part.EVENT)
+                ? fixtureEventRepository.findAllByFixtureFixtureIdOrderByMatchTimeAsc(fixtureId)
+                : generationReadStore.findEvents(generationId,
+                        generationReadStore.findFixture(generationId, fixtureId)
+                                .orElseThrow(() -> new IllegalStateException(
+                                        "Published generation is missing fixture " + fixtureId)));
+        List<FixtureEventResponseDto.Event> events = source
                 .stream()
                 .map(this::toEvent)
                 .toList();
