@@ -5,6 +5,8 @@ import com.son.soccerStreaming.admin.entity.AdminSyncJob;
 import com.son.soccerStreaming.admin.entity.AdminSyncJobStatus;
 import com.son.soccerStreaming.admin.service.AdminSyncJobService;
 import com.son.soccerStreaming.admin.service.AdminSyncTaskRunner;
+import com.son.soccerStreaming.apifootball.entity.ScheduledSyncJob;
+import com.son.soccerStreaming.apifootball.entity.ScheduledSyncJobStatus;
 import com.son.soccerStreaming.fixture.entity.Fixture;
 import com.son.soccerStreaming.fixture.repository.FixtureRepository;
 import com.son.soccerStreaming.live.service.LiveFixtureBroadcastService;
@@ -38,6 +40,7 @@ public class RedisSyncJobWorker implements SmartLifecycle {
     private final ObjectMapper objectMapper;
     private final ApiFootballSyncExecutionGuard guard;
     private final AdminSyncJobService adminJobs;
+    private final ScheduledSyncJobService scheduledJobs;
     private final AdminSyncTaskRunner adminRunner;
     private final ApiFootballSyncStatusService syncStatus;
     private final LeagueSeasonCoverageSyncService seasons;
@@ -77,6 +80,10 @@ public class RedisSyncJobWorker implements SmartLifecycle {
                 publisher.publishAdmin(job.getId(), job.getTask(),
                         ApiFootballSyncExecutionGuard.key(job.getTask(), job.getDetails()), job.getQueuePayload());
             }
+        }
+        for (ScheduledSyncJob job : scheduledJobs.recoverableJobs()) {
+            publisher.publishRecorded(new SyncQueueMessage(
+                    job.getJobId(), job.getTask(), job.getSyncKey(), job.getPayload()));
         }
     }
 
@@ -190,8 +197,20 @@ public class RedisSyncJobWorker implements SmartLifecycle {
 
     void process(RedisSyncJobStream.QueuedSyncJob job) {
         SyncQueueMessage message = job.message();
+        boolean scheduled = !message.jobId().startsWith("admin-");
+        ScheduledSyncJob scheduledJob = scheduled ? scheduledJobs.find(message.jobId()).orElse(null) : null;
+        if (scheduledJob != null && scheduledJob.getStatus() == ScheduledSyncJobStatus.FAILED) {
+            stream.deadLetter(job);
+            return;
+        }
+        if (scheduledJob != null && scheduledJob.getStatus() == ScheduledSyncJobStatus.SUCCEEDED) {
+            acknowledge(job);
+            return;
+        }
         if (stream.completed(message.jobId())) {
-            if (message.jobId().startsWith("admin-") && adminJobActive(message.jobId())) {
+            if ((message.jobId().startsWith("admin-") && adminJobActive(message.jobId()))
+                    || (scheduledJob != null && (scheduledJob.getStatus() == ScheduledSyncJobStatus.QUEUED
+                    || scheduledJob.getStatus() == ScheduledSyncJobStatus.RUNNING))) {
                 // A previous worker may have acknowledged a job whose DB status never became terminal.
                 stream.clearCompleted(message.jobId());
             } else {
@@ -206,7 +225,13 @@ public class RedisSyncJobWorker implements SmartLifecycle {
                     if (message.jobId().startsWith("admin-")) {
                         runAdmin(message, payload);
                     } else {
-                        runScheduled(message.task(), payload, message.jobId());
+                        if (scheduledJob == null || scheduledJobs.start(message.jobId())) {
+                            runScheduled(message.task(), payload, message.jobId());
+                            ApiFootballSyncExecutionGuard.checkCurrentLease();
+                            if (scheduledJob != null) {
+                                scheduledJobs.succeed(message.jobId());
+                            }
+                        }
                     }
                 } catch (SyncLockLostException exception) {
                     throw exception;
@@ -223,10 +248,17 @@ public class RedisSyncJobWorker implements SmartLifecycle {
             // Leave the delivery pending so another worker can reclaim it after its idle timeout.
             throw exception;
         } catch (Exception exception) {
+            // A DB completion followed by a Redis failure must be ACKed on redelivery, not retried as a job failure.
+            if (scheduledJob != null && scheduledJobs.find(message.jobId())
+                    .map(ScheduledSyncJob::getStatus).orElse(null) == ScheduledSyncJobStatus.SUCCEEDED) {
+                throw new IllegalStateException("Scheduled job completed in DB but Redis cleanup failed", exception);
+            }
             if (!message.jobId().startsWith("admin-")) {
                 recordSyncFailure(message.task(), message.payload(), exception);
             }
-            long failures = stream.recordFailure(job.id());
+            long failures = scheduledJob == null
+                    ? stream.recordFailure(job.id())
+                    : scheduledJobs.fail(message.jobId(), (int) MAX_FAILURES);
             log.error("Redis sync job failed. jobId={}, attempt={}", message.jobId(), failures, exception);
             if (failures >= MAX_FAILURES) {
                 if (message.jobId().startsWith("admin-")) {

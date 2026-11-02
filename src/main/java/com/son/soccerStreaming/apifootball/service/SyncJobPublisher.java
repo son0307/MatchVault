@@ -5,6 +5,7 @@ import tools.jackson.databind.ObjectMapper;
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Component;
 
 import java.time.Instant;
@@ -14,6 +15,7 @@ import java.time.temporal.ChronoUnit;
 @RequiredArgsConstructor
 public class SyncJobPublisher {
     private final RedisSyncJobStream stream;
+    private final ScheduledSyncJobService scheduledJobs;
     private final ObjectMapper objectMapper;
 
     @Value("${api-football.sync.redis-queue.enabled:false}")
@@ -47,9 +49,22 @@ public class SyncJobPublisher {
     }
 
     public void publishScheduled(String task, String syncKey, SyncJobPayload payload, ChronoUnit period) {
-        stream.ensureConsumerGroup();
         Instant occurrence = Instant.now().truncatedTo(period);
         String id = task + ":" + syncKey + ":" + occurrence;
-        stream.addScheduledOnce(new SyncQueueMessage(id, task, syncKey, payload(payload)));
+        SyncQueueMessage message = new SyncQueueMessage(id, task, syncKey, payload(payload));
+        try {
+            scheduledJobs.enqueue(message);
+        } catch (DataIntegrityViolationException exception) {
+            if (scheduledJobs.alreadyQueued(message)) {
+                return;
+            }
+            throw exception;
+        }
+        publishRecorded(message);
+    }
+
+    public void publishRecorded(SyncQueueMessage message) {
+        stream.ensureConsumerGroup();
+        stream.addScheduledOnce(message);
     }
 }

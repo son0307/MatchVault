@@ -5,6 +5,8 @@ import com.son.soccerStreaming.admin.service.AdminSyncJobService;
 import com.son.soccerStreaming.admin.service.AdminSyncTaskRunner;
 import com.son.soccerStreaming.admin.entity.AdminSyncJob;
 import com.son.soccerStreaming.admin.entity.AdminSyncJobStatus;
+import com.son.soccerStreaming.apifootball.entity.ScheduledSyncJob;
+import com.son.soccerStreaming.apifootball.entity.ScheduledSyncJobStatus;
 import com.son.soccerStreaming.auth.entity.AppUser;
 import com.son.soccerStreaming.fixture.repository.FixtureRepository;
 import com.son.soccerStreaming.live.service.LiveFixtureBroadcastService;
@@ -15,6 +17,7 @@ import org.springframework.context.support.GenericApplicationContext;
 
 import java.time.Duration;
 import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -22,6 +25,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
@@ -49,7 +53,7 @@ class RedisSyncJobWorkerTest {
             return true;
         });
         RedisSyncJobWorker worker = new RedisSyncJobWorker(stream, mock(SyncJobPublisher.class),
-                new ObjectMapper(), guard, mock(AdminSyncJobService.class), mock(AdminSyncTaskRunner.class),
+                new ObjectMapper(), guard, mock(AdminSyncJobService.class), mock(ScheduledSyncJobService.class), mock(AdminSyncTaskRunner.class),
                 mock(ApiFootballSyncStatusService.class),
                 mock(LeagueSeasonCoverageSyncService.class), teams, mock(ApiFootballStandingSyncService.class),
                 mock(ApiFootballFixtureSyncService.class), mock(ApiFootballFixtureDetailSyncService.class),
@@ -64,6 +68,101 @@ class RedisSyncJobWorkerTest {
         verify(teams).syncTeams(39, 2025);
         verify(stream).markCompleted(message.jobId());
         verify(stream).acknowledgeScheduled(queued);
+    }
+
+    @Test
+    void completedScheduledJobIsAcknowledgedWithoutExecutingAgain() {
+        RedisSyncJobStream stream = mock(RedisSyncJobStream.class);
+        ScheduledSyncJobService scheduledJobs = mock(ScheduledSyncJobService.class);
+        ScheduledSyncJob saved = mock(ScheduledSyncJob.class);
+        ApiFootballTeamSyncService teams = mock(ApiFootballTeamSyncService.class);
+        var message = new SyncQueueMessage("teams:2025-01-01", "teams", "teams:39",
+                "{\"league\":39,\"season\":2025}");
+        var queued = new RedisSyncJobStream.QueuedSyncJob(RecordId.of("1-0"), message);
+        when(scheduledJobs.find(message.jobId())).thenReturn(Optional.of(saved));
+        when(saved.getStatus()).thenReturn(ScheduledSyncJobStatus.SUCCEEDED);
+        RedisSyncJobWorker worker = new RedisSyncJobWorker(stream, mock(SyncJobPublisher.class),
+                new ObjectMapper(), mock(ApiFootballSyncExecutionGuard.class), mock(AdminSyncJobService.class),
+                scheduledJobs, mock(AdminSyncTaskRunner.class), mock(ApiFootballSyncStatusService.class),
+                mock(LeagueSeasonCoverageSyncService.class), teams, mock(ApiFootballStandingSyncService.class),
+                mock(ApiFootballFixtureSyncService.class), mock(ApiFootballFixtureDetailSyncService.class),
+                mock(ApiFootballPlayerSyncService.class), mock(ApiFootballInjurySyncService.class),
+                mock(FixtureRepository.class), mock(LiveFixtureBroadcastService.class));
+
+        worker.process(queued);
+
+        verify(stream).acknowledgeScheduled(queued);
+        verify(teams, never()).syncTeams(39, 2025);
+    }
+
+    @Test
+    void recordedScheduledJobFinishesInDatabaseBeforeRedisAcknowledgement() {
+        RedisSyncJobStream stream = mock(RedisSyncJobStream.class);
+        ScheduledSyncJobService scheduledJobs = mock(ScheduledSyncJobService.class);
+        ScheduledSyncJob saved = mock(ScheduledSyncJob.class);
+        ApiFootballSyncExecutionGuard guard = mock(ApiFootballSyncExecutionGuard.class);
+        ApiFootballTeamSyncService teams = mock(ApiFootballTeamSyncService.class);
+        var message = new SyncQueueMessage("teams:2025-01-01", "teams", "teams:39",
+                "{\"league\":39,\"season\":2025}");
+        var queued = new RedisSyncJobStream.QueuedSyncJob(RecordId.of("1-0"), message);
+        when(scheduledJobs.find(message.jobId())).thenReturn(Optional.of(saved));
+        when(saved.getStatus()).thenReturn(ScheduledSyncJobStatus.QUEUED);
+        when(scheduledJobs.start(message.jobId())).thenReturn(true);
+        when(guard.executeIfAvailable(eq(message.syncKey()), any())).thenAnswer(invocation -> {
+            ((Runnable) invocation.getArgument(1)).run();
+            return true;
+        });
+        RedisSyncJobWorker worker = new RedisSyncJobWorker(stream, mock(SyncJobPublisher.class),
+                new ObjectMapper(), guard, mock(AdminSyncJobService.class), scheduledJobs,
+                mock(AdminSyncTaskRunner.class), mock(ApiFootballSyncStatusService.class),
+                mock(LeagueSeasonCoverageSyncService.class), teams, mock(ApiFootballStandingSyncService.class),
+                mock(ApiFootballFixtureSyncService.class), mock(ApiFootballFixtureDetailSyncService.class),
+                mock(ApiFootballPlayerSyncService.class), mock(ApiFootballInjurySyncService.class),
+                mock(FixtureRepository.class), mock(LiveFixtureBroadcastService.class));
+
+        worker.process(queued);
+
+        var order = inOrder(scheduledJobs, teams, stream);
+        order.verify(scheduledJobs).start(message.jobId());
+        order.verify(teams).syncTeams(39, 2025);
+        order.verify(scheduledJobs).succeed(message.jobId());
+        order.verify(stream).markCompleted(message.jobId());
+        order.verify(stream).acknowledgeScheduled(queued);
+    }
+
+    @Test
+    void scheduledJobFailureUsesDatabaseAttemptsAndMovesFinalFailureToDeadStream() {
+        RedisSyncJobStream stream = mock(RedisSyncJobStream.class);
+        ScheduledSyncJobService scheduledJobs = mock(ScheduledSyncJobService.class);
+        ScheduledSyncJob saved = mock(ScheduledSyncJob.class);
+        ApiFootballSyncExecutionGuard guard = mock(ApiFootballSyncExecutionGuard.class);
+        ApiFootballTeamSyncService teams = mock(ApiFootballTeamSyncService.class);
+        var message = new SyncQueueMessage("teams:2025-01-01", "teams", "teams:39",
+                "{\"league\":39,\"season\":2025}");
+        var queued = new RedisSyncJobStream.QueuedSyncJob(RecordId.of("1-0"), message);
+        when(scheduledJobs.find(message.jobId())).thenReturn(Optional.of(saved));
+        when(saved.getStatus()).thenReturn(ScheduledSyncJobStatus.RUNNING);
+        when(scheduledJobs.start(message.jobId())).thenReturn(true);
+        when(scheduledJobs.fail(message.jobId(), 3)).thenReturn(3);
+        when(guard.executeIfAvailable(eq(message.syncKey()), any())).thenAnswer(invocation -> {
+            ((Runnable) invocation.getArgument(1)).run();
+            return true;
+        });
+        org.mockito.Mockito.doThrow(new IllegalStateException("provider error"))
+                .when(teams).syncTeams(39, 2025);
+        RedisSyncJobWorker worker = new RedisSyncJobWorker(stream, mock(SyncJobPublisher.class),
+                new ObjectMapper(), guard, mock(AdminSyncJobService.class), scheduledJobs,
+                mock(AdminSyncTaskRunner.class), mock(ApiFootballSyncStatusService.class),
+                mock(LeagueSeasonCoverageSyncService.class), teams, mock(ApiFootballStandingSyncService.class),
+                mock(ApiFootballFixtureSyncService.class), mock(ApiFootballFixtureDetailSyncService.class),
+                mock(ApiFootballPlayerSyncService.class), mock(ApiFootballInjurySyncService.class),
+                mock(FixtureRepository.class), mock(LiveFixtureBroadcastService.class));
+
+        worker.process(queued);
+
+        verify(scheduledJobs).fail(message.jobId(), 3);
+        verify(stream).deadLetter(queued);
+        verify(stream, never()).recordFailure(queued.id());
     }
 
     @Test
@@ -86,7 +185,7 @@ class RedisSyncJobWorkerTest {
                 "{\"season\":2025}");
         var queued = new RedisSyncJobStream.QueuedSyncJob(RecordId.of("25-0"), message);
         RedisSyncJobWorker worker = new RedisSyncJobWorker(stream, mock(SyncJobPublisher.class),
-                new ObjectMapper(), guard, adminJobs, mock(AdminSyncTaskRunner.class),
+                new ObjectMapper(), guard, adminJobs, mock(ScheduledSyncJobService.class), mock(AdminSyncTaskRunner.class),
                 mock(ApiFootballSyncStatusService.class), mock(LeagueSeasonCoverageSyncService.class),
                 mock(ApiFootballTeamSyncService.class), mock(ApiFootballStandingSyncService.class),
                 mock(ApiFootballFixtureSyncService.class), mock(ApiFootballFixtureDetailSyncService.class),
@@ -111,7 +210,7 @@ class RedisSyncJobWorkerTest {
         when(guard.executeIfAvailable(eq("teams:39"), any()))
                 .thenThrow(new SyncLockLostException(RedisSyncJobWorker.ACTIVE_WORKER_KEY));
         RedisSyncJobWorker worker = new RedisSyncJobWorker(stream, mock(SyncJobPublisher.class),
-                new ObjectMapper(), guard, mock(AdminSyncJobService.class), mock(AdminSyncTaskRunner.class),
+                new ObjectMapper(), guard, mock(AdminSyncJobService.class), mock(ScheduledSyncJobService.class), mock(AdminSyncTaskRunner.class),
                 mock(ApiFootballSyncStatusService.class), mock(LeagueSeasonCoverageSyncService.class),
                 mock(ApiFootballTeamSyncService.class), mock(ApiFootballStandingSyncService.class),
                 mock(ApiFootballFixtureSyncService.class), mock(ApiFootballFixtureDetailSyncService.class),
@@ -146,7 +245,7 @@ class RedisSyncJobWorkerTest {
             return true;
         }).when(guard).executeIfAvailable(eq("teams:39"), any());
         RedisSyncJobWorker worker = new RedisSyncJobWorker(stream, mock(SyncJobPublisher.class),
-                new ObjectMapper(), guard, adminJobs, mock(AdminSyncTaskRunner.class),
+                new ObjectMapper(), guard, adminJobs, mock(ScheduledSyncJobService.class), mock(AdminSyncTaskRunner.class),
                 mock(ApiFootballSyncStatusService.class), mock(LeagueSeasonCoverageSyncService.class),
                 mock(ApiFootballTeamSyncService.class), mock(ApiFootballStandingSyncService.class),
                 mock(ApiFootballFixtureSyncService.class), mock(ApiFootballFixtureDetailSyncService.class),
@@ -222,7 +321,7 @@ class RedisSyncJobWorkerTest {
             return List.of();
         });
         RedisSyncJobWorker worker = new RedisSyncJobWorker(stream, mock(SyncJobPublisher.class),
-                new ObjectMapper(), green, mock(AdminSyncJobService.class), mock(AdminSyncTaskRunner.class),
+                new ObjectMapper(), green, mock(AdminSyncJobService.class), mock(ScheduledSyncJobService.class), mock(AdminSyncTaskRunner.class),
                 mock(ApiFootballSyncStatusService.class), mock(LeagueSeasonCoverageSyncService.class),
                 mock(ApiFootballTeamSyncService.class), mock(ApiFootballStandingSyncService.class),
                 mock(ApiFootballFixtureSyncService.class), mock(ApiFootballFixtureDetailSyncService.class),
