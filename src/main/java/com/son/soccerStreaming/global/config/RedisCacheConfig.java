@@ -1,15 +1,22 @@
 package com.son.soccerStreaming.global.config;
 
+import io.micrometer.core.instrument.MeterRegistry;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.cache.CacheManager;
 import org.springframework.cache.annotation.EnableCaching;
 import org.springframework.cache.annotation.CachingConfigurer;
 import org.springframework.cache.interceptor.CacheErrorHandler;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Primary;
+import org.springframework.core.env.Environment;
+import org.springframework.core.env.Profiles;
 import org.springframework.data.redis.cache.RedisCacheConfiguration;
 import org.springframework.data.redis.cache.RedisCacheManager;
 import org.springframework.data.redis.cache.RedisCacheWriter;
 import org.springframework.data.redis.connection.RedisConnectionFactory;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.serializer.GenericJacksonJsonRedisSerializer;
 import org.springframework.data.redis.serializer.RedisSerializationContext;
 import org.springframework.data.redis.serializer.StringRedisSerializer;
@@ -46,13 +53,28 @@ public class RedisCacheConfig implements CachingConfigurer {
     }
 
     @Bean(name = RANKINGS_CACHE_MANAGER)
-    public RedisCacheManager rankingsCacheManager(RedisConnectionFactory connectionFactory) {
-        RedisCacheWriter cacheWriter = RedisCacheWriter.lockingRedisCacheWriter(connectionFactory);
+    public CacheManager rankingsCacheManager(RedisConnectionFactory connectionFactory,
+                                            @Qualifier("cacheManager") RedisCacheManager defaultManager,
+                                            StringRedisTemplate redis,
+                                            MeterRegistry meterRegistry,
+                                            Environment environment,
+                                            @Value("${ranking.cache.baseline-nonlocking:false}") boolean baselineNonLocking,
+                                            @Value("${ranking.cache.lock-ttl:60s}") Duration lockTtl,
+                                            @Value("${ranking.cache.max-wait:10s}") Duration maxWait,
+                                            @Value("${ranking.cache.fallback-permits:2}") int fallbackPermits) {
+        if (baselineNonLocking) {
+            if (!environment.acceptsProfiles(Profiles.of("local"))) {
+                throw new IllegalStateException("Non-locking ranking baseline is only available in the local profile");
+            }
+            return defaultManager;
+        }
+        RedisCacheWriter cacheWriter = RedisCacheWriter.nonLockingRedisCacheWriter(connectionFactory);
         RedisCacheConfiguration defaultConfig = defaultCacheConfiguration();
 
-        return RedisCacheManager.builder(cacheWriter)
+        RedisCacheManager delegate = RedisCacheManager.builder(cacheWriter)
                 .cacheDefaults(defaultConfig)
                 .build();
+        return new RankingCacheManager(delegate, redis, meterRegistry, lockTtl, maxWait, fallbackPermits);
     }
 
     private RedisCacheConfiguration defaultCacheConfiguration() {

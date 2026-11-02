@@ -1,0 +1,50 @@
+# 순위 캐시 부하 테스트
+
+2026-11-02 로컬 50 VU 실행 결과는 [결과 기록](results-2026-11-02.md)에 정리했다.
+
+`ranking-cache.js`는 1 VU당 1회 요청하는 버스트를 만든다. 기본값은 50 VU, 시즌 `2025,2024,2026`, 로컬 `http://127.0.0.1:8080`이다. `ranking_request_duration`과 `ranking_request_failed`는 준비 단계의 시즌 목록·팀 순위 조회를 제외하고 실제 순위 요청만 집계한다.
+
+```powershell
+$env:BASE_URL='http://127.0.0.1:8080'
+$env:SEASONS='2025,2024,2026'
+$env:VUS='50'
+k6 run -e TEST_CASE=same-key -e SEASONS=2025 performance-tests/ranking-cache.js
+k6 run -e TEST_CASE=mixed-season performance-tests/ranking-cache.js
+k6 run -e TEST_CASE=mixed-team -e TEAMS_PER_SEASON=4 performance-tests/ranking-cache.js
+k6 run -e TEST_CASE=mixed-all -e TEAMS_PER_SEASON=4 performance-tests/ranking-cache.js
+```
+
+| 테스트 | 요청 분포 | 확인할 점 |
+| --- | --- | --- |
+| `same-key` | 모든 VU가 같은 시즌의 리그 선수 순위 | 이전 2025 단일 키 테스트와 비교, 동일 키 집계 중복 여부 |
+| `mixed-season` | 시즌별 리그 선수 순위 | 같은 캐시 이름의 다른 키가 서로 막지 않는지 |
+| `mixed-team` | 시즌별 상위 N팀의 선수 순위 | 일부 VU는 같은 키를 공유하고, 다른 팀 키는 병렬로 계산되는지 |
+| `mixed-all` | 리그 선수·리그 팀·팀 선수 순위 혼합 | 서로 다른 캐시와 키가 겹칠 때 응답 지연과 실패율 |
+
+`mixed-team`과 `mixed-all`은 준비 단계에 `/api/v1/teams/standings?season=...`을 호출해 실제 팀 ID를 얻는다. 팀이 2개 미만인 시즌은 실패시킨다. 응답이 비어 있으면 해당 시즌에 집계 데이터가 없는 것으로 보고 `ranking has data` 검증이 실패한다.
+
+**cold-cache 결과**는 해당 순위 키가 비어 있을 때만 해석한다. 같은 테스트를 반복하면 캐시가 채워져 warm-cache 결과가 된다. 키 삭제나 Redis 초기화는 이 스크립트에 넣지 않았다. 기존 문서의 2025 결과와 비교하려면 동일한 데이터량·서버·DB 조건을 맞추고, 요청 대상 키의 캐시 상태를 확인한다. 현재 순위 캐시의 값 TTL은 10분이다.
+
+로컬 Redis(`127.0.0.1:6379`)에서만 순위 캐시를 cold 상태로 만들려면 아래처럼 세대 번호를 올린다. 다른 Redis 키를 삭제하지 않고, 이전 세대의 캐시 값은 TTL이 끝날 때까지 남는다. 공유 환경에서는 실행하지 않는다.
+
+```powershell
+python performance-tests/bump-ranking-cache-epoch.py leaguePlayerRankings
+python performance-tests/bump-ranking-cache-epoch.py teamPlayerRankings leagueTeamRankings
+```
+
+## 비잠금형 기준선과 비교
+
+로컬 프로필에서만 `--ranking.cache.baseline-nonlocking=true` 프로그램 인자로 서버를 시작하면 순위 조회도 실제 기본 `cacheManager`를 사용한다. `@Cacheable(sync = true)`와 캐시 값 TTL은 유지된다. 비교용 서버를 실행하기 전에 기존 8080 서버를 종료하고 같은 DB·Redis·JVM 조건을 유지한다. 테스트 후에는 인자를 제거하고 다시 시작한다.
+
+비잠금형 기준선에는 세대 번호가 적용되지 않으므로, 버스트 직전에 아래 명령으로 **로컬 Redis의 선택한 순위 캐시 엔트리만** 제거한다. `--clear-baseline` 없이 실행하면 현재 키별 잠금 방식의 세대 번호를 올린다. 두 방식 모두 실행 직전에 cold 상태로 만들고 같은 `TEST_CASE`, `SEASONS`, `VUS`를 사용한다.
+
+```powershell
+python performance-tests/bump-ranking-cache-epoch.py --clear-baseline leaguePlayerRankings
+k6 run -e TEST_CASE=same-key -e SEASONS=2025 -e VUS=50 performance-tests/ranking-cache.js
+```
+
+`--inspect`는 키를 바꾸지 않고 기본 매니저의 raw 키와 키별 잠금 매니저의 세대 키 개수만 보여 준다. 비잠금형 비교를 마친 뒤에는 프로그램 인자를 제거하고 로컬 서버를 재시작한다.
+
+비잠금형 모드는 동일 키의 중복 집계로 DB에 부하를 줄 수 있다. 이전 기록의 50 VU를 상한으로 사용하고, 먼저 10 VU로 서버 상태를 확인한다. 비교할 때는 k6의 `ranking_request_duration`, 실패율과 함께 DB 커넥션·CPU, 서버의 집계 실행 횟수를 기록한다.
+
+기록할 값은 `ranking_request_duration`의 p95/p99/최대, `ranking_request_failed`, HTTP 503 건수, `ranking has data` 실패, 서버의 `ranking.cache.load`와 `ranking.cache.wait` 분포, `ranking.cache.fallback_rejected` 건수다. k6의 HTTP 지연만으로 집계 실행 횟수를 증명할 수는 없다. 서버 메트릭을 함께 수집해야 한다.

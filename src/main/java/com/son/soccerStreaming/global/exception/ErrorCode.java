@@ -41,6 +41,7 @@ public enum ErrorCode {
     NEWS_ARTICLE_NOT_FOUND(HttpStatus.NOT_FOUND, "해당 팀의 뉴스 기사를 찾을 수 없습니다."),
 
     // 503 SERVICE_UNAVAILABLE
+    RANKING_CACHE_BUSY(HttpStatus.SERVICE_UNAVAILABLE, "순위 정보를 준비 중입니다. 잠시 후 다시 시도해 주세요."),
     ADMIN_MEDIA_STORAGE_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "이미지 저장소를 사용할 수 없습니다."),
     NEWS_REFRESH_FAILED(HttpStatus.BAD_GATEWAY, "뉴스를 새로고침하지 못했습니다. 잠시 후 다시 시도해 주세요."),
     NEWS_TRANSLATION_FAILED(HttpStatus.BAD_GATEWAY, "뉴스 제목을 번역하지 못했습니다. 잠시 후 다시 시도해 주세요."),
