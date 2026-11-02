@@ -11,6 +11,7 @@ import org.springframework.mock.env.MockEnvironment;
 import java.time.Duration;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
 
 class RedisCacheConfigBaselineTest {
@@ -40,12 +41,12 @@ class RedisCacheConfigBaselineTest {
     }
 
     @Test
-    void temporaryBaselineUsesDefaultManagerInProdProfile() {
+    void baselineCannotBeEnabledOutsideLocalProfile() {
         MockEnvironment environment = new MockEnvironment();
         environment.setActiveProfiles("prod");
-        CacheManager selected = config.rankingsCacheManager(connectionFactory, defaultManager, redis,
-                metrics, environment, true, Duration.ofSeconds(60), Duration.ofSeconds(10), 2);
-
-        assertThat(selected).isSameAs(defaultManager);
+        assertThatThrownBy(() -> config.rankingsCacheManager(connectionFactory, defaultManager, redis,
+                metrics, environment, true,
+                Duration.ofSeconds(60), Duration.ofSeconds(10), 2))
+                .isInstanceOf(IllegalStateException.class);
     }
 }
