@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+      - codex/ranking-cache-30s-comparison
   workflow_dispatch:
 
 permissions:
