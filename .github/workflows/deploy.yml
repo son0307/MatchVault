@@ -133,3 +133,7 @@ jobs:
       - name: Run remote deployment
         run: |
           ssh -o ServerAliveInterval=30 -o ServerAliveCountMax=120 -i ~/.ssh/match-vault_deploy_key -p "$SSH_PORT" "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}" "bash -s" "$DEPLOY_PATH" "$GITHUB_SHA" < deploy/scripts/deploy-production.sh
+
+      - name: Verify internal Hikari metrics
+        run: |
+          ssh -i ~/.ssh/match-vault_deploy_key -p "$SSH_PORT" "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}" "bash -s" "$DEPLOY_PATH" < deploy/scripts/verify-hikari-metrics.sh
