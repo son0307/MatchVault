@@ -40,13 +40,15 @@ public class PlayerTeamSeasonStatAggregationService {
             @CacheEvict(
                     cacheManager = RedisCacheConfig.RANKINGS_CACHE_MANAGER,
                     cacheNames = RedisCacheConfig.TEAM_PLAYER_RANKINGS_CACHE,
-                    allEntries = true
+                    allEntries = true,
+                    condition = "@fixtureDetailGenerationResolver.activeForSeason(#season) == null"
             ),
             @CacheEvict(cacheNames = RedisCacheConfig.FAVORITE_PLAYER_CARD_CACHE, allEntries = true),
             @CacheEvict(
                     cacheManager = RedisCacheConfig.RANKINGS_CACHE_MANAGER,
                     cacheNames = RedisCacheConfig.LEAGUE_PLAYER_RANKINGS_CACHE,
-                    allEntries = true
+                    allEntries = true,
+                    condition = "@fixtureDetailGenerationResolver.activeForSeason(#season) == null"
             )
     })
     @Transactional
@@ -71,13 +73,15 @@ public class PlayerTeamSeasonStatAggregationService {
             @CacheEvict(
                     cacheManager = RedisCacheConfig.RANKINGS_CACHE_MANAGER,
                     cacheNames = RedisCacheConfig.TEAM_PLAYER_RANKINGS_CACHE,
-                    allEntries = true
+                    allEntries = true,
+                    condition = "@fixtureDetailGenerationResolver.activeForSeason(#season) == null"
             ),
             @CacheEvict(cacheNames = RedisCacheConfig.FAVORITE_PLAYER_CARD_CACHE, allEntries = true),
             @CacheEvict(
                     cacheManager = RedisCacheConfig.RANKINGS_CACHE_MANAGER,
                     cacheNames = RedisCacheConfig.LEAGUE_PLAYER_RANKINGS_CACHE,
-                    allEntries = true
+                    allEntries = true,
+                    condition = "@fixtureDetailGenerationResolver.activeForSeason(#season) == null"
             )
     })
     @Transactional(propagation = Propagation.REQUIRES_NEW)

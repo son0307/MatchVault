@@ -37,6 +37,8 @@ class ApiFootballFixturePlayerStatSyncServiceTest {
     @Mock private TeamRepository teamRepository;
     @Mock private ApiFootballPlayerSyncService playerSyncService;
     @Mock private AdminFieldOverrideRepository adminFieldOverrideRepository;
+    @Mock private FixtureDetailGenerationResolver generationResolver;
+    @Mock private com.son.soccerStreaming.global.config.RankingCacheInvalidationService rankingCacheInvalidationService;
 
     @Test
     void preservesOverriddenPlayerStatEvenWhenApiNormalizationWouldClearIt() {
@@ -47,11 +49,13 @@ class ApiFootballFixturePlayerStatSyncServiceTest {
                 playerFixtureStatRepository,
                 teamRepository,
                 playerSyncService,
-                overrideService
+                overrideService,
+                generationResolver,
+                rankingCacheInvalidationService
         );
         Team team = Team.builder().teamId(42L).name("Arsenal").build();
         Player player = Player.builder().playerId(10L).name("Player").build();
-        Fixture fixture = Fixture.builder().fixtureId(1000L).build();
+        Fixture fixture = Fixture.builder().fixtureId(1000L).season(2025).build();
         PlayerFixtureStat entity = PlayerFixtureStat.builder()
                 .id(201L)
                 .fixture(fixture)
@@ -89,6 +93,7 @@ class ApiFootballFixturePlayerStatSyncServiceTest {
                 eq(AdminOverrideTargetType.FIXTURE_PLAYER_STAT), eq(201L), anyCollection()))
                 .thenReturn(List.of(AdminFieldOverride.of(
                         AdminOverrideTargetType.FIXTURE_PLAYER_STAT, 201L, "goals")));
+        when(generationResolver.activeForSeason(2025)).thenReturn(29L);
 
         PlayerFixtureStat draft = service.previewPlayerStats(fixture, List.of(response)).get(0);
         assertThat(draft).isNotSameAs(entity);
@@ -102,13 +107,15 @@ class ApiFootballFixturePlayerStatSyncServiceTest {
         assertThat(entity.getGoals()).isEqualTo(2);
         assertThat(entity.getMinutesPlayed()).isNull();
         assertThat(entity.getRating()).isEqualTo(8.0);
+        verifyNoInteractions(rankingCacheInvalidationService);
     }
 
     @Test
     void skipsPlaceholderPlayerIdInPrivateStats() {
         ApiFootballFixturePlayerStatSyncService service = new ApiFootballFixturePlayerStatSyncService(
                 apiFootballClient, fixtureRepository, playerFixtureStatRepository,
-                teamRepository, playerSyncService, new AdminOverrideService(adminFieldOverrideRepository));
+                teamRepository, playerSyncService, new AdminOverrideService(adminFieldOverrideRepository),
+                generationResolver, rankingCacheInvalidationService);
         Team team = Team.builder().teamId(42L).build();
         Fixture fixture = Fixture.builder().fixtureId(1000L).build();
         ApiFootballLiveDto.TeamInfo teamInfo = new ApiFootballLiveDto.TeamInfo();

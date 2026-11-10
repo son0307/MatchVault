@@ -6,6 +6,7 @@ import com.son.soccerStreaming.admin.entity.AdminOverrideTargetType;
 import com.son.soccerStreaming.admin.service.AdminOverrideService;
 import com.son.soccerStreaming.fixture.entity.Fixture;
 import com.son.soccerStreaming.global.config.RedisCacheConfig;
+import com.son.soccerStreaming.global.config.RankingCacheInvalidationService;
 import com.son.soccerStreaming.player.entity.Player;
 import com.son.soccerStreaming.fixture.entity.PlayerFixtureStat;
 import com.son.soccerStreaming.team.entity.Team;
@@ -17,7 +18,6 @@ import com.son.soccerStreaming.team.repository.TeamRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cache.annotation.CacheEvict;
-import org.springframework.cache.annotation.Caching;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -37,6 +37,8 @@ public class ApiFootballFixturePlayerStatSyncService {
     private final TeamRepository teamRepository;
     private final ApiFootballPlayerSyncService apiFootballPlayerSyncService;
     private final AdminOverrideService adminOverrideService;
+    private final FixtureDetailGenerationResolver generationResolver;
+    private final RankingCacheInvalidationService rankingCacheInvalidationService;
     private static final List<String> OVERRIDE_FIELDS = List.of(
             "minutesPlayed", "rating", "captain", "substitute", "goals", "assists", "conceded",
             "saves", "shotsTotal", "shotsOnTarget", "passesTotal", "passesKey", "passesAccurate",
@@ -46,19 +48,7 @@ public class ApiFootballFixturePlayerStatSyncService {
             "penaltyMissed", "penaltySaved"
     );
 
-    @Caching(evict = {
-            @CacheEvict(
-                    cacheManager = RedisCacheConfig.RANKINGS_CACHE_MANAGER,
-                    cacheNames = RedisCacheConfig.TEAM_PLAYER_RANKINGS_CACHE,
-                    allEntries = true
-            ),
-            @CacheEvict(cacheNames = RedisCacheConfig.FAVORITE_PLAYER_CARD_CACHE, allEntries = true),
-            @CacheEvict(
-                    cacheManager = RedisCacheConfig.RANKINGS_CACHE_MANAGER,
-                    cacheNames = RedisCacheConfig.LEAGUE_PLAYER_RANKINGS_CACHE,
-                    allEntries = true
-            )
-    })
+    @CacheEvict(cacheNames = RedisCacheConfig.FAVORITE_PLAYER_CARD_CACHE, allEntries = true)
     @Transactional
     public int syncPlayerStats(Long fixtureId) {
         Fixture fixture = fixtureRepository.findByFixtureId(fixtureId)
@@ -68,19 +58,7 @@ public class ApiFootballFixturePlayerStatSyncService {
         return syncPlayerStats(fixture, teamStats);
     }
 
-    @Caching(evict = {
-            @CacheEvict(
-                    cacheManager = RedisCacheConfig.RANKINGS_CACHE_MANAGER,
-                    cacheNames = RedisCacheConfig.TEAM_PLAYER_RANKINGS_CACHE,
-                    allEntries = true
-            ),
-            @CacheEvict(cacheNames = RedisCacheConfig.FAVORITE_PLAYER_CARD_CACHE, allEntries = true),
-            @CacheEvict(
-                    cacheManager = RedisCacheConfig.RANKINGS_CACHE_MANAGER,
-                    cacheNames = RedisCacheConfig.LEAGUE_PLAYER_RANKINGS_CACHE,
-                    allEntries = true
-            )
-    })
+    @CacheEvict(cacheNames = RedisCacheConfig.FAVORITE_PLAYER_CARD_CACHE, allEntries = true)
     @Transactional
     public int syncPlayerStats(Long fixtureId, List<ApiFootballLiveDto.FixturePlayersResponse> teamStats) {
         Fixture fixture = fixtureRepository.findByFixtureId(fixtureId)
@@ -88,19 +66,7 @@ public class ApiFootballFixturePlayerStatSyncService {
         return syncPlayerStats(fixture, teamStats);
     }
 
-    @Caching(evict = {
-            @CacheEvict(
-                    cacheManager = RedisCacheConfig.RANKINGS_CACHE_MANAGER,
-                    cacheNames = RedisCacheConfig.TEAM_PLAYER_RANKINGS_CACHE,
-                    allEntries = true
-            ),
-            @CacheEvict(cacheNames = RedisCacheConfig.FAVORITE_PLAYER_CARD_CACHE, allEntries = true),
-            @CacheEvict(
-                    cacheManager = RedisCacheConfig.RANKINGS_CACHE_MANAGER,
-                    cacheNames = RedisCacheConfig.LEAGUE_PLAYER_RANKINGS_CACHE,
-                    allEntries = true
-            )
-    })
+    @CacheEvict(cacheNames = RedisCacheConfig.FAVORITE_PLAYER_CARD_CACHE, allEntries = true)
     @Transactional
     public int syncPlayerStats(Fixture fixture, List<ApiFootballLiveDto.FixturePlayersResponse> teamStats) {
         if (teamStats == null || teamStats.isEmpty()) {
@@ -122,22 +88,17 @@ public class ApiFootballFixturePlayerStatSyncService {
             }
         }
 
+        // Published generations are invalidated after projection commits. Seasons without
+        // a generation still read the base tables, so invalidate them after this commit.
+        Integer season = fixture.getSeason();
+        if (syncedCount > 0 && season != null && generationResolver.activeForSeason(season) == null) {
+            rankingCacheInvalidationService.invalidateAfterCommit(season);
+        }
+
         return syncedCount;
     }
 
-    @Caching(evict = {
-            @CacheEvict(
-                    cacheManager = RedisCacheConfig.RANKINGS_CACHE_MANAGER,
-                    cacheNames = RedisCacheConfig.TEAM_PLAYER_RANKINGS_CACHE,
-                    allEntries = true
-            ),
-            @CacheEvict(cacheNames = RedisCacheConfig.FAVORITE_PLAYER_CARD_CACHE, allEntries = true),
-            @CacheEvict(
-                    cacheManager = RedisCacheConfig.RANKINGS_CACHE_MANAGER,
-                    cacheNames = RedisCacheConfig.LEAGUE_PLAYER_RANKINGS_CACHE,
-                    allEntries = true
-            )
-    })
+    @CacheEvict(cacheNames = RedisCacheConfig.FAVORITE_PLAYER_CARD_CACHE, allEntries = true)
     @Transactional
     public int syncPlayerStats(List<Fixture> fixtures) {
         int syncedCount = 0;
