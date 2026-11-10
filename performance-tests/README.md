@@ -26,6 +26,17 @@ k6 run -e BASE_URL=https://matchvault.site -e SEASONS=2026 -e TARGET=league-play
 
 2026-11-02 로컬 50 VU 실행 결과는 [결과 기록](results-2026-11-02.md)에 정리했다.
 
+## 운영 Hikari 커넥션 기록
+
+이 테스트 브랜치의 운영 프로필은 Actuator `health,metrics`를 노출한다. 앱 포트는 `127.0.0.1`에만 바인딩되고 Nginx는 `/actuator/metrics`를 프록시하지 않는다. 배포 묶음의 `monitoring/record-hikari.py`가 Nginx의 활성 백엔드 포트(8082 또는 8083)를 읽어 Hikari `active`, `pending`, `max`를 CSV에 기록한다. Oracle Cloud 인스턴스에서 테스트 직전에 다음 명령을 실행하고, `Recording` 메시지가 보이면 별도 터미널에서 캐시를 비운 뒤 부하 테스트를 시작한다.
+
+```bash
+python3 /opt/match-vault/current/monitoring/record-hikari.py \
+  --seconds 45 --interval 0.1 --output "$HOME/hikari-test.csv"
+```
+
+CSV의 최대 `active`와 `pending`을 집계 로그 시간대와 비교한다. 실험 후에는 메트릭 노출 설정이 없는 배포로 되돌린다.
+
 `ranking-cache.js`는 1 VU당 1회 요청하는 버스트를 만든다. 기본값은 50 VU, 시즌 `2025,2024,2026`, 로컬 `http://127.0.0.1:8080`이다. `ranking_request_duration`과 `ranking_request_failed`는 준비 단계의 시즌 목록·팀 순위 조회를 제외하고 실제 순위 요청만 집계한다.
 
 ```powershell

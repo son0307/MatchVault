@@ -111,9 +111,10 @@ jobs:
 
       - name: Prepare release bundle
         run: |
-          mkdir -p release/backend release/frontend
+          mkdir -p release/backend release/frontend release/monitoring
           cp artifacts/backend/*.jar release/backend/app.jar
           cp -R artifacts/frontend/. release/frontend/
+          cp performance-tests/record-hikari-prod.py release/monitoring/record-hikari.py
           tar -czf match-vault-release.tar.gz -C release .
 
       - name: Configure SSH
