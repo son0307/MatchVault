@@ -102,6 +102,7 @@ export default function (data) {
     : `/api/v1/leagues/39/${endpoint === 'league-player' ? 'player-rankings' : 'team-rankings'}?season=${season}`;
   const response = http.get(`${baseUrl}${path}`, {
     timeout: '25s',
+    headers: { Accept: 'application/json', 'Accept-Encoding': 'gzip' },
     tags: { test_case: testCase, endpoint, season: String(season) },
   });
   const tags = { test_case: testCase, endpoint, season: String(season) };

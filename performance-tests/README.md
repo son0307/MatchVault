@@ -37,6 +37,19 @@ python3 /opt/match-vault/current/monitoring/record-hikari.py \
 
 CSV의 최대 `active`와 `pending`을 집계 로그 시간대와 비교한다. 실험 후에는 메트릭 노출 설정이 없는 배포로 되돌린다.
 
+### 2026 리그 선수 순위 콜드 캐시 버스트
+
+`ranking-cache.js`의 `same-key` 모드는 VU마다 리그 선수 순위 한 키를 정확히 1회 요청한다. 요청은 `Accept-Encoding: gzip`을 포함하고, 클라이언트 타임아웃은 25초다. 아래 첫 실험은 기본 설정인 키별 잠금형 100 VU다. `setup()`은 시즌 목록만 확인하므로 순위 캐시를 채우지 않는다.
+
+1. Oracle Cloud 인스턴스에서 위 CSV 기록을 시작하고, `top`에서 `mysqld` CPU를 관찰한다.
+2. 테스트할 순위 캐시를 만료 처리한다. 키별 잠금형은 `match-vault:ranking-cache:epoch:leaguePlayerRankings`의 세대를 증가시킨다.
+3. 만료 직후 아래 k6 명령을 실행한다. 테스트 시간 범위의 집계 로그와 CSV를 보관한다.
+4. 250 VU 및 비잠금형을 측정할 때도 매 실행 전에 같은 순서로 기록과 캐시 만료를 반복한다.
+
+```powershell
+k6 run -e BASE_URL=https://matchvault.site -e TEST_CASE=same-key -e SEASONS=2026 -e VUS=100 performance-tests/ranking-cache.js
+```
+
 `ranking-cache.js`는 1 VU당 1회 요청하는 버스트를 만든다. 기본값은 50 VU, 시즌 `2025,2024,2026`, 로컬 `http://127.0.0.1:8080`이다. `ranking_request_duration`과 `ranking_request_failed`는 준비 단계의 시즌 목록·팀 순위 조회를 제외하고 실제 순위 요청만 집계한다.
 
 ```powershell
