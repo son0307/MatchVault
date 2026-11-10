@@ -2,7 +2,7 @@
 
 ## Oracle 100→250 VU 혼합 조회 비교 브랜치
 
-`codex/ranking-cache-mixed-ramp-baseline`은 비교를 위해 순위 캐시의 기본값을 비잠금형으로 설정한 임시 브랜치다. 배포 후 `ranking.cache.baseline-nonlocking`을 별도로 지정하지 않으면 기본 `cacheManager`를 사용한다. 잠금형으로 되돌릴 때는 이 값을 `false`로 지정하거나 키별 잠금 배포 커밋을 다시 배포한다. 이 브랜치의 세 순위 서비스는 캐시 미스 후 집계 메서드가 실행될 때 `Ranking aggregation started.` 로그를 남긴다.
+`codex/ranking-cache-mixed-ramp-baseline`은 비교용 임시 브랜치다. 첫 실험 커밋 `594c268`은 순위 캐시의 기본값을 비잠금형으로 설정했고, 다음 커밋부터는 기본값을 키별 잠금형으로 되돌렸다. 두 커밋 모두 세 순위 서비스가 캐시 미스 후 집계 메서드를 실행할 때 `Ranking aggregation started.` 로그를 남긴다. 로컬 프로필 제한은 이 브랜치에서 제거했으므로 `ranking.cache.baseline-nonlocking=true`를 운영 프로필에 지정하면 비잠금형으로 전환할 수 있다.
 
 `ranking-cache-ramp.js`는 기존 단일 키 `stampede` 모드와 동일한 100 VU 20초 → 1초 증가 → 250 VU 10초 → 1초 감소 패턴을 3회 반복한다. 기본 조회 대상은 리그 39의 2024·2025·2026 시즌이며, 시즌마다 리그 선수 순위·리그 팀 순위·상위 4개 팀의 선수 순위를 순환한다. 준비 단계는 순위 API를 호출하지 않으며, 선택된 팀 ID를 시작 시 출력한다.
 
