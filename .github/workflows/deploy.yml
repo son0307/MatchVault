@@ -110,9 +110,10 @@ jobs:
 
       - name: Prepare release bundle
         run: |
-          mkdir -p release/backend release/frontend
+          mkdir -p release/backend release/frontend release/monitoring
           cp artifacts/backend/*.jar release/backend/app.jar
           cp -R artifacts/frontend/. release/frontend/
+          cp performance-tests/record-hikari-prod.py release/monitoring/record-hikari.py
           tar -czf match-vault-release.tar.gz -C release .
 
       - name: Configure SSH
@@ -131,3 +132,7 @@ jobs:
       - name: Run remote deployment
         run: |
           ssh -o ServerAliveInterval=30 -o ServerAliveCountMax=120 -i ~/.ssh/match-vault_deploy_key -p "$SSH_PORT" "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}" "bash -s" "$DEPLOY_PATH" "$GITHUB_SHA" < deploy/scripts/deploy-production.sh
+
+      - name: Verify internal Hikari metrics
+        run: |
+          ssh -i ~/.ssh/match-vault_deploy_key -p "$SSH_PORT" "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}" "bash -s" "$DEPLOY_PATH" < deploy/scripts/verify-hikari-metrics.sh

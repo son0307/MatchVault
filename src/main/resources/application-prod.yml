@@ -88,3 +88,9 @@ logging:
       max-file-size: ${LOG_MAX_FILE_SIZE:100MB}
       max-history: ${LOG_MAX_HISTORY:30}
       total-size-cap: ${LOG_TOTAL_SIZE_CAP:5GB}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,metrics
