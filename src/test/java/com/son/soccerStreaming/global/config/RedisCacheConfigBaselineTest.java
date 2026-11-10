@@ -27,7 +27,7 @@ class RedisCacheConfigBaselineTest {
         MockEnvironment environment = new MockEnvironment();
         environment.setActiveProfiles("local");
         CacheManager selected = config.rankingsCacheManager(connectionFactory, defaultManager, redis,
-                metrics, environment, true, Duration.ofSeconds(60), Duration.ofSeconds(10), 2);
+                metrics, environment, true, "per-key", Duration.ofSeconds(60), Duration.ofSeconds(10), 2);
 
         assertThat(selected).isSameAs(defaultManager);
     }
@@ -35,9 +35,22 @@ class RedisCacheConfigBaselineTest {
     @Test
     void normalModeKeepsPerKeyLocking() {
         CacheManager selected = config.rankingsCacheManager(connectionFactory, defaultManager, redis,
-                metrics, new MockEnvironment(), false, Duration.ofSeconds(60), Duration.ofSeconds(10), 2);
+                metrics, new MockEnvironment(), false, "per-key", Duration.ofSeconds(60), Duration.ofSeconds(10), 2);
 
         assertThat(selected).isInstanceOf(RankingCacheManager.class);
+    }
+
+    @Test
+    void comparisonModesSelectTheExpectedRedisManagers() {
+        CacheManager nonLocking = config.rankingsCacheManager(connectionFactory, defaultManager, redis,
+                metrics, new MockEnvironment(), false, "non-locking",
+                Duration.ofSeconds(60), Duration.ofSeconds(10), 2);
+        CacheManager nameLocking = config.rankingsCacheManager(connectionFactory, defaultManager, redis,
+                metrics, new MockEnvironment(), false, "name-locking",
+                Duration.ofSeconds(60), Duration.ofSeconds(10), 2);
+
+        assertThat(nonLocking).isSameAs(defaultManager);
+        assertThat(nameLocking).isInstanceOf(RedisCacheManager.class).isNotSameAs(defaultManager);
     }
 
     @Test
@@ -45,7 +58,7 @@ class RedisCacheConfigBaselineTest {
         MockEnvironment environment = new MockEnvironment();
         environment.setActiveProfiles("prod");
         assertThatThrownBy(() -> config.rankingsCacheManager(connectionFactory, defaultManager, redis,
-                metrics, environment, true,
+                metrics, environment, true, "per-key",
                 Duration.ofSeconds(60), Duration.ofSeconds(10), 2))
                 .isInstanceOf(IllegalStateException.class);
     }

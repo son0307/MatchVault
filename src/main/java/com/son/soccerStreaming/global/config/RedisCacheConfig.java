@@ -59,6 +59,7 @@ public class RedisCacheConfig implements CachingConfigurer {
                                             MeterRegistry meterRegistry,
                                             Environment environment,
                                             @Value("${ranking.cache.baseline-nonlocking:false}") boolean baselineNonLocking,
+                                            @Value("${ranking.cache.comparison-mode:non-locking}") String comparisonMode,
                                             @Value("${ranking.cache.lock-ttl:60s}") Duration lockTtl,
                                             @Value("${ranking.cache.max-wait:10s}") Duration maxWait,
                                             @Value("${ranking.cache.fallback-permits:2}") int fallbackPermits) {
@@ -67,6 +68,17 @@ public class RedisCacheConfig implements CachingConfigurer {
                 throw new IllegalStateException("Non-locking ranking baseline is only available in the local profile");
             }
             return defaultManager;
+        }
+        if ("non-locking".equals(comparisonMode)) {
+            return defaultManager;
+        }
+        if ("name-locking".equals(comparisonMode)) {
+            return RedisCacheManager.builder(RedisCacheWriter.lockingRedisCacheWriter(connectionFactory))
+                    .cacheDefaults(defaultCacheConfiguration())
+                    .build();
+        }
+        if (!"per-key".equals(comparisonMode)) {
+            throw new IllegalArgumentException("Unknown ranking cache comparison mode: " + comparisonMode);
         }
         RedisCacheWriter cacheWriter = RedisCacheWriter.nonLockingRedisCacheWriter(connectionFactory);
         RedisCacheConfiguration defaultConfig = defaultCacheConfiguration();
