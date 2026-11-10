@@ -1,5 +1,11 @@
 # 순위 캐시 부하 테스트
 
+## 캐시 이름 단위 잠금 비교 브랜치
+
+`codex/ranking-cache-name-lock-comparison`은 키별 잠금 비교 커밋 `d1ea96f`에서 갈라져 순위 전용 매니저를 `LockingRedisCacheWriter`로 바꾼 임시 브랜치다. 일반 조회 캐시는 non-locking writer를 유지한다. `LockingRedisCacheWriter`의 잠금은 엔트리 키가 아니라 캐시 이름 단위이므로, 서로 다른 시즌·리그의 리그 선수 순위도 같은 `leaguePlayerRankings` 캐시 안에서는 순차 처리될 수 있다. 팀 선수 순위와 리그 팀 순위는 각각 별도의 캐시 이름을 사용한다.
+
+이 방식에는 키별 잠금 구현의 10초 대기 상한·60초 TTL·동시 2건 fallback이 적용되지 않는다. 비교 실험에서는 세 순위 서비스의 `Ranking aggregation started.` 로그로 캐시 미스 후 집계 메서드 진입 횟수를 센다. 기존 혼합 100→250 VU 실험과 같은 `ranking-cache-ramp.js`를 실행하며, k6 요청 타임아웃은 기본 10초다.
+
 ## Oracle 100→250 VU 혼합 조회 비교 브랜치
 
 `codex/ranking-cache-mixed-ramp-baseline`은 비교용 임시 브랜치다. 첫 실험 커밋 `594c268`은 순위 캐시의 기본값을 비잠금형으로 설정했고, 다음 커밋부터는 기본값을 키별 잠금형으로 되돌렸다. 두 커밋 모두 세 순위 서비스가 캐시 미스 후 집계 메서드를 실행할 때 `Ranking aggregation started.` 로그를 남긴다. 로컬 프로필 제한은 이 브랜치에서 제거했으므로 `ranking.cache.baseline-nonlocking=true`를 운영 프로필에 지정하면 비잠금형으로 전환할 수 있다.
