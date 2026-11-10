@@ -1,5 +1,6 @@
 package com.son.soccerStreaming.apifootball.service;
 
+import com.son.soccerStreaming.global.config.RankingCacheInvalidationService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
@@ -34,6 +35,7 @@ public class FixtureDetailGenerationPublisher {
     private final FixtureDetailGenerationStore generationStore;
     private final FixtureDetailGenerationAggregationService aggregationService;
     private final FixtureDetailFixtureFieldStore fixtureFieldStore;
+    private final RankingCacheInvalidationService rankingCacheInvalidationService;
 
     @Transactional(isolation = Isolation.READ_COMMITTED)
     public void publish(int season, long generationId) {
@@ -112,6 +114,7 @@ public class FixtureDetailGenerationPublisher {
                   projected_fixture_revision = fixture_revision
                 WHERE season = ?
                 """, season);
+        rankingCacheInvalidationService.invalidateAfterCommit(season);
     }
 
     @Transactional(isolation = Isolation.READ_COMMITTED)
@@ -165,6 +168,7 @@ public class FixtureDetailGenerationPublisher {
                   projected_player_stat_count = JSON_LENGTH(player_stat_changes)
                 WHERE season = ?
                 """, season);
+        rankingCacheInvalidationService.invalidateAfterCommit(season);
         return true;
     }
 

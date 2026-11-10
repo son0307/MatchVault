@@ -101,7 +101,8 @@ class FixtureDetailGenerationMigrationTest {
                 statement.executeUpdate("UPDATE fixture SET venue_name = 'Admin' WHERE fixture_id = 100");
                 var fields = new FixtureDetailFixtureFieldStore(jdbc);
                 var publisher = new FixtureDetailGenerationPublisher(jdbc, store,
-                        new FixtureDetailGenerationAggregationService(jdbc), fields);
+                        new FixtureDetailGenerationAggregationService(jdbc), fields,
+                        mock(com.son.soccerStreaming.global.config.RankingCacheInvalidationService.class));
                 new TransactionTemplate(new DataSourceTransactionManager(dataSource))
                         .executeWithoutResult(status -> publisher.publish(2025, generationId));
                 try (ResultSet merged = statement.executeQuery("SELECT home_score, venue_name, venue_city "
@@ -346,7 +347,8 @@ class FixtureDetailGenerationMigrationTest {
                     new FixtureDetailGenerationAggregationService(new JdbcTemplate(dataSource));
             FixtureDetailGenerationPublisher publisher =
                     new FixtureDetailGenerationPublisher(new JdbcTemplate(dataSource), store, aggregation,
-                            new FixtureDetailFixtureFieldStore(new JdbcTemplate(dataSource)));
+                            new FixtureDetailFixtureFieldStore(new JdbcTemplate(dataSource)),
+                            mock(com.son.soccerStreaming.global.config.RankingCacheInvalidationService.class));
             new TransactionTemplate(new DataSourceTransactionManager(dataSource))
                     .executeWithoutResult(status -> publisher.publish(
                             2025, mergedGeneration, "scheduled-fixture-2025", 1));

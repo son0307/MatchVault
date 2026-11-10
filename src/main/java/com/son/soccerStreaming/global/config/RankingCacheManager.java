@@ -26,6 +26,7 @@ public class RankingCacheManager implements CacheManager {
 
     private static final String LOCK_PREFIX = "match-vault:ranking-cache:lock:";
     private static final String EPOCH_PREFIX = "match-vault:ranking-cache:epoch:";
+    private static final String SEASON_EPOCH_PREFIX = "match-vault:ranking-cache:season-epoch:";
     private static final long POLL_MILLIS = 50;
     private static final DefaultRedisScript<Long> RELEASE_SCRIPT = new DefaultRedisScript<>(
             "if redis.call('GET', KEYS[1]) == ARGV[1] then "
@@ -61,6 +62,13 @@ public class RankingCacheManager implements CacheManager {
     @Override
     public Collection<String> getCacheNames() {
         return delegate.getCacheNames();
+    }
+
+    public void invalidatePlayerRankingsForSeason(int season) {
+        redis.opsForValue().increment(SEASON_EPOCH_PREFIX
+                + RedisCacheConfig.LEAGUE_PLAYER_RANKINGS_CACHE + ":" + season);
+        redis.opsForValue().increment(SEASON_EPOCH_PREFIX
+                + RedisCacheConfig.TEAM_PLAYER_RANKINGS_CACHE + ":" + season);
     }
 
     private class RankingCache implements Cache {
@@ -231,7 +239,23 @@ public class RankingCacheManager implements CacheManager {
 
         private String versionedKey(Object key) {
             String epoch = redis.opsForValue().get(EPOCH_PREFIX + getName());
-            return (epoch == null ? "0" : epoch) + ":" + key;
+            String seasonEpoch = "0";
+            String keyText = key.toString();
+            int seasonStart = keyText.lastIndexOf(":season:");
+            if (seasonStart >= 0) {
+                String season = keyText.substring(seasonStart + ":season:".length());
+                int suffix = season.indexOf(':');
+                if (suffix >= 0) {
+                    season = season.substring(0, suffix);
+                }
+                if (!season.isEmpty() && season.chars().allMatch(Character::isDigit)) {
+                    String current = redis.opsForValue().get(
+                            SEASON_EPOCH_PREFIX + getName() + ":" + season);
+                    seasonEpoch = current == null ? "0" : current;
+                }
+            }
+            return (epoch == null ? "0" : epoch) + ":"
+                    + (seasonStart >= 0 ? seasonEpoch + ":" : "") + key;
         }
 
         @Override

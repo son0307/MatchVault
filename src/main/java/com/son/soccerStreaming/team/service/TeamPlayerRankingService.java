@@ -3,13 +3,11 @@ package com.son.soccerStreaming.team.service;
 import com.son.soccerStreaming.apifootball.service.FixtureDetailGenerationRankingReadStore;
 import com.son.soccerStreaming.apifootball.service.FixtureDetailGenerationResolver;
 import com.son.soccerStreaming.fixture.repository.PlayerFixtureStatRepository;
-import com.son.soccerStreaming.global.config.RedisCacheConfig;
 import com.son.soccerStreaming.media.service.MediaUrlService;
 import com.son.soccerStreaming.player.entity.PlayerTeamSeasonStat;
 import com.son.soccerStreaming.player.repository.PlayerTeamSeasonStatRepository;
 import com.son.soccerStreaming.team.dto.TeamResponseDto;
 import lombok.RequiredArgsConstructor;
-import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -29,12 +27,6 @@ public class TeamPlayerRankingService {
     private final FixtureDetailGenerationResolver generationResolver;
     private final FixtureDetailGenerationRankingReadStore generationRankingReadStore;
 
-    @Cacheable(
-            cacheManager = RedisCacheConfig.RANKINGS_CACHE_MANAGER,
-            cacheNames = RedisCacheConfig.TEAM_PLAYER_RANKINGS_CACHE,
-            key = "'v3:team:' + #teamId + ':season:' + #season + ':generation:' + @fixtureDetailGenerationResolver.activeForSeason(#season) + ':live:' + (@fixtureDetailGenerationResolver.enabled() ? @fixtureDetailGenerationStore.activeLiveRevision(#season) : 0)",
-            sync = true
-    )
     public TeamResponseDto.PlayerRankings getPlayerRankings(Long teamId, Integer season) {
         Long generationId = generationResolver.enabled() ? generationResolver.activeForSeason(season) : null;
         List<PlayerTeamSeasonStat> candidates = generationId == null

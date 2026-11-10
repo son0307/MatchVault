@@ -2,7 +2,7 @@ package com.son.soccerStreaming.league.controller;
 
 import com.son.soccerStreaming.league.dto.LeaguePlayerRankingResponseDto;
 import com.son.soccerStreaming.league.dto.LeagueTeamRankingResponseDto;
-import com.son.soccerStreaming.league.service.LeaguePlayerRankingService;
+import com.son.soccerStreaming.global.config.PlayerRankingCacheService;
 import com.son.soccerStreaming.league.service.LeagueSeasonCoverageService;
 import com.son.soccerStreaming.league.service.LeagueTeamRankingService;
 import org.junit.jupiter.api.BeforeEach;
@@ -21,14 +21,14 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 class LeagueControllerTest {
 
-    private LeaguePlayerRankingService rankingService;
+    private PlayerRankingCacheService rankingService;
     private LeagueTeamRankingService teamRankingService;
     private MockMvc mockMvc;
 
     @BeforeEach
     void setUp() {
         LeagueSeasonCoverageService seasonCoverageService = mock(LeagueSeasonCoverageService.class);
-        rankingService = mock(LeaguePlayerRankingService.class);
+        rankingService = mock(PlayerRankingCacheService.class);
         teamRankingService = mock(LeagueTeamRankingService.class);
         mockMvc = MockMvcBuilders
                 .standaloneSetup(new LeagueController(seasonCoverageService, rankingService, teamRankingService))
@@ -85,7 +85,7 @@ class LeagueControllerTest {
                 .cleanSheets(List.of())
                 .savePercentages(List.of())
                 .build();
-        when(rankingService.getRankings(39, 2025)).thenReturn(response);
+        when(rankingService.getLeagueRankings(39, 2025)).thenReturn(response);
 
         mockMvc.perform(get("/api/v1/leagues/39/player-rankings").param("season", "2025"))
                 .andExpect(status().isOk())
@@ -93,7 +93,7 @@ class LeagueControllerTest {
                 .andExpect(jsonPath("$.goals[0].playerName").value("Player"))
                 .andExpect(jsonPath("$.goals[0].goals").value(10));
 
-        verify(rankingService).getRankings(39, 2025);
+        verify(rankingService).getLeagueRankings(39, 2025);
     }
 
     @Test

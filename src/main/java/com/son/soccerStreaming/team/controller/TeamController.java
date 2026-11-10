@@ -1,6 +1,7 @@
 package com.son.soccerStreaming.team.controller;
 
 import com.son.soccerStreaming.player.dto.PlayerResponseDto;
+import com.son.soccerStreaming.global.config.PlayerRankingCacheService;
 import com.son.soccerStreaming.team.dto.TeamResponseDto;
 import com.son.soccerStreaming.team.dto.TeamStandingResponseDto;
 import com.son.soccerStreaming.team.service.TeamService;
@@ -25,6 +26,7 @@ public class TeamController {
 
     private final TeamService teamService;
     private final TeamStandingService teamStandingService;
+    private final PlayerRankingCacheService playerRankingCacheService;
 
     @Operation(summary = "팀 목록 조회", description = "저장된 팀의 기본 정보를 조회합니다.")
     @GetMapping
@@ -69,6 +71,6 @@ public class TeamController {
             @Parameter(description = "조회할 시즌", example = "2025")
             @RequestParam(defaultValue = "2025") Integer season
     ) {
-        return teamService.getPlayerRankings(teamId, season);
+        return playerRankingCacheService.getTeamRankings(teamId, season);
     }
 }

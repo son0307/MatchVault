@@ -3,7 +3,7 @@ package com.son.soccerStreaming.league.controller;
 import com.son.soccerStreaming.league.dto.LeagueSeasonCoverageResponseDto;
 import com.son.soccerStreaming.league.dto.LeaguePlayerRankingResponseDto;
 import com.son.soccerStreaming.league.dto.LeagueTeamRankingResponseDto;
-import com.son.soccerStreaming.league.service.LeaguePlayerRankingService;
+import com.son.soccerStreaming.global.config.PlayerRankingCacheService;
 import com.son.soccerStreaming.league.service.LeagueSeasonCoverageService;
 import com.son.soccerStreaming.league.service.LeagueTeamRankingService;
 import lombok.RequiredArgsConstructor;
@@ -24,7 +24,7 @@ public class LeagueController {
     private static final int PREMIER_LEAGUE_ID = 39;
 
     private final LeagueSeasonCoverageService leagueSeasonCoverageService;
-    private final LeaguePlayerRankingService leaguePlayerRankingService;
+    private final PlayerRankingCacheService playerRankingCacheService;
     private final LeagueTeamRankingService leagueTeamRankingService;
 
     @GetMapping("/{leagueId}/seasons")
@@ -39,7 +39,7 @@ public class LeagueController {
             @RequestParam(defaultValue = "2025") Integer season
     ) {
         validateLeague(leagueId);
-        return ResponseEntity.ok(leaguePlayerRankingService.getRankings(leagueId, season));
+        return ResponseEntity.ok(playerRankingCacheService.getLeagueRankings(leagueId, season));
     }
 
     @GetMapping("/{leagueId}/team-rankings")

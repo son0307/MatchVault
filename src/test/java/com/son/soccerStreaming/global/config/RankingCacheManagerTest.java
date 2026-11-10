@@ -47,6 +47,27 @@ class RankingCacheManagerTest {
     }
 
     @Test
+    void invalidatingOneSeasonChangesOnlyThatSeasonsCacheKey() {
+        when(delegate.getCache(RedisCacheConfig.LEAGUE_PLAYER_RANKINGS_CACHE)).thenReturn(backingCache);
+        when(backingCache.getName()).thenReturn(RedisCacheConfig.LEAGUE_PLAYER_RANKINGS_CACHE);
+        when(redis.opsForValue()).thenReturn(values);
+        String versionKey = "match-vault:ranking-cache:season-epoch:leaguePlayerRankings:2026";
+        when(values.get(versionKey)).thenReturn(null, "1");
+        RankingCacheManager manager = new RankingCacheManager(delegate, redis, metrics,
+                Duration.ofSeconds(60), Duration.ofSeconds(10), 2);
+        Cache cache = manager.getCache(RedisCacheConfig.LEAGUE_PLAYER_RANKINGS_CACHE);
+
+        cache.get("v8:league:39:season:2026");
+        manager.invalidatePlayerRankingsForSeason(2026);
+        cache.get("v8:league:39:season:2026");
+        cache.get("v8:league:39:season:2025");
+
+        verify(backingCache).get("0:0:v8:league:39:season:2026");
+        verify(backingCache).get("0:1:v8:league:39:season:2026");
+        verify(backingCache).get("0:0:v8:league:39:season:2025");
+    }
+
+    @Test
     void ownerWritesComputedValueWithExpiringLock() {
         Cache cache = rankingCache(Duration.ofMillis(250), 2);
         AtomicReference<String> owner = new AtomicReference<>();
