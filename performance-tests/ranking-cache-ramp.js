@@ -6,6 +6,7 @@ const baseUrl = (__ENV.BASE_URL || '').replace(/\/+$/, '');
 const leagueId = positiveInteger(__ENV.LEAGUE_ID || '39', 'LEAGUE_ID');
 const seasons = (__ENV.SEASONS || '2024,2025,2026').split(',')
   .map((value) => positiveInteger(value.trim(), 'SEASONS'));
+const target = (__ENV.TARGET || 'mixed').toLowerCase();
 const teamsPerSeason = positiveInteger(__ENV.TEAMS_PER_SEASON || '4', 'TEAMS_PER_SEASON');
 const requestTimeout = __ENV.REQUEST_TIMEOUT || '10s';
 const sleepSeconds = Number(__ENV.SLEEP_SECONDS || '0.1');
@@ -21,9 +22,12 @@ const cycleSeconds = baselineSeconds + rampSeconds * 2 + peakSeconds;
 if (!baseUrl || !/^https?:\/\//.test(baseUrl)) {
   throw new Error('BASE_URL must be an explicit http(s) URL.');
 }
-if (new Set(seasons).size !== seasons.length || seasons.length < 2 || teamsPerSeason < 2 ||
+if (!['mixed', 'league-player'].includes(target)) {
+  throw new Error('TARGET must be mixed or league-player.');
+}
+if (new Set(seasons).size !== seasons.length || teamsPerSeason < 2 ||
     !Number.isFinite(sleepSeconds) || sleepSeconds < 0) {
-  throw new Error('Use at least two distinct seasons, two teams per season, and nonnegative SLEEP_SECONDS.');
+  throw new Error('Use distinct seasons, at least two teams per season, and nonnegative SLEEP_SECONDS.');
 }
 
 const stages = [];
@@ -38,7 +42,7 @@ for (let i = 0; i < peaks; i += 1) {
 
 export const options = {
   scenarios: {
-    ranking_mixed_stampede: {
+    ranking_stampede: {
       executor: 'ramping-vus',
       startVUs: baselineVus,
       stages,
@@ -63,6 +67,9 @@ export function setup() {
       fail(`Season ${season} is absent from league ${leagueId} coverage.`);
     }
     cases.push({ endpoint: 'league-player', season, teamId: null });
+    if (target === 'league-player') {
+      continue;
+    }
     cases.push({ endpoint: 'league-team', season, teamId: null });
 
     const standings = http.get(`${baseUrl}/api/v1/teams/standings?season=${season}`, {

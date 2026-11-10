@@ -10,6 +10,18 @@
 k6 run -e BASE_URL=https://matchvault.site -e SEASONS=2024,2025,2026 -e TEAMS_PER_SEASON=4 performance-tests/ranking-cache-ramp.js
 ```
 
+2026 시즌만 조회하려면 `SEASONS=2026`으로 실행한다. 이때 조회 키는 리그 선수 순위 1개, 리그 팀 순위 1개, 2026 시즌 상위 4팀 선수 순위 4개로 총 6개다. VU 단계와 나머지 조건은 동일하다.
+
+```powershell
+k6 run -e BASE_URL=https://matchvault.site -e SEASONS=2026 -e TEAMS_PER_SEASON=4 performance-tests/ranking-cache-ramp.js
+```
+
+2026 시즌 **리그 선수 순위 한 키만** 반복 조회하려면 `TARGET=league-player`를 추가한다. 이 모드의 준비 단계는 시즌 존재 여부만 확인하고 팀 순위 API를 호출하지 않는다.
+
+```powershell
+k6 run -e BASE_URL=https://matchvault.site -e SEASONS=2026 -e TARGET=league-player performance-tests/ranking-cache-ramp.js
+```
+
 두 모드에서 출력된 조회 키 목록이 같아야 한다. 전체 및 `phase=peak`의 HTTP 실패·p95/p99·처리량과, 각 실험 시간 범위의 `Ranking aggregation started.` 로그 건수를 함께 기록한다. 이 로그는 SQL 문 실행 횟수가 아니라 캐시 미스 후 서비스 집계 메서드 진입 횟수다. 첫 요청 후 캐시가 채워질 수 있으므로 세 피크를 모두 cold-cache 결과로 해석하지 않는다. 이전 단일 키 100→250 VU 테스트와도 직접적인 처리량 비교를 하지 않는다.
 
 2026-11-02 로컬 50 VU 실행 결과는 [결과 기록](results-2026-11-02.md)에 정리했다.
