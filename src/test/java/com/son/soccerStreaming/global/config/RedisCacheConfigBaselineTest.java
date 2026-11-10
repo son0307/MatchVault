@@ -6,12 +6,10 @@ import org.springframework.cache.CacheManager;
 import org.springframework.data.redis.cache.RedisCacheManager;
 import org.springframework.data.redis.connection.RedisConnectionFactory;
 import org.springframework.data.redis.core.StringRedisTemplate;
-import org.springframework.mock.env.MockEnvironment;
 
 import java.time.Duration;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
 
 class RedisCacheConfigBaselineTest {
@@ -23,11 +21,9 @@ class RedisCacheConfigBaselineTest {
     private final SimpleMeterRegistry metrics = new SimpleMeterRegistry();
 
     @Test
-    void localBaselineUsesTheActualDefaultNonLockingManager() {
-        MockEnvironment environment = new MockEnvironment();
-        environment.setActiveProfiles("local");
+    void baselineUsesTheActualDefaultNonLockingManager() {
         CacheManager selected = config.rankingsCacheManager(connectionFactory, defaultManager, redis,
-                metrics, environment, true, Duration.ofSeconds(60), Duration.ofSeconds(10), 2);
+                metrics, true, Duration.ofSeconds(60), Duration.ofSeconds(10), 2);
 
         assertThat(selected).isSameAs(defaultManager);
     }
@@ -35,18 +31,9 @@ class RedisCacheConfigBaselineTest {
     @Test
     void normalModeKeepsPerKeyLocking() {
         CacheManager selected = config.rankingsCacheManager(connectionFactory, defaultManager, redis,
-                metrics, new MockEnvironment(), false, Duration.ofSeconds(60), Duration.ofSeconds(10), 2);
+                metrics, false, Duration.ofSeconds(60), Duration.ofSeconds(10), 2);
 
         assertThat(selected).isInstanceOf(RankingCacheManager.class);
     }
 
-    @Test
-    void baselineCannotBeEnabledOutsideLocalProfile() {
-        MockEnvironment environment = new MockEnvironment();
-        environment.setActiveProfiles("prod");
-        assertThatThrownBy(() -> config.rankingsCacheManager(connectionFactory, defaultManager, redis,
-                metrics, environment, true,
-                Duration.ofSeconds(60), Duration.ofSeconds(10), 2))
-                .isInstanceOf(IllegalStateException.class);
-    }
 }

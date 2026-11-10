@@ -10,8 +10,6 @@ import org.springframework.cache.interceptor.CacheErrorHandler;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Primary;
-import org.springframework.core.env.Environment;
-import org.springframework.core.env.Profiles;
 import org.springframework.data.redis.cache.RedisCacheConfiguration;
 import org.springframework.data.redis.cache.RedisCacheManager;
 import org.springframework.data.redis.cache.RedisCacheWriter;
@@ -57,15 +55,11 @@ public class RedisCacheConfig implements CachingConfigurer {
                                             @Qualifier("cacheManager") RedisCacheManager defaultManager,
                                             StringRedisTemplate redis,
                                             MeterRegistry meterRegistry,
-                                            Environment environment,
-                                            @Value("${ranking.cache.baseline-nonlocking:false}") boolean baselineNonLocking,
+                                            @Value("${ranking.cache.baseline-nonlocking:true}") boolean baselineNonLocking,
                                             @Value("${ranking.cache.lock-ttl:60s}") Duration lockTtl,
                                             @Value("${ranking.cache.max-wait:10s}") Duration maxWait,
                                             @Value("${ranking.cache.fallback-permits:2}") int fallbackPermits) {
         if (baselineNonLocking) {
-            if (!environment.acceptsProfiles(Profiles.of("local"))) {
-                throw new IllegalStateException("Non-locking ranking baseline is only available in the local profile");
-            }
             return defaultManager;
         }
         RedisCacheWriter cacheWriter = RedisCacheWriter.nonLockingRedisCacheWriter(connectionFactory);

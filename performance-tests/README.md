@@ -1,5 +1,17 @@
 # 순위 캐시 부하 테스트
 
+## Oracle 100→250 VU 혼합 조회 비교 브랜치
+
+`codex/ranking-cache-mixed-ramp-baseline`은 비교를 위해 순위 캐시의 기본값을 비잠금형으로 설정한 임시 브랜치다. 배포 후 `ranking.cache.baseline-nonlocking`을 별도로 지정하지 않으면 기본 `cacheManager`를 사용한다. 잠금형으로 되돌릴 때는 이 값을 `false`로 지정하거나 키별 잠금 배포 커밋을 다시 배포한다. 이 브랜치의 세 순위 서비스는 캐시 미스 후 집계 메서드가 실행될 때 `Ranking aggregation started.` 로그를 남긴다.
+
+`ranking-cache-ramp.js`는 기존 단일 키 `stampede` 모드와 동일한 100 VU 20초 → 1초 증가 → 250 VU 10초 → 1초 감소 패턴을 3회 반복한다. 기본 조회 대상은 리그 39의 2024·2025·2026 시즌이며, 시즌마다 리그 선수 순위·리그 팀 순위·상위 4개 팀의 선수 순위를 순환한다. 준비 단계는 순위 API를 호출하지 않으며, 선택된 팀 ID를 시작 시 출력한다.
+
+```powershell
+k6 run -e BASE_URL=https://matchvault.site -e SEASONS=2024,2025,2026 -e TEAMS_PER_SEASON=4 performance-tests/ranking-cache-ramp.js
+```
+
+두 모드에서 출력된 조회 키 목록이 같아야 한다. 전체 및 `phase=peak`의 HTTP 실패·p95/p99·처리량과, 각 실험 시간 범위의 `Ranking aggregation started.` 로그 건수를 함께 기록한다. 이 로그는 SQL 문 실행 횟수가 아니라 캐시 미스 후 서비스 집계 메서드 진입 횟수다. 첫 요청 후 캐시가 채워질 수 있으므로 세 피크를 모두 cold-cache 결과로 해석하지 않는다. 이전 단일 키 100→250 VU 테스트와도 직접적인 처리량 비교를 하지 않는다.
+
 2026-11-02 로컬 50 VU 실행 결과는 [결과 기록](results-2026-11-02.md)에 정리했다.
 
 `ranking-cache.js`는 1 VU당 1회 요청하는 버스트를 만든다. 기본값은 50 VU, 시즌 `2025,2024,2026`, 로컬 `http://127.0.0.1:8080`이다. `ranking_request_duration`과 `ranking_request_failed`는 준비 단계의 시즌 목록·팀 순위 조회를 제외하고 실제 순위 요청만 집계한다.
