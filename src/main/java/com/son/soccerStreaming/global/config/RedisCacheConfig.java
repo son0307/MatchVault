@@ -59,7 +59,7 @@ public class RedisCacheConfig implements CachingConfigurer {
                                             MeterRegistry meterRegistry,
                                             Environment environment,
                                             @Value("${ranking.cache.baseline-nonlocking:false}") boolean baselineNonLocking,
-                                            @Value("${ranking.cache.comparison-mode:name-locking}") String comparisonMode,
+                                            @Value("${ranking.cache.comparison-mode:non-locking}") String comparisonMode,
                                             @Value("${ranking.cache.lock-ttl:60s}") Duration lockTtl,
                                             @Value("${ranking.cache.max-wait:10s}") Duration maxWait,
                                             @Value("${ranking.cache.fallback-permits:2}") int fallbackPermits) {

@@ -8,6 +8,7 @@ import com.son.soccerStreaming.player.entity.PlayerTeamSeasonStat;
 import com.son.soccerStreaming.player.repository.PlayerTeamSeasonStatRepository;
 import com.son.soccerStreaming.team.dto.TeamResponseDto;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -19,6 +20,7 @@ import java.util.stream.Collectors;
 @Service
 @Transactional(readOnly = true)
 @RequiredArgsConstructor
+@Slf4j
 public class TeamPlayerRankingService {
 
     private final PlayerTeamSeasonStatRepository playerTeamSeasonStatRepository;
@@ -28,6 +30,7 @@ public class TeamPlayerRankingService {
     private final FixtureDetailGenerationRankingReadStore generationRankingReadStore;
 
     public TeamResponseDto.PlayerRankings getPlayerRankings(Long teamId, Integer season) {
+        log.info("Ranking aggregation started. endpoint=team-player teamId={} season={}", teamId, season);
         Long generationId = generationResolver.enabled() ? generationResolver.activeForSeason(season) : null;
         List<PlayerTeamSeasonStat> candidates = generationId == null
                 ? playerTeamSeasonStatRepository.findAllByTeamAndSeason(teamId, season)

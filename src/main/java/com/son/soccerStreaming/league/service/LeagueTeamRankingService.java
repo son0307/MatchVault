@@ -7,6 +7,7 @@ import com.son.soccerStreaming.media.service.MediaUrlService;
 import com.son.soccerStreaming.team.entity.TeamStanding;
 import com.son.soccerStreaming.team.repository.TeamStandingRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -21,6 +22,7 @@ import java.util.stream.Collectors;
 @Service
 @Transactional(readOnly = true)
 @RequiredArgsConstructor
+@Slf4j
 public class LeagueTeamRankingService {
 
     private final TeamStandingRepository teamStandingRepository;
@@ -34,6 +36,7 @@ public class LeagueTeamRankingService {
             sync = true
     )
     public LeagueTeamRankingResponseDto getRankings(Integer leagueId, Integer season) {
+        log.info("Ranking aggregation started. endpoint=league-team leagueId={} season={}", leagueId, season);
         List<TeamStanding> standings = teamStandingRepository.findAllByLeagueIdAndSeason(leagueId, season);
         if (standings.isEmpty()) {
             return emptyResponse(leagueId, season);
